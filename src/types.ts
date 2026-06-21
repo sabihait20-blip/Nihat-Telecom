@@ -1,0 +1,63 @@
+export type Operator = 'GP' | 'Robi' | 'Airtel' | 'Teletalk' | 'Banglalink';
+
+export interface OperatorDetails {
+  id: Operator;
+  name: string;
+  nameBn: string;
+  color: string;
+  textColor: string;
+  gradient: string;
+  prefixes: string[];
+}
+
+export type ConnectionType = 'Prepaid' | 'Postpaid' | 'Skitto';
+
+export interface RechargePackage {
+  id: string;
+  title: string;
+  titleBn: string;
+  operator: Operator;
+  price: number;
+  validity: string;
+  validityBn: string;
+  category: 'internet' | 'talktime' | 'bundle';
+  volume: string;
+  volumeBn: string;
+  description: string;
+  descriptionBn: string;
+  isPopular?: boolean;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'Recharge' | 'Bill' | 'CashIn';
+  operator?: Operator;
+  targetNumber?: string;
+  amount: number;
+  billerName?: string;
+  billerNameBn?: string;
+  date: string;
+  txId: string;
+  status: 'Success' | 'Pending' | 'Failed';
+}
+
+export interface FavoriteContact {
+  id: string;
+  name: string;
+  number: string;
+  operator: Operator;
+  color: string; // Tailwind bg color class
+}
+
+export interface BillProvider {
+  id: string;
+  name: string;
+  nameBn: string;
+  category: 'Electricity' | 'Water' | 'Gas' | 'Internet' | 'Education';
+  categoryBn: string;
+  logoColor: string;
+}
+
+export type AppTab = 'home' | 'packages' | 'history' | 'profile';
+
+export type Language = 'bn' | 'en';

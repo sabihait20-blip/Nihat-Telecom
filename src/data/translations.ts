@@ -1,0 +1,222 @@
+export const TRANSLATIONS = {
+  bn: {
+    appName: 'ফ্লেক্সিলোড প্রো',
+    subTitle: 'স্মার্ট ও নিরাপদ ফ্লেক্সিলোড অ্যাপ',
+    home: 'হোম',
+    packages: 'প্যাকেজ',
+    history: 'ইতিহাস',
+    profile: 'প্রোফাইল',
+    
+    // Header
+    currBalance: 'বর্তমান ব্যালেন্স',
+    tapToSee: 'ব্যালেন্স দেখতে ট্যাপ করুন',
+    helloUser: 'স্বাগতম, সাব্বির আহমেদ!',
+    loyaltyPoints: '৪২০ পয়েন্ট',
+    
+    // Services
+    mobileRecharge: 'মোবাইল রিচার্জ',
+    internetPackage: 'ইন্টারনেট প্যাক',
+    billPayment: 'বিল পেমেন্ট',
+    balanceCheck: 'ব্যালেন্স চেক',
+    transactionHistory: 'লেনদেন ইতিহাস',
+    favoriteOperator: 'প্রিয় অপারেটর',
+    
+    // Banners & Promos
+    promos: 'বিশেষ ধামাকা অফার',
+    cashbackTitle: '১০% ইনস্ট্যান্ট ক্যাশব্যাক!',
+    cashbackDesc: 'যেকোনো Teletalk রিচার্জে ১০% তাৎক্ষণিক ক্যাশব্যাক বোনাস।',
+    internetOffer: 'সুপার ইন্টারনেট ডিল',
+    internetOfferDesc: 'Robi ৫ জিবি প্যাক মাত্র ৪৯ টাকায় ৭ দিন মেয়াদ!',
+    
+    // Recharge Modal Steps
+    enterNumber: 'মোবাইল নম্বর লিখুন',
+    invalidNumber: 'নম্বরটি সঠিক নয়, ১১ সংখ্যা হতে হবে',
+    phonePlaceholder: 'উদা: ০১৭xxxxxxxx',
+    selectOperator: 'অপারেটর সিলেক্ট করুন',
+    selectConnection: 'সংযোগের ধরন',
+    enterAmount: 'টাকার পরিমাণ',
+    popularAmounts: 'জনপ্রিয় রিচার্জ',
+    next: 'পরবর্তী',
+    back: 'পূর্ববর্তী',
+    confirmDetails: 'তথ্য নিশ্চিত করুন',
+    rechargeTarget: 'রিচার্জ নম্বর',
+    connectionType: 'মিডিয়াম',
+    rechargeAmount: 'রিচার্জের পরিমাণ',
+    enterPin: '৪-ডিজিটের পিন দিন',
+    pinPlaceholder: '••••',
+    invalidPin: 'পিন নম্বরটি ৪ ডিজিটের হতে হবে',
+    demoPinWarning: 'টেস্ট পিন: ১২৩৪',
+    holdToConfirm: 'রিচার্জ করতে ট্যাপ করে ধরে রাখুন',
+    recharging: 'রিচার্জ হচ্ছে...',
+    successTitle: 'রিচার্জ সফল হয়েছে!',
+    successDesc: 'আপনার ফ্লেক্সিলোড অনুরোধ সফলভাবে সম্পন্ন হয়েছে।',
+    billSuccessDesc: 'আপনার ইউটিলিটি বিল সফলভাবে পরিশোধ করা হয়েছে।',
+    newBalance: 'নতুন ব্যালেন্স',
+    txId: 'লেনদেন আইডি (TxID)',
+    date: 'তারিখ ও সময়',
+    downloadReceipt: 'রসিদ ডাউনলোড',
+    close: 'বন্ধ করুন',
+    
+    // Internet & Bundle Section
+    buyPackage: 'প্যাকেজ কিনুন',
+    availableOffers: 'সাশ্রয়ী ইন্টারনেট ও ভয়েস অফার',
+    allOperators: 'সব অপারেটর',
+    searchPack: 'প্যাকেজ খুঁজুন...',
+    days: 'দিন',
+    popularBadge: 'সেরা অফার',
+    insufficientFunds: 'পর্যাপ্ত ব্যালেন্স নেই',
+    
+    // Bill Pay Section
+    selectBiller: 'ইউটিলিটি সেবাদাতা নির্বাচন করুন',
+    enterCustId: 'গ্রাহক অ্যাকাউন্ট নম্বর (Customer ID)',
+    custNoPlaceholder: 'উদা: ১০৪২৮৮৯২০০',
+    invalidCustId: 'অনুগ্রহ করে গ্রাহক আইডি সঠিকভাবে লিখুন',
+    billAmount: 'বিলের বকেয়া পরিমাণ',
+    billPayConfirm: 'বিল পরিশোধ করুন',
+    payBill: 'বিল পে',
+    
+    // History Section
+    txList: 'সাম্প্রতিক লেনদেন সমূহ',
+    all: 'সব',
+    filterRecharge: 'রিচার্জ',
+    filterBill: 'বিল পে',
+    filterCashin: 'ক্যাশ ইন',
+    noTransactions: 'কোনো লেনদেন পাওয়া যায়নি',
+    
+    // Favorites Grid
+    favOperatorsTitle: 'ঝটপট রিচার্জের জন্য প্রিয় নম্বর সমূহ',
+    addFav: 'প্রিয় তালিকায় যোগ করুন',
+    
+    // Profile Section
+    accountConfig: 'অ্যাকাউন্ট সেটিংস',
+    userStatus: 'ফিনটেক গোল্ড মেম্বার',
+    joinedDate: 'আজাদ হয়েছেন: জানুয়ারি ২০২৬',
+    support: 'গ্রাহক সেবা লাইন',
+    supportDesc: '২৪/৭ যেকোনো প্রয়োজনে কল করুন ১৬২৪৭ নম্বরে',
+    notifications: 'বার্তা ও নোটিফিকেশন',
+    themeMode: 'ডার্ক মোড',
+    changeLang: 'English-এ পরিবর্তন',
+    logout: 'লগআউট',
+    appVersion: 'ভার্সন ৪.১.২ (ফিনটেক গ্রেড)',
+    secureTitle: 'নিরাপদ অ্যাকাউন্ট লক',
+    pinRequired: 'আপনার ৪-ডিজিটের সেভিং পিন নম্বর দিন',
+    biometricTitle: 'বায়োমেট্রিক লগইন',
+    faceTouchId: 'ফেস আইডি / ফিঙ্গারপ্রিন্ট সেন্সর',
+    biometricDesc: 'বায়োমেট্রিক স্পর্শ দিয়ে তাৎক্ষণিক অ্যাক্সেস করুন',
+    wrongPin: 'ভুল পিন! দয়া করে সঠিক পিন দিন (ডেমো পিন: ১২৩৪)',
+    biometricError: 'বায়োমেট্রিক যাচাইকরণ ব্যর্থ হয়েছে, আপনার পিন ব্যবহার করুন।',
+    unlockBtn: 'ওয়ালেট আনলক করুন',
+    registerBiometric: 'বায়োমেট্রিক রেজিস্ট্রেশন করুন',
+    biometricRegistered: 'বায়োমেট্রিক সফলভাবে রেজিস্টার করা হয়েছে'
+  },
+  en: {
+    appName: 'Flexiload Pro',
+    subTitle: 'Smart & Secure Flexiload Solutions',
+    home: 'Home',
+    packages: 'Packages',
+    history: 'History',
+    profile: 'Profile',
+    
+    // Header
+    currBalance: 'Current Balance',
+    tapToSee: 'Tap to see Balance',
+    helloUser: 'Welcome, Sabbir Ahmed!',
+    loyaltyPoints: '420 Points',
+    
+    // Services
+    mobileRecharge: 'Mobile Recharge',
+    internetPackage: 'Internet Packs',
+    billPayment: 'Bill Pay',
+    balanceCheck: 'Balance Check',
+    transactionHistory: 'Transactions',
+    favoriteOperator: 'Favorite No.',
+    
+    // Banners & Promos
+    promos: 'Exclusive Promo Offers',
+    cashbackTitle: '10% Instant Cashback!',
+    cashbackDesc: 'Immediate 10% cashback on all Teletalk recharges.',
+    internetOffer: 'Super Internet Deal',
+    internetOfferDesc: 'Robi 5 GB Pack for only ৳49 with 7 days validity!',
+    
+    // Recharge Modal Steps
+    enterNumber: 'Enter Mobile Number',
+    invalidNumber: 'Invalid mobile number (Must be 11 digits)',
+    phonePlaceholder: 'e.g. 017xxxxxxxx',
+    selectOperator: 'Select Operator',
+    selectConnection: 'Select Connection Type',
+    enterAmount: 'Enter Amount',
+    popularAmounts: 'Popular Amounts',
+    next: 'Next',
+    back: 'Back',
+    confirmDetails: 'Confirm Transaction Details',
+    rechargeTarget: 'Recharge No',
+    connectionType: 'Medium',
+    rechargeAmount: 'Recharged Amount',
+    enterPin: 'Enter 4-Digit Pin',
+    pinPlaceholder: '••••',
+    invalidPin: 'PIN code must be 4 digits',
+    demoPinWarning: 'Demo PIN: 1234',
+    holdToConfirm: 'Tap & Hold down to Confirm',
+    recharging: 'Processing Recharge...',
+    successTitle: 'Recharge Successful!',
+    successDesc: 'Your flexiload request was completed successfully.',
+    billSuccessDesc: 'Your utility bill was paid successfully.',
+    newBalance: 'New Balance',
+    txId: 'Transaction ID (TxID)',
+    date: 'Date & Time',
+    downloadReceipt: 'Download Receipt',
+    close: 'Close',
+    
+    // Internet & Bundle Section
+    buyPackage: 'Buy Package',
+    availableOffers: 'Great Internet & Voice Offers',
+    allOperators: 'All Operators',
+    searchPack: 'Search packages...',
+    days: 'Days',
+    popularBadge: 'Popular',
+    insufficientFunds: 'Insufficient Funds',
+    
+    // Bill Pay Section
+    selectBiller: 'Select Utility Biller',
+    enterCustId: 'Customer Account ID',
+    custNoPlaceholder: 'e.g. 1042889200',
+    invalidCustId: 'Please enter a valid Customer Account ID',
+    billAmount: 'Bill Owed Amount',
+    billPayConfirm: 'Confirm Bill Payment',
+    payBill: 'Pay Bill',
+    
+    // History Section
+    txList: 'Recent Transactions Log',
+    all: 'All',
+    filterRecharge: 'Recharge',
+    filterBill: 'Bill Pay',
+    filterCashin: 'Cash In',
+    noTransactions: 'No transactions found',
+    
+    // Favorites Grid
+    favOperatorsTitle: 'Favorite Numbers for Fast Recharge',
+    addFav: 'Add to Favorites',
+    
+    // Profile Section
+    accountConfig: 'Account Control',
+    userStatus: 'Fintech Gold Member',
+    joinedDate: 'Joined: January 2026',
+    support: 'Customer Helpdesk',
+    supportDesc: 'Call 16247 for 24/7 priority customer helpline',
+    notifications: 'Inbox & Alerts',
+    themeMode: 'Dark Mode',
+    changeLang: 'পরিবর্তন করুন বাংলায়',
+    logout: 'Logout',
+    appVersion: 'Version 4.1.2 (Fintech-Grade)',
+    secureTitle: 'Secure Account Lock',
+    pinRequired: 'Enter your 4-digit secure PIN code',
+    biometricTitle: 'Biometric Login',
+    faceTouchId: 'Face ID / Fingerprint Sensor',
+    biometricDesc: 'Use your biometric sensor for instant secure access',
+    wrongPin: 'Incorrect PIN! Please enter the correct PIN (Demo: 1234)',
+    biometricError: 'Biometric verification failed, please use your secure pin.',
+    unlockBtn: 'Unlock Wallet',
+    registerBiometric: 'Register Biometrics',
+    biometricRegistered: 'Biometrics registered successfully'
+  }
+};

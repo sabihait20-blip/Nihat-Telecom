@@ -1,0 +1,86 @@
+{
+  "collections": {
+    "wallet": {
+      "balance": {
+        "type": "number",
+        "description": "User wallet balance"
+      }
+    },
+    "transactions": {
+      "id": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "operator": {
+        "type": "string",
+        "optional": true
+      },
+      "targetNumber": {
+        "type": "string",
+        "optional": true
+      },
+      "billerName": {
+        "type": "string",
+        "optional": true
+      },
+      "billerNameBn": {
+        "type": "string",
+        "optional": true
+      },
+      "date": {
+        "type": "string"
+      },
+      "txId": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "favorites": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "operator": {
+        "type": "string"
+      },
+      "color": {
+        "type": "string"
+      }
+    },
+    "notifications": {
+      "id": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "titleBn": {
+        "type": "string"
+      },
+      "desc": {
+        "type": "string"
+      },
+      "descBn": {
+        "type": "string"
+      },
+      "time": {
+        "type": "string"
+      },
+      "read": {
+        "type": "boolean"
+      }
+    }
+  }
+}
