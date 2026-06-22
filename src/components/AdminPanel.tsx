@@ -13,7 +13,8 @@ import { Language, Operator, RechargePackage, PromoBanner, Transaction } from '.
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
   'nurnobyr36@gmail.com',
-  'sabihait20@gmail.com'
+  'sabihait20@gmail.com',
+  'dhukabuzz420@gmail.com'
 ];
 
 interface AdminPanelProps {

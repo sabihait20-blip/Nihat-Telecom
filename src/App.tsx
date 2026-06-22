@@ -46,7 +46,8 @@ import AdminPanel from './components/AdminPanel';
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
   'nurnobyr36@gmail.com',
-  'sabihait20@gmail.com'
+  'sabihait20@gmail.com',
+  'dhukabuzz420@gmail.com'
 ];
 
 interface NotificationItem {
