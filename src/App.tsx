@@ -7,11 +7,12 @@ import {
 } from 'lucide-react';
 
 // Data types & assets
-import { AppTab, Language, Operator, Transaction, FavoriteContact, RechargePackage, PromoBanner } from './types';
+import { AppTab, Language, Operator, Transaction, FavoriteContact, RechargePackage, PromoBanner, BillProvider } from './types';
 import { TRANSLATIONS } from './data/translations';
 import {
   OPERATORS,
   POPULAR_PACKAGES,
+  BILL_PROVIDERS,
 } from './data/mockData';
 
 // Firestore helpers
@@ -88,6 +89,7 @@ export default function App() {
   // Dynamic admin-controlled custom data states
   const [dbOffers, setDbOffers] = useState<RechargePackage[]>([]);
   const [dbBanners, setDbBanners] = useState<PromoBanner[]>([]);
+  const [dbBillers, setDbBillers] = useState<BillProvider[]>([]);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
 
   // Modal triggers
@@ -196,6 +198,34 @@ export default function App() {
       }
     }, (error) => {
       console.error("Error loading banners in App: ", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore dynamic billers database snap observer
+  useEffect(() => {
+    const q = collection(db, 'billers');
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) {
+        try {
+          const batch = writeBatch(db);
+          BILL_PROVIDERS.forEach((biller) => {
+            const docRef = doc(db, 'billers', biller.id);
+            batch.set(docRef, biller);
+          });
+          await batch.commit();
+        } catch (err) {
+          console.error("Error seeding default billers to Firestore billers collection: ", err);
+        }
+      } else {
+        const list: BillProvider[] = [];
+        snapshot.forEach((snap) => {
+          list.push(snap.data() as BillProvider);
+        });
+        setDbBillers(list);
+      }
+    }, (error) => {
+      console.error("Error loading billers in App: ", error);
     });
     return () => unsubscribe();
   }, []);
@@ -928,6 +958,23 @@ export default function App() {
     );
   };
 
+  const isUserAdmin = currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim());
+
+  if (currentUser && isUserAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800 w-full">
+        <div className="w-full max-w-5xl h-screen md:h-[850px] bg-white md:rounded-[3rem] md:shadow-2xl overflow-hidden relative flex flex-col border border-slate-200/40 animate-scale-up">
+          <AdminPanel
+            lang={lang}
+            isOpen={true}
+            onClose={handleLogout}
+            isStandalone={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800">
       
@@ -1163,6 +1210,7 @@ export default function App() {
               lang={lang}
               currentBalance={balance}
               onSuccess={handleBillSuccess}
+              billers={dbBillers}
             />
           )}
 

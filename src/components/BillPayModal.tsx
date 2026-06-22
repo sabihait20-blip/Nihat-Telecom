@@ -14,6 +14,7 @@ interface BillPayModalProps {
   lang: Language;
   currentBalance: number;
   onSuccess: (amount: number, billerName: string, billerNameBn: string) => void;
+  billers?: BillProvider[];
 }
 
 export default function BillPayModal({
@@ -22,16 +23,24 @@ export default function BillPayModal({
   lang,
   currentBalance,
   onSuccess,
+  billers = BILL_PROVIDERS,
 }: BillPayModalProps) {
   // Navigation steps: 'select' | 'details' | 'pin' | 'confirm' | 'success'
   const [step, setStep] = useState<'select' | 'details' | 'pin' | 'confirm' | 'success'>('select');
-  const [selectedBiller, setSelectedBiller] = useState<BillProvider>(BILL_PROVIDERS[0]);
+  const [selectedBiller, setSelectedBiller] = useState<BillProvider>(billers[0] || BILL_PROVIDERS[0]);
   const [customerId, setCustomerId] = useState('');
   const [billAmount, setBillAmount] = useState<string>('');
   
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Update selected Biller when billers prop changes
+  useEffect(() => {
+    if (billers && billers.length > 0) {
+      setSelectedBiller(billers[0]);
+    }
+  }, [billers]);
 
   // Hold-to-confirm animations
   const [holdProgress, setHoldProgress] = useState(0);
@@ -121,7 +130,7 @@ export default function BillPayModal({
   };
 
   // Filter bills in directory
-  const filteredBillers = BILL_PROVIDERS.filter((biller) => {
+  const filteredBillers = billers.filter((biller) => {
     const q = searchQuery.toLowerCase();
     return biller.name.toLowerCase().includes(q) || biller.nameBn.toLowerCase().includes(q);
   });

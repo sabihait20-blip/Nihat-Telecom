@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
-  Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send
+  Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
+  LogOut
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
   query, orderBy, writeBatch, updateDoc, getDoc 
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Language, Operator, RechargePackage, PromoBanner, Transaction } from '../types';
+import { Language, Operator, RechargePackage, PromoBanner, Transaction, BillProvider } from '../types';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -21,10 +22,11 @@ interface AdminPanelProps {
   lang: Language;
   isOpen: boolean;
   onClose: () => void;
+  isStandalone?: boolean;
 }
 
-export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners'>('requests');
+export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false }: AdminPanelProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   
@@ -35,6 +37,7 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
   // Dynamic collections loaders
   const [offers, setOffers] = useState<RechargePackage[]>([]);
   const [banners, setBanners] = useState<PromoBanner[]>([]);
+  const [billers, setBillers] = useState<BillProvider[]>([]);
   
   // Offer Form States
   const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
@@ -65,6 +68,17 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
     operator: 'GP',
     prefillAmount: 50,
     gradient: 'from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20'
+  });
+
+  // Biller Form States
+  const [editingBillerId, setEditingBillerId] = useState<string | null>(null);
+  const [showBillerForm, setShowBillerForm] = useState<boolean>(false);
+  const [billerForm, setBillerForm] = useState<Omit<BillProvider, 'id'>>({
+    name: '',
+    nameBn: '',
+    category: 'Electricity',
+    categoryBn: 'বিদ্যুৎ',
+    logoColor: 'bg-blue-600',
   });
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -113,6 +127,22 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
       setBanners(list);
     }, (error) => {
       console.error("Error loading banners inside admin panel: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 4. Listen for billers
+  useEffect(() => {
+    const q = collection(db, 'billers');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: BillProvider[] = [];
+      snapshot.forEach((snap) => {
+        list.push(snap.data() as BillProvider);
+      });
+      setBillers(list);
+    }, (error) => {
+      console.error("Error loading billers inside admin panel: ", error);
     });
 
     return () => unsubscribe();
@@ -382,12 +412,78 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
     }
   };
 
+  // ---------------- BILLERS MANAGEMENT ----------------
+  const handleSaveBiller = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const billerId = editingBillerId || `bill-${Date.now()}`;
+      const docRef = doc(db, 'billers', billerId);
+      
+      await setDoc(docRef, {
+        ...billerForm,
+        id: billerId
+      });
+
+      setShowBillerForm(false);
+      setEditingBillerId(null);
+      setBillerForm({
+        name: '',
+        nameBn: '',
+        category: 'Electricity',
+        categoryBn: 'বিদ্যুৎ',
+        logoColor: 'bg-blue-600',
+      });
+    } catch (err) {
+      console.error("Error saving biller: ", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditBiller = (biller: BillProvider) => {
+    setEditingBillerId(biller.id);
+    setBillerForm({
+      name: biller.name,
+      nameBn: biller.nameBn,
+      category: biller.category,
+      categoryBn: biller.categoryBn,
+      logoColor: biller.logoColor,
+    });
+    setShowBillerForm(true);
+  };
+
+  const handleDeleteBiller = async (id: string) => {
+    if(!confirm(lang === 'bn' ? 'সেবাদাতাটি ডিলিট করতে চান?' : 'Are you sure you want to delete this biller?')) return;
+    try {
+      await deleteDoc(doc(db, 'billers', id));
+    } catch (err) {
+      console.error("Error deleting biller: ", err);
+    }
+  };
+
+  const setBillerCategory = (cat: 'Electricity' | 'Water' | 'Gas' | 'Internet' | 'Education') => {
+    const catsBn = {
+      Electricity: 'বিদ্যুৎ',
+      Water: 'পানি',
+      Gas: 'গ্যাস',
+      Internet: 'ইন্টারনেট',
+      Education: 'শিক্ষা'
+    };
+    setBillerForm({
+      ...billerForm,
+      category: cat,
+      categoryBn: catsBn[cat] || 'অন্যান্য'
+    });
+  };
+
   // Localized texts
   const labels = {
     title: lang === 'bn' ? 'অ্যাডমিন কন্ট্রোল পোর্টাল' : 'Admin Operations Command',
     requests: lang === 'bn' ? 'পেন্ডিং রিকুয়েস্ট' : 'Pending Requests',
     offers: lang === 'bn' ? 'মোবাইল অফার প্যাক' : 'Manage Packs',
     banners: lang === 'bn' ? 'প্রোমো ব্যানার স্লাইড' : 'Promo Banners',
+    billers: lang === 'bn' ? 'ইউটিলিটি বিলার' : 'Manage Billers',
   };
 
   if (!isOpen) return null;
@@ -425,42 +521,45 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        onClick={onClose}
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm cursor-pointer"
-      />
-
-      {/* Main Admin Console Container */}
-      <div className="relative bg-slate-50 w-full max-w-2xl h-[90%] rounded-[36px] shadow-2xl border border-slate-200/50 flex flex-col relative z-10 overflow-hidden text-slate-800 animate-scale-up">
-        
-        {/* Header bar */}
-        <div className="bg-white border-b border-slate-150 px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-md shadow-blue-500/10">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-slate-900 font-extrabold text-sm tracking-tight font-display flex items-center gap-1.5 leading-none">
-                {labels.title}
-              </h2>
-              <p className="text-[10px] text-slate-400 font-bold font-mono tracking-wider mt-1">
-                SECURE SANDBOX ADMINISTRATIVE MODE
-              </p>
-            </div>
+  const adminPanelBody = (
+    <>
+      <div className={isStandalone ? "w-full h-full bg-slate-50 flex flex-col relative overflow-hidden text-slate-800" : "relative bg-slate-50 w-full max-w-2xl h-[90%] rounded-[36px] shadow-2xl border border-slate-200/50 flex flex-col relative z-10 overflow-hidden text-slate-800 animate-scale-up"}>
+      
+      {/* Header bar */}
+      <div className="bg-white border-b border-slate-150 px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-md shadow-blue-500/10">
+            <ShieldCheck className="h-5 w-5" />
           </div>
+          <div>
+            <h2 className="text-slate-900 font-extrabold text-sm tracking-tight font-display flex items-center gap-1.5 leading-none">
+              {labels.title}
+            </h2>
+            <p className="text-[10px] text-slate-400 font-bold font-mono tracking-wider mt-1">
+              {isStandalone ? "SECURE HARDENED ADMINISTRATIVE SYSTEM" : "SECURE SANDBOX ADMINISTRATIVE MODE"}
+            </p>
+          </div>
+        </div>
+        {isStandalone ? (
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border-0"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>{lang === 'bn' ? 'লগআউট' : 'Logout'}</span>
+          </button>
+        ) : (
           <button
             onClick={onClose}
             className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-all cursor-pointer active:scale-95"
           >
             <X className="h-4.5 w-4.5" />
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* Dynamic Inner Tab Controller header pill list */}
-        <div className="bg-white border-b border-slate-100 px-6 py-2.5 flex gap-2">
+      {/* Dynamic Inner Tab Controller header pill list */}
+      <div className="bg-white border-b border-slate-100 px-6 py-2.5 flex gap-2">
           <button
             onClick={() => setActiveSubTab('requests')}
             className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer ${
@@ -490,6 +589,16 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
             }`}
           >
             {labels.banners} ({banners.length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('billers')}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+              activeSubTab === 'billers' 
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' 
+                : 'bg-slate-100/80 hover:bg-slate-150 text-slate-600'
+            }`}
+          >
+            {labels.billers} ({billers.length})
           </button>
         </div>
 
@@ -1083,6 +1192,167 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
             </div>
           )}
 
+          {/* TAB 4: MANAGE BILLERS */}
+          {activeSubTab === 'billers' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-extrabold text-slate-400 tracking-widest uppercase">
+                  UTILITY BILL PROVIDERS
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBillerId(null);
+                    setBillerForm({
+                      name: '',
+                      nameBn: '',
+                      category: 'Electricity',
+                      categoryBn: 'বিদ্যুৎ',
+                      logoColor: 'bg-blue-600',
+                    });
+                    setShowBillerForm(true);
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-black rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-1 shadow-md shadow-blue-500/10 cursor-pointer active:scale-95"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[3]" />
+                  <span>{lang === 'bn' ? 'নতুন বিলার যুক্ত করুন' : 'Add Biller'}</span>
+                </button>
+              </div>
+
+              {/* Add/Edit Biller Inline Form */}
+              {showBillerForm && (
+                <form onSubmit={handleSaveBiller} className="p-5 bg-white border-2 border-blue-100 rounded-3xl space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <h4 className="text-slate-900 font-extrabold text-xs tracking-tight flex items-center gap-1.5">
+                      <CreditCard className="h-4.5 w-4.5 text-blue-600" />
+                      <span>{editingBillerId ? (lang === 'bn' ? 'বিলার এডিট করুন' : 'Edit Biller') : (lang === 'bn' ? 'নতুন বিলার যুক্ত করুন' : 'Add Utility Biller')}</span>
+                    </h4>
+                    <button 
+                      type="button"
+                      onClick={() => setShowBillerForm(false)}
+                      className="p-1 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Provider Name (EN)</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g. DESCO (Electricity)"
+                        value={billerForm.name}
+                        onChange={(e) => setBillerForm({...billerForm, name: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Provider Name (বাংলা)</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="ডেসকো (বিদ্যুৎ)"
+                        value={billerForm.nameBn}
+                        onChange={(e) => setBillerForm({...billerForm, nameBn: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Category</label>
+                      <select
+                        value={billerForm.category}
+                        onChange={(e) => setBillerCategory(e.target.value as any)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="Electricity">Electricity (বিদ্যুৎ)</option>
+                        <option value="Water">Water (পানি)</option>
+                        <option value="Gas">Gas (গ্যাস)</option>
+                        <option value="Internet">Internet (ইন্টারনেট)</option>
+                        <option value="Education">Education (শিক্ষা)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Logo Background Color</label>
+                      <select
+                        value={billerForm.logoColor}
+                        onChange={(e) => setBillerForm({...billerForm, logoColor: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 cursor-pointer text-xs"
+                      >
+                        <option value="bg-green-600">Green (DESCO)</option>
+                        <option value="bg-emerald-600">Emerald (DPDC)</option>
+                        <option value="bg-blue-600">Blue (WASA)</option>
+                        <option value="bg-amber-600">Amber (Titas)</option>
+                        <option value="bg-purple-600">Purple (Amber IT)</option>
+                        <option value="bg-indigo-600">Indigo (DU)</option>
+                        <option value="bg-rose-600">Rose Red</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowBillerForm(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-xl text-xs font-black shadow-md shadow-blue-500/10 cursor-pointer"
+                    >
+                      {loading ? (lang === 'bn' ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving...') : (lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save Biller')}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Billers listing */}
+              <div className="space-y-3">
+                {billers.map((biller) => (
+                  <div key={biller.id} className="bg-white border border-slate-150 p-4 rounded-3xl flex items-center justify-between group">
+                    <div className="flex items-center gap-3.5">
+                      <div className={`h-11 w-11 rounded-2xl ${biller.logoColor || 'bg-slate-500'} text-white font-bold flex items-center justify-center shadow-sm`}>
+                        {biller.name ? biller.name[0] : 'B'}
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[8.5px] font-black tracking-widest text-slate-400 uppercase">
+                          {lang === 'bn' ? biller.categoryBn : biller.category}
+                        </span>
+                        <h4 className="text-xs text-slate-900 font-extrabold">
+                          {lang === 'bn' ? biller.nameBn : biller.name}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => handleEditBiller(biller)}
+                        className="p-1 px-3 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit2 className="h-3 w-3 shrink-0" />
+                        <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBiller(biller.id)}
+                        className="p-1 px-3 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3 w-3 shrink-0" />
+                        <span>{lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -1162,6 +1432,21 @@ export default function AdminPanel({ lang, isOpen, onClose }: AdminPanelProps) {
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (isStandalone) {
+    return adminPanelBody;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm cursor-pointer"
+      />
+      {adminPanelBody}
     </div>
   );
 }
