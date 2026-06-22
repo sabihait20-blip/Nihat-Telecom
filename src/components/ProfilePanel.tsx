@@ -283,10 +283,10 @@ export default function ProfilePanel({
             {t.supportDesc}
           </p>
           <a
-            href="tel:16247"
+            href="tel:01970250988"
             className="inline-flex items-center gap-1 text-xs font-bold text-sky-600 pt-1"
           >
-            <span>১৬২৪৭ (16247)</span>
+            <span>০১৯৭০২৫০৯৮৮ (01970250988)</span>
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
