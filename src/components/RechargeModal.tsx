@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X, ArrowLeft, Smartphone, ShieldCheck, CheckCircle2,
   AlertTriangle, CreditCard, ChevronRight, Download, Share2, HelpCircle,
-  Users, Search
+  Users, Search, AlertCircle
 } from 'lucide-react';
 import { Operator, ConnectionType, Language, FavoriteContact } from '../types';
 import { TRANSLATIONS } from '../data/translations';
@@ -18,6 +18,7 @@ interface RechargeModalProps {
   initialOperator?: Operator | null;
   initialAmount?: number | null;
   favorites?: FavoriteContact[];
+  onAddFundRedirect?: () => void;
 }
 
 export default function RechargeModal({
@@ -29,6 +30,7 @@ export default function RechargeModal({
   initialOperator,
   initialAmount,
   favorites = [],
+  onAddFundRedirect,
 }: RechargeModalProps) {
   // Navigation steps: 'number' | 'operator' | 'amount' | 'pin' | 'confirm' | 'success'
   const [step, setStep] = useState<'number' | 'operator' | 'amount' | 'pin' | 'confirm' | 'success'>('number');
@@ -38,6 +40,10 @@ export default function RechargeModal({
   const [amount, setAmount] = useState<string>('');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+
+  // States for custom beautiful balance alert popups
+  const [showLowBalanceAlert, setShowLowBalanceAlert] = useState(false);
+  const [lowBalanceRequired, setLowBalanceRequired] = useState(0);
 
   // Contact book state managers
   const [showContactBook, setShowContactBook] = useState(false);
@@ -74,6 +80,8 @@ export default function RechargeModal({
       setIsHolding(false);
       setShowContactBook(false);
       setContactSearch('');
+      setShowLowBalanceAlert(false);
+      setLowBalanceRequired(0);
     }
   }, [isOpen, initialOperator, initialAmount]);
 
@@ -106,7 +114,8 @@ export default function RechargeModal({
     const numAmt = parseFloat(amount);
     if (!isNaN(numAmt) && numAmt >= 10 && numAmt <= 5000) {
       if (numAmt > currentBalance) {
-        alert(lang === 'bn' ? 'দুঃখিত, আপনার ব্যালেন্স অপর্যাপ্ত!' : 'Insufficient funds for this transaction');
+        setLowBalanceRequired(numAmt);
+        setShowLowBalanceAlert(true);
         return;
       }
       setStep('pin');
@@ -826,6 +835,79 @@ export default function RechargeModal({
                     );
                   });
                 })()}
+              </div>
+            </motion.div>
+          )}
+
+          {showLowBalanceAlert && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute inset-0 bg-white/98 backdrop-blur-md z-40 flex flex-col items-center justify-center p-6 text-center text-slate-800"
+            >
+              {/* Pulsing light-red glowing ring surrounding AlertCircle */}
+              <div className="relative mb-5 flex items-center justify-center">
+                <div className="absolute inset-0 h-16 w-16 bg-rose-100 rounded-full animate-ping opacity-35" />
+                <div className="h-16 w-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center text-rose-600 relative z-10 shadow-md">
+                  <AlertCircle className="h-8 w-8 stroke-[2]" />
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6 max-w-xs">
+                <h3 className="text-slate-900 font-extrabold text-base font-display tracking-tight">
+                  {lang === 'bn' ? 'পর্যাপ্ত ব্যালেন্স নেই!' : 'Insufficient Balance!'}
+                </h3>
+                <p className="text-slate-500 text-xs leading-relaxed font-semibold">
+                  {lang === 'bn' 
+                    ? 'দুঃখিত, রিচার্জ করার জন্য আপনার ওয়ালেটে পর্যাপ্ত পরিমাণ অর্থ নেই।' 
+                    : 'Sorry, your wallet balance is insufficient to complete this recharge.'}
+                </p>
+              </div>
+
+              {/* Amount side-by-side comparison boxes */}
+              <div className="grid grid-cols-2 gap-3 w-full max-w-xs mb-8">
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 text-left">
+                  <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">
+                    {lang === 'bn' ? 'আপনার বর্তমান ব্যালেন্স' : 'Current Balance'}
+                  </span>
+                  <span className="text-slate-800 font-display font-extrabold text-xs block mt-1">
+                    ৳{currentBalance.toLocaleString()}
+                  </span>
+                </div>
+                <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-3 text-left">
+                  <span className="text-[10px] text-rose-400 font-black uppercase tracking-wider block">
+                    {lang === 'bn' ? 'প্রয়োজনীয় ব্যালেন্স' : 'Recharge Sum'}
+                  </span>
+                  <span className="text-rose-600 font-display font-extrabold text-xs block mt-1">
+                    ৳{lowBalanceRequired.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* CTA buttons */}
+              <div className="space-y-2 w-full max-w-xs">
+                {onAddFundRedirect && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLowBalanceAlert(false);
+                      onAddFundRedirect();
+                    }}
+                    className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/10 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <CreditCard className="h-4 w-4 text-white" />
+                    <span>{lang === 'bn' ? 'টাকা যোগ করুন' : 'Add Fund Now'}</span>
+                  </button>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={() => setShowLowBalanceAlert(false)}
+                  className="w-full h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-98 cursor-pointer"
+                >
+                  {lang === 'bn' ? 'বাতিল করুন' : 'Cancel & Go Back'}
+                </button>
               </div>
             </motion.div>
           )}

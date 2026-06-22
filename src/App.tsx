@@ -1199,6 +1199,10 @@ export default function App() {
               initialOperator={prefilledOp}
               initialAmount={prefilledAmt}
               favorites={favorites}
+              onAddFundRedirect={() => {
+                setIsRechargeOpen(false);
+                setIsAddFundOpen(true);
+              }}
             />
           )}
 
@@ -1211,6 +1215,10 @@ export default function App() {
               currentBalance={balance}
               onSuccess={handleBillSuccess}
               billers={dbBillers}
+              onAddFundRedirect={() => {
+                setIsBillPayOpen(false);
+                setIsAddFundOpen(true);
+              }}
             />
           )}
 
