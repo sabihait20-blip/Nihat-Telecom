@@ -213,9 +213,20 @@ export default function BillPayModal({
                     className="w-full text-left p-3 rounded-2xl border border-slate-100 hover:border-blue-500 bg-white hover:bg-blue-50/10 flex items-center justify-between transition-all cursor-pointer group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-xl ${biller.logoColor} text-white font-bold text-sm flex items-center justify-center shadow-xs`}>
-                        {biller.name[0]}
-                      </div>
+                      {biller.imageUrl ? (
+                        <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center shadow-xs bg-slate-50">
+                          <img 
+                            src={biller.imageUrl} 
+                            alt={biller.name} 
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className={`h-10 w-10 rounded-xl ${biller.logoColor} text-white font-bold text-sm flex items-center justify-center shadow-xs`}>
+                          {biller.name[0]}
+                        </div>
+                      )}
                       <div>
                         <h4 className="text-slate-900 font-bold text-xs">
                           {lang === 'bn' ? biller.nameBn : biller.name}
@@ -236,9 +247,20 @@ export default function BillPayModal({
           {step === 'details' && (
             <div className="space-y-4">
               <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3">
-                <div className={`h-11 w-11 rounded-xl ${selectedBiller.logoColor} text-white font-bold flex items-center justify-center`}>
-                  {selectedBiller.name[0]}
-                </div>
+                {selectedBiller.imageUrl ? (
+                  <div className="h-11 w-11 rounded-xl overflow-hidden shrink-0 border border-slate-150 bg-white flex items-center justify-center">
+                    <img 
+                      src={selectedBiller.imageUrl} 
+                      alt={selectedBiller.name} 
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className={`h-11 w-11 rounded-xl ${selectedBiller.logoColor} text-white font-bold flex items-center justify-center`}>
+                    {selectedBiller.name[0]}
+                  </div>
+                )}
                 <div>
                   <h4 className="text-slate-950 font-extrabold text-sm font-display">
                     {lang === 'bn' ? selectedBiller.nameBn : selectedBiller.name}

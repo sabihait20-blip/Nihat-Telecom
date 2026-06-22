@@ -54,7 +54,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     volumeBn: '',
     description: '',
     descriptionBn: '',
-    isPopular: false
+    isPopular: false,
+    imageUrl: ''
   });
 
   // Banner Form States
@@ -67,7 +68,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     descEn: '',
     operator: 'GP',
     prefillAmount: 50,
-    gradient: 'from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20'
+    gradient: 'from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20',
+    imageUrl: ''
   });
 
   // Biller Form States
@@ -79,10 +81,16 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     category: 'Electricity',
     categoryBn: 'বিদ্যুৎ',
     logoColor: 'bg-blue-600',
+    imageUrl: ''
   });
 
   const [loading, setLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    id: string;
+    type: 'offer' | 'banner' | 'biller';
+    title: string;
+  } | null>(null);
 
   // 1. Listen for collective admin requests
   useEffect(() => {
@@ -321,7 +329,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         volumeBn: '',
         description: '',
         descriptionBn: '',
-        isPopular: false
+        isPopular: false,
+        imageUrl: ''
       });
     } catch (err) {
       console.error("Error saving offer: ", err);
@@ -344,18 +353,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       volumeBn: pkg.volumeBn,
       description: pkg.description,
       descriptionBn: pkg.descriptionBn,
-      isPopular: pkg.isPopular || false
+      isPopular: pkg.isPopular || false,
+      imageUrl: pkg.imageUrl || ''
     });
     setShowOfferForm(true);
   };
 
-  const handleDeleteOffer = async (id: string) => {
-    if(!confirm(lang === 'bn' ? 'অফারটি ডিলিট করতে চান?' : 'Are you sure you want to delete this offer?')) return;
-    try {
-      await deleteDoc(doc(db, 'offers', id));
-    } catch (err) {
-      console.error("Error deleting offer: ", err);
-    }
+  const handleDeleteOffer = (id: string, title: string) => {
+    setDeleteConfirm({ id, type: 'offer', title });
   };
 
   // ---------------- BANNER MANAGEMENTS ----------------
@@ -380,7 +385,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         descEn: '',
         operator: 'GP',
         prefillAmount: 50,
-        gradient: 'from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20'
+        gradient: 'from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20',
+        imageUrl: ''
       });
     } catch (err) {
       console.error("Error saving banner: ", err);
@@ -398,17 +404,31 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       descEn: ban.descEn,
       operator: ban.operator,
       prefillAmount: ban.prefillAmount,
-      gradient: ban.gradient
+      gradient: ban.gradient,
+      imageUrl: ban.imageUrl || ''
     });
     setShowBannerForm(true);
   };
 
-  const handleDeleteBanner = async (id: string) => {
-    if(!confirm(lang === 'bn' ? 'ব্যানারটি ডিলিট করতে চান?' : 'Are you sure you want to delete this banner?')) return;
+  const handleDeleteBanner = (id: string, title: string) => {
+    setDeleteConfirm({ id, type: 'banner', title });
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirm) return;
     try {
-      await deleteDoc(doc(db, 'banners', id));
+      const { type, id } = deleteConfirm;
+      let collectionName = '';
+      if (type === 'offer') collectionName = 'offers';
+      else if (type === 'banner') collectionName = 'banners';
+      else if (type === 'biller') collectionName = 'billers';
+
+      if (collectionName) {
+        await deleteDoc(doc(db, collectionName, id));
+      }
+      setDeleteConfirm(null);
     } catch (err) {
-      console.error("Error deleting banner: ", err);
+      console.error("Error executing delete: ", err);
     }
   };
 
@@ -433,6 +453,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         category: 'Electricity',
         categoryBn: 'বিদ্যুৎ',
         logoColor: 'bg-blue-600',
+        imageUrl: ''
       });
     } catch (err) {
       console.error("Error saving biller: ", err);
@@ -449,17 +470,13 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       category: biller.category,
       categoryBn: biller.categoryBn,
       logoColor: biller.logoColor,
+      imageUrl: biller.imageUrl || ''
     });
     setShowBillerForm(true);
   };
 
-  const handleDeleteBiller = async (id: string) => {
-    if(!confirm(lang === 'bn' ? 'সেবাদাতাটি ডিলিট করতে চান?' : 'Are you sure you want to delete this biller?')) return;
-    try {
-      await deleteDoc(doc(db, 'billers', id));
-    } catch (err) {
-      console.error("Error deleting biller: ", err);
-    }
+  const handleDeleteBiller = (id: string, title: string) => {
+    setDeleteConfirm({ id, type: 'biller', title });
   };
 
   const setBillerCategory = (cat: 'Electricity' | 'Water' | 'Gas' | 'Internet' | 'Education') => {
@@ -523,19 +540,23 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   const adminPanelBody = (
     <>
-      <div className={isStandalone ? "w-full h-full bg-slate-50 flex flex-col relative overflow-hidden text-slate-800" : "relative bg-slate-50 w-full max-w-2xl h-[90%] rounded-[36px] shadow-2xl border border-slate-200/50 flex flex-col relative z-10 overflow-hidden text-slate-800 animate-scale-up"}>
+      <div className={isStandalone ? "w-full h-full bg-slate-950 flex flex-col relative overflow-hidden text-slate-100" : "relative bg-slate-900/85 backdrop-blur-2xl w-full max-w-2xl h-[90%] rounded-[36px] shadow-2xl border border-white/10 flex flex-col relative z-10 overflow-hidden text-slate-100 animate-scale-up"}>
       
+      {/* Dynamic Ambient Blur Spheres */}
+      <div className="absolute top-[-50px] right-[-50px] w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none select-none" />
+      <div className="absolute bottom-[-50px] left-[-50px] w-80 h-80 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none select-none" />
+
       {/* Header bar */}
-      <div className="bg-white border-b border-slate-150 px-6 py-5 flex items-center justify-between">
+      <div className="bg-slate-950/60 backdrop-blur-md border-b border-white/10 px-6 py-5 flex items-center justify-between relative z-10">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-md shadow-blue-500/10">
+          <div className="p-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/15">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-slate-900 font-extrabold text-sm tracking-tight font-display flex items-center gap-1.5 leading-none">
+            <h2 className="text-white font-extrabold text-sm tracking-tight flex items-center gap-1.5 leading-none">
               {labels.title}
             </h2>
-            <p className="text-[10px] text-slate-400 font-bold font-mono tracking-wider mt-1">
+            <p className="text-[10px] text-slate-400 font-bold font-mono tracking-wider mt-1.5">
               {isStandalone ? "SECURE HARDENED ADMINISTRATIVE SYSTEM" : "SECURE SANDBOX ADMINISTRATIVE MODE"}
             </p>
           </div>
@@ -543,7 +564,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         {isStandalone ? (
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border-0"
+            className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-rose-500/15"
           >
             <LogOut className="h-4 w-4" />
             <span>{lang === 'bn' ? 'লগআউট' : 'Logout'}</span>
@@ -551,7 +572,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         ) : (
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-all cursor-pointer active:scale-95"
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer active:scale-95"
           >
             <X className="h-4.5 w-4.5" />
           </button>
@@ -559,43 +580,43 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       </div>
 
       {/* Dynamic Inner Tab Controller header pill list */}
-      <div className="bg-white border-b border-slate-100 px-6 py-2.5 flex gap-2">
+      <div className="bg-slate-950/40 border-b border-white/5 px-6 py-3 flex gap-2 overflow-x-auto scroller-hidden relative z-10">
           <button
             onClick={() => setActiveSubTab('requests')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
               activeSubTab === 'requests' 
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' 
-                : 'bg-slate-100/80 hover:bg-slate-150 text-slate-600'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
             }`}
           >
             {labels.requests} ({pendingRequests.filter(r => r.status === 'Pending').length})
           </button>
           <button
             onClick={() => setActiveSubTab('offers')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
               activeSubTab === 'offers' 
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' 
-                : 'bg-slate-100/80 hover:bg-slate-150 text-slate-600'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
             }`}
           >
             {labels.offers} ({offers.length})
           </button>
           <button
             onClick={() => setActiveSubTab('banners')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
               activeSubTab === 'banners' 
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' 
-                : 'bg-slate-100/80 hover:bg-slate-150 text-slate-600'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
             }`}
           >
             {labels.banners} ({banners.length})
           </button>
           <button
             onClick={() => setActiveSubTab('billers')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
               activeSubTab === 'billers' 
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' 
-                : 'bg-slate-100/80 hover:bg-slate-150 text-slate-600'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
             }`}
           >
             {labels.billers} ({billers.length})
@@ -603,10 +624,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         </div>
 
         {/* Scrollable Workspace panel viewport */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 relative z-10 bg-slate-900/30">
           
           {actionError && (
-            <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-2 text-rose-600 text-xs font-semibold">
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-2 text-rose-400 text-xs font-semibold">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{actionError}</span>
             </div>
@@ -619,15 +640,15 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 <span className="text-[10px] font-extrabold text-slate-400 tracking-widest uppercase">
                   ACTIVE TRANSACTIONS POOL
                 </span>
-                <span className="text-[10px] text-blue-600 font-bold">
+                <span className="text-[10px] text-blue-400 font-bold hover:text-blue-300 transition-colors">
                   {lang === 'bn' ? 'রিয়েল-টাইমে আপডেট হচ্ছে' : 'Listening Live via snapshots'}
                 </span>
               </div>
 
               {pendingRequests.length === 0 ? (
-                <div className="bg-white border border-slate-150 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-2">
-                  <FileText className="h-10 w-10 text-slate-300" />
-                  <h4 className="text-slate-800 font-bold text-xs">
+                <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-2">
+                  <FileText className="h-10 w-10 text-slate-600" />
+                  <h4 className="text-white font-bold text-xs">
                     {lang === 'bn' ? 'কোনো পেন্ডিং রিকোয়েস্ট নেই' : 'All clear! No pending requests'}
                   </h4>
                   <p className="text-slate-400 text-[10.5px] max-w-xs leading-relaxed font-semibold">
@@ -641,43 +662,43 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     return (
                       <div 
                         key={req.id} 
-                        className={`bg-white border border-slate-150 rounded-2xl p-5 shadow-xs transition-all relative overflow-hidden flex flex-col justify-between ${
-                          !isTxPending ? 'opacity-70 bg-slate-50 border-slate-200' : ''
+                        className={`bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-lg transition-all relative overflow-hidden flex flex-col justify-between ${
+                          !isTxPending ? 'opacity-50 bg-slate-950/40 border-slate-800/60' : ''
                         }`}
                       >
                         {/* Top banner tag detailing operator or type */}
-                        <div className="absolute right-0 top-0 h-5 px-3 rounded-bl-lg text-[9px] font-black uppercase flex items-center text-white bg-slate-900 tracking-wide">
+                        <div className="absolute right-0 top-0 h-5 px-3 rounded-bl-lg text-[9px] font-black uppercase flex items-center text-white bg-slate-950 border-l border-b border-white/10 tracking-wide">
                           {req.type}
                         </div>
 
                         <div className="space-y-2.5">
                           {/* User metadata */}
                           <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 font-semibold leading-none">
-                            <span className="bg-slate-100 text-slate-700 font-bold size-4 text-[9px] flex items-center justify-center rounded-sm">U</span>
-                            <span className="text-slate-700 font-bold">{req.userName || req.userEmail || 'Client ID'}</span>
-                            <span className="text-slate-300">|</span>
-                            <span className="font-mono text-[9px] font-medium">{req.date}</span>
+                            <span className="bg-white/10 text-slate-200 font-bold size-4 text-[9px] flex items-center justify-center rounded-sm">U</span>
+                            <span className="text-slate-200 font-bold">{req.userName || req.userEmail || 'Client ID'}</span>
+                            <span className="text-slate-500">|</span>
+                            <span className="font-mono text-[9px] font-medium text-slate-400">{req.date}</span>
                           </div>
 
                           {/* Primary content row */}
                           <div className="flex justify-between items-start">
                             <div>
-                              <h3 className="text-base text-slate-900 font-extrabold font-display leading-tight flex items-center gap-2">
+                              <h3 className="text-base text-white font-extrabold leading-tight flex items-center gap-2">
                                 <span>৳{req.amount}</span>
                                 <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-bold ${
-                                  req.status === 'Success' ? 'bg-emerald-100 text-emerald-700' :
-                                  req.status === 'Failed' ? 'bg-rose-100 text-rose-700' :
-                                  'bg-amber-100 text-amber-700 font-black animate-pulse'
+                                  req.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                  req.status === 'Failed' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                                  'bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black animate-pulse'
                                 }`}>
                                   {req.status}
                                 </span>
                               </h3>
                               
-                              <div className="text-xs text-slate-600 font-bold mt-1 space-y-0.5">
+                              <div className="text-xs text-slate-300 font-medium mt-1 space-y-0.5">
                                 {req.type === 'CashIn' && (
                                   <>
                                     <p>{lang === 'bn' ? `মোবাইল ব্যাংকিং মাধ্যম: ${req.targetNumber}` : `Depository Channel: ${req.targetNumber}`}</p>
-                                    <p className="text-blue-600 text-xs font-bold leading-none font-mono">
+                                    <p className="text-blue-400 text-xs font-bold leading-none font-mono mt-1">
                                       TrxID: {req.txId}
                                     </p>
                                   </>
@@ -691,7 +712,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                               </div>
 
                               {req.rejectionReason && (
-                                <p className="text-rose-600 font-bold text-[10px] mt-1 p-1 bg-rose-50 rounded-lg inline-block">
+                                <p className="text-rose-400 font-semibold text-[10px] mt-1.5 p-1 px-2 bg-rose-500/10 rounded-lg inline-block border border-rose-500/15">
                                   {lang === 'bn' ? `বাতিলের কারণ: ${req.rejectionReason}` : `Declined Reason: ${req.rejectionReason}`}
                                 </p>
                               )}
@@ -701,11 +722,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                         {/* Action buttons if pending */}
                         {isTxPending && (
-                          <div className="flex gap-2.5 border-t border-slate-100 pt-3.5 mt-3.5 justify-end">
+                          <div className="flex gap-2.5 border-t border-white/10 pt-3.5 mt-3.5 justify-end">
                             <button
                               disabled={isProcessing === req.id}
                               onClick={() => setRejectingTx(req)}
-                              className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 shrink-0 border border-rose-500/10"
                             >
                               <X className="h-3.5 w-3.5 shrink-0" />
                               <span>{lang === 'bn' ? 'রিজেক্ট করুন' : 'Reject / Flag'}</span>
@@ -713,7 +734,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             <button
                               disabled={isProcessing === req.id}
                               onClick={() => handleApprove(req)}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 text-center shrink-0"
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 text-center shrink-0"
                             >
                               {isProcessing === req.id ? (
                                 <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />
@@ -755,7 +776,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       volumeBn: '',
                       description: '',
                       descriptionBn: '',
-                      isPopular: false
+                      isPopular: false,
+                      imageUrl: ''
                     });
                     setShowOfferForm(true);
                   }}
@@ -921,6 +943,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-[9.5px] font-black text-slate-500 uppercase font-mono">Custom Pack Image URL (প্যাক ইমেজ লিংক - ঐচ্ছিক / Optional)</label>
+                    <input 
+                      type="url" 
+                      placeholder="যেমন: https://domain.com/pack-image.jpg"
+                      value={offerForm.imageUrl || ''}
+                      onChange={(e) => setOfferForm({...offerForm, imageUrl: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 font-mono text-emerald-600 placeholder-slate-400"
+                    />
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <input 
                       type="checkbox" 
@@ -960,16 +993,28 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     <span className="absolute right-0 top-0 text-[8.5px] uppercase font-black bg-slate-150 text-slate-600 px-2 py-0.5 rounded-bl-lg">
                       {pkg.operator}
                     </span>
-                    <div className="space-y-1 pr-12">
-                      <h4 className="text-xs text-slate-900 font-extrabold leading-tight">
-                        {lang === 'bn' ? pkg.titleBn : pkg.title}
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-extrabold font-mono uppercase tracking-wide">
-                        {pkg.category} | {lang === 'bn' ? pkg.validityBn : pkg.validity}
-                      </p>
-                      <p className="text-[10.5px] text-slate-500 leading-normal font-semibold">
-                        {lang === 'bn' ? pkg.descriptionBn : pkg.description}
-                      </p>
+                    <div className="flex gap-3">
+                      {pkg.imageUrl && (
+                        <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 border border-slate-100/50 shadow-sm relative self-start mt-1">
+                          <img 
+                            src={pkg.imageUrl} 
+                            alt="pkg logo" 
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-1 flex-1 pr-8">
+                        <h4 className="text-xs text-slate-900 font-extrabold leading-tight">
+                          {lang === 'bn' ? pkg.titleBn : pkg.title}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-extrabold font-mono uppercase tracking-wide">
+                          {pkg.category} | {lang === 'bn' ? pkg.validityBn : pkg.validity}
+                        </p>
+                        <p className="text-[10.5px] text-slate-500 leading-normal font-semibold">
+                          {lang === 'bn' ? pkg.descriptionBn : pkg.description}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
@@ -983,7 +1028,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
                         </button>
                         <button
-                          onClick={() => handleDeleteOffer(pkg.id)}
+                          onClick={() => handleDeleteOffer(pkg.id, lang === 'bn' ? pkg.titleBn : pkg.title)}
                           className="p-1 px-2.0 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
                         >
                           <Trash2 className="h-3 w-3 shrink-0" />
@@ -1028,16 +1073,16 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
               {/* Add/Edit Banner Overlay Form */}
               {showBannerForm && (
-                <form onSubmit={handleSaveBanner} className="p-5 bg-white border-2 border-blue-100 rounded-3xl space-y-4">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                    <h4 className="text-slate-900 font-extrabold text-xs tracking-tight flex items-center gap-1.5">
-                      <Sparkles className="h-4.5 w-4.5 text-blue-600" />
-                      <span>{editingBannerId ? (lang === 'bn' ? 'ব্যানার এডিট করুন' : 'Edit Banner info') : (lang === 'bn' ? 'নতুন ব্যানার যুক্ত করুন' : 'Add Promo Slider')}</span>
+                <form onSubmit={handleSaveBanner} className="p-5 bg-slate-900 border border-white/15 rounded-3xl space-y-4 shadow-xl">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <h4 className="text-white font-extrabold text-xs tracking-tight flex items-center gap-1.5">
+                      <Sparkles className="h-4.5 w-4.5 text-blue-400" />
+                      <span>{editingBannerId ? (lang === 'bn' ? 'ব্যানার এডিটর' : 'Edit Banner details') : (lang === 'bn' ? 'নতুন ব্যানার যুক্ত করুন' : 'Add Promo Banner')}</span>
                     </h4>
                     <button 
                       type="button"
                       onClick={() => setShowBannerForm(false)}
-                      className="p-1 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer"
+                      className="p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -1045,105 +1090,116 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Banner Headline (বাংলা)</label>
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase">Banner Headline (বাংলা)</label>
                       <input 
                         type="text" 
                         required
-                        placeholder="e.g. ১০% ইনস্ট্যান্ট ক্যাশব্যাক"
+                        placeholder="যেমন: ১০% ইনস্ট্যান্ট ক্যাশব্যাক"
                         value={bannerForm.title}
                         onChange={(e) => setBannerForm({...bannerForm, title: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Banner Headline (EN)</label>
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase">Banner Headline (EN)</label>
                       <input 
                         type="text" 
                         required
                         placeholder="e.g. 10% Instant Cashback"
                         value={bannerForm.titleEn}
                         onChange={(e) => setBannerForm({...bannerForm, titleEn: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Target Operator</label>
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase">Target Operator</label>
                       <select
                         value={bannerForm.operator}
                         onChange={(e) => setBannerForm({...bannerForm, operator: e.target.value as Operator})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 cursor-pointer"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 cursor-pointer"
                       >
-                        <option value="GP">Grameenphone</option>
-                        <option value="Robi">Robi</option>
-                        <option value="Airtel">Airtel</option>
-                        <option value="Banglalink">Banglalink</option>
-                        <option value="Teletalk">Teletalk</option>
+                        <option value="GP" className="bg-slate-900">Grameenphone</option>
+                        <option value="Robi" className="bg-slate-900">Robi</option>
+                        <option value="Airtel" className="bg-slate-900">Airtel</option>
+                        <option value="Banglalink" className="bg-slate-900">Banglalink</option>
+                        <option value="Teletalk" className="bg-slate-900">Teletalk</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Prefill Recharge Amount</label>
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase">Prefill Recharge Amount</label>
                       <input 
                         type="number" 
                         required
                         value={bannerForm.prefillAmount}
                         onChange={(e) => setBannerForm({...bannerForm, prefillAmount: parseInt(e.target.value) || 0})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Color theme / styling</label>
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase">Color theme / styling</label>
                       <select
                         value={bannerForm.gradient}
                         onChange={(e) => setBannerForm({...bannerForm, gradient: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 cursor-pointer text-[10.5px]"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 cursor-pointer text-[10.5px]"
                       >
-                        <option value="from-emerald-500/10 via-emerald-600/5 to-transparent border-emerald-500/20">Emerald Green (Teletalk)</option>
-                        <option value="from-orange-500/10 via-red-600/5 to-transparent border-orange-500/20">Sunset Orange (Robi)</option>
-                        <option value="from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20">Cosmic Blue (GP)</option>
-                        <option value="from-red-600/10 via-pink-600/5 to-transparent border-red-500/20">Airtel Ruby Red (Airtel)</option>
-                        <option value="from-amber-500/10 via-orange-500/5 to-transparent border-amber-500/20">Banglalink Amber (BL)</option>
+                        <option value="from-emerald-500/10 via-emerald-600/5 to-transparent border-emerald-500/20" className="bg-slate-900">Emerald Green (Teletalk)</option>
+                        <option value="from-orange-500/10 via-red-600/5 to-transparent border-orange-500/20" className="bg-slate-900">Sunset Orange (Robi)</option>
+                        <option value="from-blue-500/10 via-sky-400/5 to-transparent border-blue-500/20" className="bg-slate-900">Cosmic Blue (GP)</option>
+                        <option value="from-red-600/10 via-pink-600/5 to-transparent border-red-500/20" className="bg-slate-900">Airtel Ruby Red (Airtel)</option>
+                        <option value="from-amber-500/10 via-orange-500/5 to-transparent border-amber-500/20" className="bg-slate-900">Banglalink Amber (BL)</option>
                       </select>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[9.5px] font-black text-slate-500 uppercase">Description (বাংলা)</label>
+                    <label className="block text-[9.5px] font-black text-slate-400 uppercase font-mono">Custom Banner Image URL (প্রমো ইমেজ লিংক - ঐচ্ছিক / Optional)</label>
+                    <input 
+                      type="url" 
+                      placeholder="e.g. https://domain.com/banner.jpg (ইমেজ ব্যানার শো করার জন্য ইমেজ লিংক বসান)"
+                      value={bannerForm.imageUrl || ''}
+                      onChange={(e) => setBannerForm({...bannerForm, imageUrl: e.target.value})}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-emerald-400 font-mono focus:border-emerald-500 placeholder-slate-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9.5px] font-black text-slate-400 uppercase">Description (বাংলা)</label>
                     <textarea 
                       rows={2}
                       required
                       placeholder="ব্যানারের সংক্ষিপ্ত বর্ণনা..."
                       value={bannerForm.desc}
                       onChange={(e) => setBannerForm({...bannerForm, desc: e.target.value})}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 resize-none"
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 resize-none placeholder-slate-700"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9.5px] font-black text-slate-500 uppercase">Description (EN)</label>
+                    <label className="block text-[9.5px] font-black text-slate-400 uppercase">Description (EN)</label>
                     <textarea 
                       rows={2}
                       required
                       placeholder="Promo banner description in or for English..."
                       value={bannerForm.descEn}
                       onChange={(e) => setBannerForm({...bannerForm, descEn: e.target.value})}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 resize-none"
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 resize-none placeholder-slate-700"
                     />
                   </div>
 
-                  <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+                  <div className="flex justify-end gap-2.5 pt-2 border-t border-white/5">
                     <button
                       type="button"
                       onClick={() => setShowBannerForm(false)}
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer"
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-bold cursor-pointer transition-colors"
                     >
                       {lang === 'bn' ? 'বাতিল' : 'Cancel'}
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-xl text-xs font-black shadow-md shadow-blue-500/10 cursor-pointer"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white rounded-xl text-xs font-black shadow-md shadow-blue-500/10 cursor-pointer transition-all active:scale-[0.98]"
                     >
                       {loading ? (lang === 'bn' ? 'রক্ষণ করা হচ্ছে...' : 'Saving...') : (lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save Banner')}
                     </button>
@@ -1154,33 +1210,54 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
               {/* Banners slider control checklist */}
               <div className="space-y-3">
                 {banners.map((ban) => (
-                  <div key={ban.id} className="bg-white border border-slate-150 p-4 rounded-3xl flex items-center justify-between group">
-                    <div className="space-y-1 max-w-[75%]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[8.5px] font-black tracking-widest text-blue-600 uppercase">
-                          {ban.operator} SLIDER
-                        </span>
-                        <span className="text-[9px] text-slate-400">Prefill: ৳{ban.prefillAmount}</span>
+                  <div key={ban.id} className="bg-slate-900/40 backdrop-blur-md border border-white/15 p-4 rounded-3xl flex items-center justify-between gap-3 group hover:bg-slate-900/60 hover:border-white/20 transition-all duration-300">
+                    <div className="flex items-center gap-3.5 max-w-[75%]">
+                      {ban.imageUrl ? (
+                        <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md relative group-hover:scale-105 transition-transform">
+                          <img 
+                            src={ban.imageUrl} 
+                            alt="preview" 
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded-xl shrink-0 bg-slate-950 border border-white/5 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                          {ban.operator}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[9px] font-black tracking-widest text-blue-400 uppercase">
+                            {ban.operator} SLIDER
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold font-mono">Prefill: ৳{ban.prefillAmount}</span>
+                          {ban.imageUrl && (
+                            <span className="text-[8.5px] uppercase font-bold bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/10 font-mono">
+                              Image Banner
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-xs text-white font-extrabold leading-tight">
+                          {lang === 'bn' ? ban.title : ban.titleEn}
+                        </h4>
+                        <p className="text-[10.5px] text-slate-400 leading-normal font-semibold">
+                          {lang === 'bn' ? ban.desc : ban.descEn}
+                        </p>
                       </div>
-                      <h4 className="text-xs text-slate-900 font-extrabold">
-                        {lang === 'bn' ? ban.title : ban.titleEn}
-                      </h4>
-                      <p className="text-[10.5px] text-slate-500 leading-relaxed font-semibold">
-                        {lang === 'bn' ? ban.desc : ban.descEn}
-                      </p>
                     </div>
 
                     <div className="flex flex-col gap-1 shrink-0">
                       <button
                         onClick={() => handleEditBanner(ban)}
-                        className="p-1 px-3 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
+                        className="p-1.5 px-3 bg-white/5 hover:bg-blue-500/20 text-slate-300 hover:text-blue-400 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center gap-1"
                       >
                         <Edit2 className="h-3 w-3 shrink-0" />
                         <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
                       </button>
                       <button
-                        onClick={() => handleDeleteBanner(ban.id)}
-                        className="p-1 px-3 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
+                        onClick={() => handleDeleteBanner(ban.id, lang === 'bn' ? ban.title : ban.titleEn)}
+                        className="p-1.5 px-3 bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center gap-1"
                       >
                         <Trash2 className="h-3 w-3 shrink-0" />
                         <span>{lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}</span>
@@ -1209,6 +1286,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       category: 'Electricity',
                       categoryBn: 'বিদ্যুৎ',
                       logoColor: 'bg-blue-600',
+                      imageUrl: ''
                     });
                     setShowBillerForm(true);
                   }}
@@ -1294,6 +1372,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-[9.5px] font-black text-slate-500 uppercase font-mono">Custom Biller Logo/Image URL (বিলার লোগো বা ইমেজ লিংক - ঐচ্ছিক / Optional)</label>
+                    <input 
+                      type="url" 
+                      placeholder="e.g. https://domain.com/biller-logo.png (বিলার ছবি বা লোগো দেখানোর জন্য লিংক)"
+                      value={billerForm.imageUrl || ''}
+                      onChange={(e) => setBillerForm({...billerForm, imageUrl: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 font-mono text-emerald-600 placeholder-slate-400"
+                    />
+                  </div>
+
                   <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
                     <button
                       type="button"
@@ -1318,9 +1407,20 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 {billers.map((biller) => (
                   <div key={biller.id} className="bg-white border border-slate-150 p-4 rounded-3xl flex items-center justify-between group">
                     <div className="flex items-center gap-3.5">
-                      <div className={`h-11 w-11 rounded-2xl ${biller.logoColor || 'bg-slate-500'} text-white font-bold flex items-center justify-center shadow-sm`}>
-                        {biller.name ? biller.name[0] : 'B'}
-                      </div>
+                      {biller.imageUrl ? (
+                        <div className="h-11 w-11 rounded-2xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
+                          <img 
+                            src={biller.imageUrl} 
+                            alt="biller logo" 
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className={`h-11 w-11 rounded-2xl ${biller.logoColor || 'bg-slate-500'} text-white font-bold flex items-center justify-center shadow-sm`}>
+                          {biller.name ? biller.name[0] : 'B'}
+                        </div>
+                      )}
                       <div className="space-y-0.5">
                         <span className="text-[8.5px] font-black tracking-widest text-slate-400 uppercase">
                           {lang === 'bn' ? biller.categoryBn : biller.category}
@@ -1340,7 +1440,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
                       </button>
                       <button
-                        onClick={() => handleDeleteBiller(biller.id)}
+                        onClick={() => handleDeleteBiller(biller.id, lang === 'bn' ? biller.nameBn : biller.name)}
                         className="p-1 px-3 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
                       >
                         <Trash2 className="h-3 w-3 shrink-0" />
@@ -1355,6 +1455,52 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
         </div>
       </div>
+
+      {/* CUSTOM CONFIRMATION DELETE DIALOG POPUP */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          <div 
+            onClick={() => setDeleteConfirm(null)}
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+          />
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-xl p-6 border border-slate-100 flex flex-col space-y-4 relative z-50 animate-scale-up text-slate-800">
+            <div className="flex items-center gap-2.5 text-rose-600 pb-1 border-b border-slate-100">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <h3 className="text-slate-950 font-black text-sm tracking-tight">
+                {lang === 'bn' ? 'মুছে ফেলার নিশ্চিতকরণ' : 'Confirm Deletion'}
+              </h3>
+            </div>
+
+            <div className="space-y-2 py-1">
+              <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                {lang === 'bn' 
+                  ? `আপনি কি নিশ্চিতভাবে এই ${deleteConfirm.type === 'offer' ? 'অফারটি' : deleteConfirm.type === 'banner' ? 'ব্যানারটি' : 'বিলারটি'} মুছে ফেলতে চান?` 
+                  : `Are you sure you want to permanently delete this ${deleteConfirm.type}?`}
+              </p>
+              <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-3 text-rose-700 font-extrabold text-[12.5px] leading-snug">
+                {deleteConfirm.title}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-98 cursor-pointer text-center"
+              >
+                {lang === 'bn' ? 'বাতিল করুন' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-500/10 transition-all active:scale-98 cursor-pointer text-center"
+              >
+                {lang === 'bn' ? 'হ্যাঁ, মুছে ফেলুন' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REJECTION DISMISSAL INPUT DIALOG POPUP */}
       {rejectingTx && (

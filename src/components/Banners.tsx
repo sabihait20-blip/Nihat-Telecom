@@ -1,19 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
-import { Language, Operator } from '../types';
+import { Language, Operator, PromoBanner } from '../types';
 import { TRANSLATIONS } from '../data/translations';
-
-interface PromoBanner {
-  id: string;
-  title: string;
-  titleEn: string;
-  desc: string;
-  descEn: string;
-  operator: Operator;
-  prefillAmount: number;
-  gradient: string;
-}
 
 const PROMOS: PromoBanner[] = [
   {
@@ -106,31 +95,50 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
             onClick={() => onSelectPromo(activePromo.operator, activePromo.prefillAmount)}
-            className={`border border-slate-100 rounded-[28px] p-5 cursor-pointer relative overflow-hidden bg-gradient-to-r ${activePromo.gradient} transition-all group hover:scale-[1.01] hover:shadow-md`}
+            className={`border rounded-[28px] p-5 cursor-pointer relative overflow-hidden transition-all group hover:scale-[1.01] hover:shadow-md min-h-[130px] flex items-center ${
+              activePromo.imageUrl 
+                ? 'bg-slate-950/90 border-slate-800 text-white' 
+                : `border-slate-100 bg-gradient-to-r text-slate-900 ${activePromo.gradient}`
+            }`}
           >
-            {/* Operator background initials */}
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-10 text-9xl font-bold tracking-tighter select-none pointer-events-none">
-              {activePromo.operator}
-            </div>
+            {/* Custom Banner Image if available */}
+            {activePromo.imageUrl && (
+              <>
+                <img 
+                  src={activePromo.imageUrl} 
+                  alt={activePromo.titleEn} 
+                  referrerPolicy="no-referrer"
+                  className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent z-0" />
+              </>
+            )}
 
-            <div className="flex items-start justify-between relative z-10 gap-3">
+            {/* Operator background initials */}
+            {!activePromo.imageUrl && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-10 text-9xl font-bold tracking-tighter select-none pointer-events-none">
+                {activePromo.operator}
+              </div>
+            )}
+
+            <div className="flex items-start justify-between relative z-10 gap-3 w-full">
               <div className="space-y-1 max-w-[80%]">
                 <div className="flex items-center gap-1.5">
-                  <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
-                  <span className="text-xs font-semibold text-blue-600 tracking-wider uppercase">
+                  <span className={`flex h-2 w-2 rounded-full ${activePromo.imageUrl ? 'bg-amber-400' : 'bg-blue-600'} animate-pulse`} />
+                  <span className={`text-[10px] font-black tracking-wider uppercase ${activePromo.imageUrl ? 'text-amber-400' : 'text-blue-600'}`}>
                     PROMO
                   </span>
                 </div>
-                <h4 className="text-slate-900 text-sm font-bold tracking-tight">
+                <h4 className={`text-sm font-extrabold tracking-tight ${activePromo.imageUrl ? 'text-white' : 'text-slate-900'}`}>
                   {lang === 'bn' ? activePromo.title : activePromo.titleEn}
                 </h4>
-                <p className="text-slate-500 text-xs leading-relaxed font-medium">
+                <p className={`text-xs leading-relaxed font-semibold ${activePromo.imageUrl ? 'text-slate-200' : 'text-slate-500'}`}>
                   {lang === 'bn' ? activePromo.desc : activePromo.descEn}
                 </p>
               </div>
 
-              <div className="h-9 w-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 group-hover:scale-105 transition-transform duration-300">
-                <Zap className="h-4.5 w-4.5 fill-white/10" />
+              <div className={`h-9 w-9 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300 ${activePromo.imageUrl ? 'bg-amber-500 text-slate-950 shadow-amber-500/10' : 'bg-blue-600 text-white shadow-blue-600/20'}`}>
+                <Zap className="h-4.5 w-4.5 fill-current/10" />
               </div>
             </div>
           </motion.div>

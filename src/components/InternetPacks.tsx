@@ -131,26 +131,38 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
                 {pkg.operator}
               </div>
 
-              <div className="space-y-1 pr-10">
-                <div className="flex items-center gap-1.5">
-                  {pkg.isPopular && (
-                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-amber-500/12 text-amber-600 border border-amber-500/10 px-2 py-0.5 rounded-md">
-                      <Sparkles className="h-2.5 w-2.5 fill-amber-500/10" />
-                      {t.popularBadge}
+              <div className="flex gap-4">
+                {pkg.imageUrl && (
+                  <div className="h-16 w-16 md:h-20 md:w-20 rounded-2xl overflow-hidden shrink-0 border border-slate-100/60 shadow-sm self-start mt-1 bg-slate-50">
+                    <img 
+                      src={pkg.imageUrl} 
+                      alt={pkg.title} 
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1 pr-10 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {pkg.isPopular && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-amber-500/12 text-amber-600 border border-amber-500/10 px-2 py-0.5 rounded-md">
+                        <Sparkles className="h-2.5 w-2.5 fill-amber-500/10" />
+                        {t.popularBadge}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      {lang === 'bn' ? pkg.category === 'internet' ? 'ইন্টারনেট' : pkg.category === 'talktime' ? 'ভয়েস কল' : 'বান্ডেল' : pkg.category}
                     </span>
-                  )}
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                    {lang === 'bn' ? pkg.category === 'internet' ? 'ইন্টারনেট' : pkg.category === 'talktime' ? 'ভয়েস কল' : 'বান্ডেল' : pkg.category}
-                  </span>
-                </div>
+                  </div>
 
-                <h3 className="text-slate-900 font-bold text-sm tracking-tight font-display">
-                  {lang === 'bn' ? pkg.titleBn : pkg.title}
-                </h3>
-                
-                <p className="text-slate-500 text-xs leading-relaxed font-medium">
-                  {lang === 'bn' ? pkg.descriptionBn : pkg.description}
-                </p>
+                  <h3 className="text-slate-900 font-bold text-sm tracking-tight font-display">
+                    {lang === 'bn' ? pkg.titleBn : pkg.title}
+                  </h3>
+                  
+                  <p className="text-slate-500 text-xs leading-relaxed font-medium">
+                    {lang === 'bn' ? pkg.descriptionBn : pkg.description}
+                  </p>
+                </div>
               </div>
 
               {/* Card Footer pricing row */}

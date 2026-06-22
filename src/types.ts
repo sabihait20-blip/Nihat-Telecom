@@ -26,6 +26,7 @@ export interface RechargePackage {
   description: string;
   descriptionBn: string;
   isPopular?: boolean;
+  imageUrl?: string;
 }
 
 export interface Transaction {
@@ -61,6 +62,7 @@ export interface BillProvider {
   category: 'Electricity' | 'Water' | 'Gas' | 'Internet' | 'Education';
   categoryBn: string;
   logoColor: string;
+  imageUrl?: string;
 }
 
 export interface PromoBanner {
@@ -72,6 +74,7 @@ export interface PromoBanner {
   operator: Operator;
   prefillAmount: number;
   gradient: string;
+  imageUrl?: string;
 }
 
 export type AppTab = 'home' | 'packages' | 'history' | 'profile';
