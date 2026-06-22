@@ -72,17 +72,6 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
     }
   };
 
-  // Pre-fill TrxID generator for ease of simulation
-  const handleAutoFillTrx = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 9; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setTrxId(result);
-    setSenderNumber('017' + Math.floor(10000000 + Math.random() * 90000000).toString());
-    setValidationError('');
-  };
 
   const handleAddFundSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,19 +302,12 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
             </div>
           </div>
 
-          {/* Trx ID input with auto-fill helper */}
+          {/* Trx ID input */}
           <div className="space-y-1">
             <div className="flex justify-between items-center px-1">
               <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">
                 {labels.trxLabel}
               </label>
-              <button
-                type="button"
-                onClick={handleAutoFillTrx}
-                className="text-[9.5px] font-black text-blue-600 hover:underline cursor-pointer"
-              >
-                {lang === 'bn' ? 'অটোফিল আইডি জেনারেট' : 'Auto-Generate Fake TrxID'}
-              </button>
             </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">

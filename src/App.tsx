@@ -230,6 +230,28 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Synchronize user profile into a global admin-accessible registered_users collection
+  useEffect(() => {
+    if (!currentUser) return;
+    const syncProfile = async () => {
+      try {
+        const userProfileRef = doc(db, 'registered_users', currentUser.uid);
+        await setDoc(userProfileRef, {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || 'Unknown User',
+          email: currentUser.email || '',
+          phone: currentUser.email?.endsWith('@nihat-telecom.com') 
+            ? currentUser.email.split('@')[0] 
+            : '',
+          lastActive: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.error("Error syncing user profile: ", err);
+      }
+    };
+    syncProfile();
+  }, [currentUser]);
+
   // Firestore balance observer scoped to logged in user
   useEffect(() => {
     if (!currentUser) return;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut
+  LogOut, User
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
@@ -26,9 +26,28 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+  // Users Management State Helpers
+  const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
+  const [searchUserQuery, setSearchUserQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [selectedUserBalance, setSelectedUserBalance] = useState<number | null>(null);
+  const [selectedUserHistory, setSelectedUserHistory] = useState<Transaction[]>([]);
+  const [loadingUserHistory, setLoadingUserHistory] = useState(false);
+  const [userBalanceAdjustValue, setUserBalanceAdjustValue] = useState('');
+  const [userBalanceAdjustType, setUserBalanceAdjustType] = useState<'increment' | 'decrement' | 'set'>('increment');
+  const [userBalanceAdjustReason, setUserBalanceAdjustReason] = useState('');
+  const [userBalanceAdjustReasonBn, setUserBalanceAdjustReasonBn] = useState('');
+
+  // Custom single-user notification state
+  const [isSendingNotif, setIsSendingNotif] = useState(false);
+  const [customNotifTitle, setCustomNotifTitle] = useState('');
+  const [customNotifTitleBn, setCustomNotifTitleBn] = useState('');
+  const [customNotifDesc, setCustomNotifDesc] = useState('');
+  const [customNotifDescBn, setCustomNotifDescBn] = useState('');
   
   // Rejection modal state
   const [rejectingTx, setRejectingTx] = useState<Transaction | null>(null);
@@ -155,6 +174,61 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
     return () => unsubscribe();
   }, []);
+
+  // 5. Listen for registered_users list
+  useEffect(() => {
+    const q = collection(db, 'registered_users');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id });
+      });
+      setRegisteredUsers(list);
+    }, (error) => {
+      console.error("Error loading registered users list: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 6. Listen for selected user balance and history on demand
+  useEffect(() => {
+    if (!selectedUser) {
+      setSelectedUserBalance(null);
+      setSelectedUserHistory([]);
+      return;
+    }
+
+    setLoadingUserHistory(true);
+
+    const balanceRef = doc(db, 'users', selectedUser.uid, 'wallet', 'balance_doc');
+    const unsubBalance = onSnapshot(balanceRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setSelectedUserBalance(docSnap.data().balance);
+      } else {
+        setSelectedUserBalance(0);
+      }
+    });
+
+    const historyRef = collection(db, 'users', selectedUser.uid, 'transactions');
+    const q = query(historyRef, orderBy('date', 'desc'));
+    const unsubHistory = onSnapshot(q, (snapshot) => {
+      const list: Transaction[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id } as Transaction);
+      });
+      setSelectedUserHistory(list);
+      setLoadingUserHistory(false);
+    }, (err) => {
+      console.error("Error loading selected user history: ", err);
+      setLoadingUserHistory(false);
+    });
+
+    return () => {
+      unsubBalance();
+      unsubHistory();
+    };
+  }, [selectedUser]);
 
   // Process Approval of Request
   const handleApprove = async (tx: Transaction) => {
@@ -494,6 +568,120 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     });
   };
 
+  const handleAdjustUserBalance = async () => {
+    if (!selectedUser || selectedUserBalance === null) return;
+    const amount = parseFloat(userBalanceAdjustValue);
+    if (isNaN(amount) || amount <= 0) {
+      alert(lang === 'bn' ? 'ভুল পরিমাণ! সঠিক অংক দিন।' : 'Please enter a valid positive amount.');
+      return;
+    }
+
+    try {
+      setActionError('');
+      let newBalance = selectedUserBalance;
+      let typeText = '';
+      let typeTextBn = '';
+      if (userBalanceAdjustType === 'increment') {
+        newBalance += amount;
+        typeText = 'Balance Added by Admin';
+        typeTextBn = 'অ্যাডমিন কর্তৃক ব্যালেন্স যোগ করা হয়েছে';
+      } else if (userBalanceAdjustType === 'decrement') {
+        if (amount > selectedUserBalance) {
+          alert(lang === 'bn' ? 'ব্যবহারকারীর পর্যাপ্ত ব্যালেন্স নেই!' : 'User has insufficient balance for deduction.');
+          return;
+        }
+        newBalance -= amount;
+        typeText = 'Balance Deducted by Admin';
+        typeTextBn = 'অ্যাডমিন কর্তৃক ব্যালেন্স কেটে নেওয়া হয়েছে';
+      } else {
+        newBalance = amount;
+        typeText = 'Balance Set by Admin';
+        typeTextBn = 'অ্যাডমিন কর্তৃক ব্যালেন্স সেট করা হয়েছে';
+      }
+
+      const batch = writeBatch(db);
+
+      // 1. Update wallet balance
+      const balanceRef = doc(db, 'users', selectedUser.uid, 'wallet', 'balance_doc');
+      batch.set(balanceRef, { balance: newBalance });
+
+      // 2. Add custom transaction log to history list
+      const txId = 'ADJ-' + Math.floor(100000 + Math.random() * 900000);
+      const customTx = {
+        id: txId,
+        type: 'CashIn',
+        amount: amount,
+        txId: txId,
+        date: new Date().toLocaleString(),
+        status: 'Approved',
+        targetNumber: selectedUser.phone || 'N/A',
+        billerName: `${typeText} (${userBalanceAdjustReason || 'Support Fix'})`,
+        billerNameBn: `${typeTextBn} (${userBalanceAdjustReasonBn || 'সাপোর্ট সমাধান'})`
+      };
+      const userTxRef = doc(db, 'users', selectedUser.uid, 'transactions', txId);
+      batch.set(userTxRef, customTx);
+
+      // 3. App notification payload
+      const notifId = 'notif-' + Date.now();
+      const notifPayload = {
+        id: notifId,
+        title: 'Wallet Balance Adjusted',
+        titleBn: 'ওয়ালেট ব্যালেন্স সমন্বয় করা হয়েছে',
+        desc: `Your wallet is updated (New: ৳${newBalance}). Memo: ${userBalanceAdjustReason || 'Support fix by administrator'}.`,
+        descBn: `আপনার ওয়ালেট আপডেট করা হয়েছে (নতুন ব্যালেন্স: ৳${newBalance})। বিবরণ: ${userBalanceAdjustReasonBn || 'অ্যাডমিন সাপোর্ট কর্তৃক সমন্বয়'}।`,
+        time: 'Just now',
+        read: false
+      };
+      const notifRef = doc(db, 'users', selectedUser.uid, 'notifications', notifId);
+      batch.set(notifRef, notifPayload);
+
+      await batch.commit();
+
+      // Clear input fields
+      setUserBalanceAdjustValue('');
+      setUserBalanceAdjustReason('');
+      setUserBalanceAdjustReasonBn('');
+      alert(lang === 'bn' ? 'ব্যালেন্স সফলভাবে সমন্বয় করা হয়েছে!' : 'Wallet balance successfully adjusted!');
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Error adjusting balance');
+    }
+  };
+
+  const handleSendCustomNotification = async () => {
+    if (!selectedUser) return;
+    if (!customNotifTitle.trim() && !customNotifTitleBn.trim()) {
+      alert(lang === 'bn' ? 'দয়া করে নোটিফিকেশন টাইটেল দিন!' : 'Please enter notification title!');
+      return;
+    }
+
+    try {
+      setIsSendingNotif(true);
+      const notifId = 'notif-' + Date.now();
+      const notifPayload = {
+        id: notifId,
+        title: customNotifTitle || customNotifTitleBn || 'Alert notification',
+        titleBn: customNotifTitleBn || customNotifTitle || 'জরুরি সতর্কবার্তা',
+        desc: customNotifDesc || 'Notification from administrative staff.',
+        descBn: customNotifDescBn || 'অ্যাডমিনিস্ট্রেটিভ কাস্টমার সাপোর্ট থেকে নোটিফিকেশন।',
+        time: 'Just now',
+        read: false
+      };
+      await setDoc(doc(db, 'users', selectedUser.uid, 'notifications', notifId), notifPayload);
+
+      setCustomNotifTitle('');
+      setCustomNotifTitleBn('');
+      setCustomNotifDesc('');
+      setCustomNotifDescBn('');
+      alert(lang === 'bn' ? 'নোটিফিকেশন সফলভাবে পাঠানো হয়েছে!' : 'Notification successfully sent to user!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Error: ' + err.message);
+    } finally {
+      setIsSendingNotif(false);
+    }
+  };
+
   // Localized texts
   const labels = {
     title: lang === 'bn' ? 'অ্যাডমিন কন্ট্রোল পোর্টাল' : 'Admin Operations Command',
@@ -501,6 +689,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     offers: lang === 'bn' ? 'মোবাইল অফার প্যাক' : 'Manage Packs',
     banners: lang === 'bn' ? 'প্রোমো ব্যানার স্লাইড' : 'Promo Banners',
     billers: lang === 'bn' ? 'ইউটিলিটি বিলার' : 'Manage Billers',
+    users: lang === 'bn' ? 'ইউজার ম্যানেজমেন্ট' : 'Users Management',
   };
 
   if (!isOpen) return null;
@@ -620,6 +809,19 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             }`}
           >
             {labels.billers} ({billers.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveSubTab('users');
+              setSelectedUser(null);
+            }}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'users' 
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+            }`}
+          >
+            {labels.users} ({registeredUsers.length})
           </button>
         </div>
 
@@ -1449,6 +1651,353 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: MANAGED USERS, BALANCES, AND HISTORY SUPPORT */}
+          {activeSubTab === 'users' && (
+            <div className="space-y-4 text-slate-100">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-1">
+                <div>
+                  <span className="text-[10px] font-extrabold text-blue-400 tracking-widest uppercase font-mono">
+                    REGISTERED CLIENT REGISTRY
+                  </span>
+                  <p className="text-xs text-slate-400 mt-1 font-semibold">
+                    {lang === 'bn' ? 'ব্যবহারকারীদের ব্যালেন্স হিস্ট্রি ও যেকোনো সমস্যা সমাধান পোর্টাল' : 'View customer balances, histories, correct states and resolve issue cases.'}
+                  </p>
+                </div>
+
+                {/* Simple client-side search bar */}
+                <div className="w-full md:w-64 relative">
+                  <input
+                    type="text"
+                    placeholder={lang === 'bn' ? 'নাম বা নম্বর দিয়ে খুঁজুন...' : 'Search by name or number...'}
+                    value={searchUserQuery}
+                    onChange={(e) => setSearchUserQuery(e.target.value)}
+                    className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl py-1.5 px-3.5 text-xs font-semibold placeholder-slate-500 outline-none focus:border-blue-500 transition-all font-mono"
+                  />
+                  {searchUserQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchUserQuery('')}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Two-Column Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                {/* Left Side: Users list */}
+                <div className={`space-y-2.5 ${selectedUser ? 'lg:col-span-5' : 'lg:col-span-12'}`}>
+                  <div className="bg-slate-950/30 border border-white/10 rounded-3xl p-3 max-h-[480px] overflow-y-auto">
+                    {registeredUsers.length === 0 ? (
+                      <div className="text-center py-8 text-xs text-slate-400">
+                        {lang === 'bn' ? 'কোনো রেজিষ্ট্রেশনকৃত ইউজার পাওয়া যায়নি!' : 'No registered users found yet.'}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {registeredUsers
+                          .filter((u) => {
+                            const queryLower = searchUserQuery.toLowerCase().trim();
+                            if (!queryLower) return true;
+                            return (
+                              (u.displayName || '').toLowerCase().includes(queryLower) ||
+                              (u.email || '').toLowerCase().includes(queryLower) ||
+                              (u.phone || '').toLowerCase().includes(queryLower) ||
+                              (u.uid || '').toLowerCase().includes(queryLower)
+                            );
+                          })
+                          .map((userObj) => {
+                            const isSelected = selectedUser?.uid === userObj.uid;
+                            return (
+                              <button
+                                key={userObj.uid}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUser(userObj);
+                                  // Clear input states when switching users
+                                  setUserBalanceAdjustValue('');
+                                  setUserBalanceAdjustReason('');
+                                  setUserBalanceAdjustReasonBn('');
+                                  setCustomNotifTitle('');
+                                  setCustomNotifTitleBn('');
+                                  setCustomNotifDesc('');
+                                  setCustomNotifDescBn('');
+                                }}
+                                className={`w-full text-left p-3.5 rounded-2xl transition-all border flex items-center justify-between cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 border-transparent text-white shadow-lg shadow-blue-600/10'
+                                    : 'bg-slate-950/20 hover:bg-slate-950/40 border-white/5 text-slate-300 hover:text-white'
+                                }`}
+                              >
+                                <div className="space-y-1 pr-2 truncate">
+                                  <h4 className="text-xs font-black truncate">
+                                    {userObj.displayName}
+                                  </h4>
+                                  <p className={`text-[10px] font-mono truncate ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                                    {userObj.phone ? `📱 ${userObj.phone}` : `✉️ ${userObj.email}`}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className={`text-[9px] font-bold block ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
+                                    {lang === 'bn' ? 'শেষ সক্রিয়' : 'Last Active'}
+                                  </span>
+                                  <span className={`text-[10px] font-semibold block font-mono ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                    {userObj.lastActive ? new Date(userObj.lastActive).toLocaleDateString() : 'N/A'}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Side: Selected User Panel Details (Balance History & Action Tools) */}
+                {selectedUser ? (
+                  <div className="lg:col-span-7 bg-slate-950/40 border border-white/10 rounded-3xl p-5 space-y-5">
+                    {/* Header profile details info card */}
+                    <div className="flex justify-between items-start border-b border-white/5 pb-4 text-slate-100">
+                      <div>
+                        <span className="text-[9px] font-black tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/15 rounded px-1.5 py-0.5 uppercase font-mono">
+                          {lang === 'bn' ? 'নির্বাচিত ইউজার প্রোফাইল' : 'Selected Customer Profile'}
+                        </span>
+                        <h3 className="text-sm font-extrabold text-white mt-2">
+                          {selectedUser.displayName}
+                        </h3>
+                        <p className="text-[11px] font-mono text-slate-400 mt-1">
+                          UID: <span className="text-slate-300">{selectedUser.uid}</span>
+                        </p>
+                        <p className="text-[11px] font-mono text-slate-400 font-medium">
+                          {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
+                        </p>
+                      </div>
+
+                      {/* Close display details button */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUser(null)}
+                        className="p-1 px-2.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl text-[10px] font-bold cursor-pointer transition-colors"
+                      >
+                        {lang === 'bn' ? 'বন্ধ করুন' : 'Clear'}
+                      </button>
+                    </div>
+
+                    {/* Balance stats display */}
+                    <div className="bg-gradient-to-br from-blue-700/20 via-blue-800/10 to-transparent border border-blue-500/15 rounded-3xl p-4 flex justify-between items-center text-slate-100">
+                      <div>
+                        <span className="text-[9.5px] font-extrabold tracking-widest text-blue-300 uppercase block">
+                          {lang === 'bn' ? 'বর্তমান ওয়ালেট ব্যালেন্স' : 'Current Wallet Balance'}
+                        </span>
+                        <div className="text-white text-2xl font-black mt-1 font-mono">
+                          ৳{selectedUserBalance !== null ? selectedUserBalance.toFixed(2) : '...'}
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-blue-600/20 border border-blue-500/30 rounded-2xl text-blue-400 shrink-0">
+                        <CreditCard className="h-6 w-6" />
+                      </div>
+                    </div>
+
+                    {/* SUPPORT SYSTEM CONTROLLER ACTIONS: Adjust Balance and Send Alerts */}
+                    <div className="space-y-4 border-t border-b border-white/5 py-4">
+                      <h4 className="text-xs font-black text-white tracking-wide flex items-center gap-1.5 uppercase font-mono">
+                        <Layers className="h-4 w-4 text-emerald-400" />
+                        <span>{lang === 'bn' ? 'সমস্যা সমাধান কার্যক্রম' : 'Problem Resolution Actions'}</span>
+                      </h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Box 1: Adjust Wallet Balance Tool */}
+                        <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 space-y-3">
+                          <span className="text-[10px] font-black text-rose-300 block uppercase tracking-wider font-mono">
+                            💰 {lang === 'bn' ? 'ব্যালেন্স সংশোধন করুন' : 'Adjust Funds / Balance'}
+                          </span>
+                          
+                          <div className="flex gap-1 bg-slate-950/60 p-1 rounded-xl">
+                            {(['increment', 'decrement', 'set'] as const).map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => setUserBalanceAdjustType(type)}
+                                className={`flex-1 py-1 rounded-lg text-[9px] font-extrabold capitalize cursor-pointer transition-colors ${
+                                  userBalanceAdjustType === type
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                {type === 'increment' ? (lang === 'bn' ? 'যোগ' : 'Add') : type === 'decrement' ? (lang === 'bn' ? 'কর্তন' : 'Deduct') : (lang === 'bn' ? 'সেট' : 'Set')}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="space-y-2">
+                            <input
+                              type="number"
+                              required
+                              placeholder={lang === 'bn' ? 'টাকার পরিমাণ' : 'Amount in BDT'}
+                              value={userBalanceAdjustValue}
+                              onChange={(e) => setUserBalanceAdjustValue(e.target.value)}
+                              className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-1.5 text-white text-xs font-bold outline-none focus:border-blue-500 font-mono"
+                            />
+                            <div className="grid grid-cols-1 gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Adjustment Memo (English)"
+                                value={userBalanceAdjustReason}
+                                onChange={(e) => setUserBalanceAdjustReason(e.target.value)}
+                                className="w-full bg-slate-950/40 border border-white/5 rounded-xl px-2 py-1 text-[10px] font-medium text-white outline-none focus:border-blue-500"
+                              />
+                              <input
+                                type="text"
+                                placeholder="সংশোধনের বিবরণ (বাংলা)"
+                                value={userBalanceAdjustReasonBn}
+                                onChange={(e) => setUserBalanceAdjustReasonBn(e.target.value)}
+                                className="w-full bg-slate-950/40 border border-white/5 rounded-xl px-2 py-1 text-[10px] font-medium text-white outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleAdjustUserBalance}
+                              className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black transition-colors shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95"
+                            >
+                              {lang === 'bn' ? 'পরিবর্তন নিশ্চিত করুন' : 'Apply Adjustment'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Box 2: Send Direct Alert Notification */}
+                        <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 space-y-3">
+                          <span className="text-[10px] font-black text-amber-300 block uppercase tracking-wider font-mono">
+                            🔔 {lang === 'bn' ? 'সরাসরি সতর্কতা বার্তা পাঠান' : 'Direct Notification Alert'}
+                          </span>
+
+                          <div className="space-y-1.5">
+                            <div className="grid grid-cols-1 gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Title (EN)"
+                                value={customNotifTitle}
+                                onChange={(e) => setCustomNotifTitle(e.target.value)}
+                                className="w-full bg-slate-950/40 border border-white/5 rounded-xl px-2 py-1 text-[10.5px] font-bold text-white outline-none focus:border-blue-500"
+                              />
+                              <input
+                                type="text"
+                                placeholder="টাইটেল (বাংলা)"
+                                value={customNotifTitleBn}
+                                onChange={(e) => setCustomNotifTitleBn(e.target.value)}
+                                className="w-full bg-slate-950/40 border border-white/5 rounded-xl px-2 py-1 text-[10.5px] font-bold text-white outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Message body (EN)"
+                                value={customNotifDesc}
+                                onChange={(e) => setCustomNotifDesc(e.target.value)}
+                                className="w-full bg-slate-950/40 border border-white/5 rounded-xl px-2 py-1 text-[10px] font-medium text-white outline-none focus:border-blue-500"
+                              />
+                              <input
+                                type="text"
+                                placeholder="বার্তা বিবরণ (বাংলা)"
+                                value={customNotifDescBn}
+                                onChange={(e) => setCustomNotifDescBn(e.target.value)}
+                                className="w-full bg-slate-950/40 border border-white/5 rounded-xl px-2 py-1 text-[10px] font-medium text-white outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleSendCustomNotification}
+                              disabled={isSendingNotif}
+                              className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-700 text-slate-950 rounded-xl text-[10px] font-black transition-colors shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 text-center font-bold"
+                            >
+                              {isSendingNotif ? '...' : (lang === 'bn' ? 'সরাসরি নোটিফিকেশন পাঠান' : 'Send Alert Notif')}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* USER TRANSACTION RECORD HISTORY LIST */}
+                    <div className="space-y-3">
+                      <span className="text-[10px] font-black text-slate-400 tracking-wider uppercase block font-mono">
+                        📋 {lang === 'bn' ? 'ব্যবহারকারীর ব্যালেন্স লেনদেন ইতিহাস' : 'User Balance History Logs'}
+                      </span>
+
+                      <div className="max-h-[250px] overflow-y-auto space-y-2 pr-1.5 scroller-hidden">
+                        {loadingUserHistory ? (
+                          <div className="text-center py-5 text-sm text-slate-400 font-bold">
+                            {lang === 'bn' ? 'লোড হচ্ছে...' : 'Loading history logs...'}
+                          </div>
+                        ) : selectedUserHistory.length === 0 ? (
+                          <div className="text-center py-5 text-xs text-slate-500 border border-dashed border-white/5 rounded-2xl">
+                            {lang === 'bn' ? 'এই গ্রাহকের কোনো ট্রানজেকশন রেকর্ড নেই।' : 'No transaction logs present for this account.'}
+                          </div>
+                        ) : (
+                          selectedUserHistory.map((hTx) => {
+                            const isApproved = hTx.status === 'Approved';
+                            const isRejected = hTx.status === 'Rejected';
+                            const isCashIn = hTx.type === 'CashIn';
+                            return (
+                              <div
+                                key={hTx.id} 
+                                className="bg-slate-950/30 border border-white/5 p-3 rounded-2xl flex justify-between items-center gap-2.5 text-slate-300"
+                              >
+                                <div className="space-y-1 truncate">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`text-[8px] font-black px-1 py-0.2 rounded uppercase shrink-0 font-mono ${
+                                      isCashIn ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'bg-rose-500/15 text-rose-400 border border-rose-500/25'
+                                    }`}>
+                                      {hTx.type || 'TX'}
+                                    </span>
+                                    <span className="text-[10.5px] font-bold text-white truncate">
+                                      {lang === 'bn' ? (hTx.billerNameBn || hTx.billerName || 'মোবাইল রিচার্জ') : (hTx.billerName || 'Mobile Recharge')}
+                                    </span>
+                                  </div>
+                                  <p className="text-[9.5px] font-mono text-slate-400 truncate">
+                                    ID: <span className="text-slate-300 select-all font-semibold font-mono">{hTx.txId || 'N/A'}</span> • {hTx.date}
+                                  </p>
+                                </div>
+
+                                <div className="text-right shrink-0 font-bold">
+                                  <div className={`text-xs font-black font-mono ${isCashIn ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {isCashIn ? '+' : '-'}৳{hTx.amount}
+                                  </div>
+                                  <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded-full inline-block mt-0.5 ${
+                                    isApproved
+                                      ? 'bg-emerald-500/10 text-emerald-400'
+                                      : isRejected
+                                      ? 'bg-rose-500/10 text-rose-400'
+                                      : 'bg-amber-500/10 text-amber-400'
+                                  }`}>
+                                    {isApproved ? (lang === 'bn' ? 'সফল' : 'Approved') : isRejected ? (lang === 'bn' ? 'ব্যর্থ' : 'Rejected') : (lang === 'bn' ? 'অপেক্ষমান' : 'Pending')}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="lg:col-span-7 bg-slate-950/20 border border-dashed border-white/5 rounded-3xl p-8 flex flex-col items-center justify-center text-center space-y-3 min-h-[300px]">
+                    <div className="p-3.5 bg-white/5 rounded-full text-slate-400">
+                      <User className="h-8 w-8 stroke-[1.5]" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-extrabold text-white">
+                        {lang === 'bn' ? 'গ্রাহক ফাইল লোড করুন' : 'Choose a Customer'}
+                      </h4>
+                      <p className="text-xs text-slate-400 max-w-[280px]">
+                        {lang === 'bn' ? 'বাম পাশের তালিকা থেকে যেকোনো ব্যবহারকারী নির্বাচন করে তাদের ব্যালেন্স হিস্ট্রি দেখতে এবং সমাধান করতে পারবেন।' : 'Select a registered user from the left list to inspect their real-time state, wallet history and adjust status.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
