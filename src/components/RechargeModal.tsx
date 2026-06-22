@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, ArrowLeft, Smartphone, ShieldCheck, CheckCircle2,
-  AlertTriangle, CreditCard, ChevronRight, Download, Share2, HelpCircle
+  AlertTriangle, CreditCard, ChevronRight, Download, Share2, HelpCircle,
+  Users, Search
 } from 'lucide-react';
-import { Operator, ConnectionType, Language } from '../types';
+import { Operator, ConnectionType, Language, FavoriteContact } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 import { OPERATORS } from '../data/mockData';
 
@@ -16,6 +17,7 @@ interface RechargeModalProps {
   onSuccess: (amount: number, operator: Operator, number: string) => void;
   initialOperator?: Operator | null;
   initialAmount?: number | null;
+  favorites?: FavoriteContact[];
 }
 
 export default function RechargeModal({
@@ -26,6 +28,7 @@ export default function RechargeModal({
   onSuccess,
   initialOperator,
   initialAmount,
+  favorites = [],
 }: RechargeModalProps) {
   // Navigation steps: 'number' | 'operator' | 'amount' | 'pin' | 'confirm' | 'success'
   const [step, setStep] = useState<'number' | 'operator' | 'amount' | 'pin' | 'confirm' | 'success'>('number');
@@ -35,6 +38,10 @@ export default function RechargeModal({
   const [amount, setAmount] = useState<string>('');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+
+  // Contact book state managers
+  const [showContactBook, setShowContactBook] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
   
   // Hold-to-confirm animation states
   const [holdProgress, setHoldProgress] = useState(0);
@@ -65,6 +72,8 @@ export default function RechargeModal({
       setPinError(false);
       setHoldProgress(0);
       setIsHolding(false);
+      setShowContactBook(false);
+      setContactSearch('');
     }
   }, [isOpen, initialOperator, initialAmount]);
 
@@ -241,8 +250,16 @@ export default function RechargeModal({
                     value={phoneNumber}
                     placeholder={t.phonePlaceholder}
                     readOnly
-                    className="w-full text-slate-900 bg-slate-50 border-2 border-slate-200/60 rounded-2xl py-3.5 pl-17 pr-4 outline-none font-mono text-lg font-bold tracking-widest text-left"
+                    className="w-full text-slate-900 bg-slate-50 border-2 border-slate-200/60 rounded-2xl py-3.5 pl-17 pr-14 outline-none font-mono text-lg font-bold tracking-widest text-left"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowContactBook(true)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center border-0 outline-none"
+                    title={lang === 'bn' ? 'কন্টাক্ট তালিকা এবং ফোন ডিরেক্টরি' : 'Choose from contact book'}
+                  >
+                    <Users className="h-5 w-5" />
+                  </button>
                 </div>
                 {phoneNumber.length > 0 && phoneNumber.length < 11 && (
                   <p className="text-rose-500 text-[10px] font-semibold flex items-center gap-1">
@@ -620,6 +637,199 @@ export default function RechargeModal({
             </div>
           )}
         </div>
+
+        {/* SECURE OVERLAY CONTACT PICKER & DIRECTORY COMPONENT */}
+        <AnimatePresence>
+          {showContactBook && (
+            <motion.div
+              initial={{ opacity: 0, y: '100%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="absolute inset-0 bg-white z-30 flex flex-col"
+            >
+              {/* Directory Header Banner */}
+              <div className="px-5 py-4.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContactBook(false);
+                      setContactSearch('');
+                    }}
+                    className="p-1 rounded-full hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <span className="font-extrabold text-sm text-slate-800 tracking-tight">
+                    {lang === 'bn' ? 'কন্টাক্ট নম্বর সিলেক্ট করুন' : 'Select Contact Number'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowContactBook(false);
+                    setContactSearch('');
+                  }}
+                  className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Dynamic Instant Search Filter */}
+              <div className="p-4 border-b border-slate-100 bg-white">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Search className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder={lang === 'bn' ? 'নাম বা ফোন নম্বর দিয়ে খুঁজুন...' : 'Search name or mobile number...'}
+                    className="w-full text-xs text-slate-800 bg-slate-50 border border-slate-200/80 rounded-xl py-3 pl-10 pr-10 outline-none focus:border-blue-500 font-medium transition-all"
+                  />
+                  {contactSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setContactSearch('')}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-slate-200 text-slate-500 text-[10px] hover:bg-slate-300 font-bold flex items-center justify-center cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Secure Phone Native Contact Exporter Link (If applicable) */}
+              {typeof navigator !== 'undefined' && 'contacts' in navigator && typeof (navigator as any).contacts?.select === 'function' && (
+                <div className="mx-4 mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex items-center justify-between shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-blue-500 text-white rounded-lg">
+                      <Smartphone className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-[11px] text-blue-800 font-black">
+                        {lang === 'bn' ? 'ডিভাইসের কন্টাক্ট ডিরেক্টরি' : 'Device Address Book'}
+                      </h4>
+                      <p className="text-[9px] text-blue-500 mt-0.5 font-bold">
+                        {lang === 'bn' ? 'সরাসরি ফোনের কন্টাক্ট বুক থেকে বাছুন' : 'Import securely from device storage'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const props = ['name', 'tel'];
+                        const opts = { multiple: false };
+                        // @ts-ignore
+                        const contactsSelected = await navigator.contacts.select(props, opts);
+                        if (contactsSelected && contactsSelected.length > 0) {
+                          const contact = contactsSelected[0];
+                          if (contact.tel && contact.tel.length > 0) {
+                            let rawNum = contact.tel[0].replace(/\s+/g, '').replace(/-/g, '');
+                            if (rawNum.startsWith('+880')) {
+                              rawNum = rawNum.substring(3);
+                            } else if (rawNum.startsWith('880')) {
+                              rawNum = rawNum.substring(2);
+                            } else if (rawNum.startsWith('+88')) {
+                              rawNum = rawNum.replace('+88', '');
+                            }
+                            
+                            if (rawNum.length === 11 && rawNum.startsWith('01')) {
+                              setPhoneNumber(rawNum);
+                            } else if (rawNum.length === 10 && rawNum.startsWith('1')) {
+                              setPhoneNumber('0' + rawNum);
+                            } else {
+                              const digitOnly = rawNum.replace(/\D/g, '');
+                              if (digitOnly.startsWith('880')) {
+                                setPhoneNumber(digitOnly.substring(2));
+                              } else if (digitOnly.length === 11) {
+                                setPhoneNumber(digitOnly);
+                              } else {
+                                alert(lang === 'bn' ? `দুঃখিত, নম্বরটি সঠিক ফরম্যাটে নেই: ${rawNum}` : `Parsed number format invalid: ${rawNum}`);
+                              }
+                            }
+                            setShowContactBook(false);
+                            setContactSearch('');
+                          }
+                        }
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black tracking-wide transition-all cursor-pointer active:scale-95 shadow-sm"
+                  >
+                    {lang === 'bn' ? 'খুলুন' : 'Open'}
+                  </button>
+                </div>
+              )}
+
+              {/* Dynamic Database Contacts list */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+                {(() => {
+                  const contactsToDisplay = favorites;
+                  const filtered = contactsToDisplay.filter(contact => {
+                    const query = contactSearch.toLowerCase();
+                    return contact.name.toLowerCase().includes(query) || contact.number.includes(query);
+                  });
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-12 text-center text-slate-400 space-y-2">
+                        <div className="p-3 bg-slate-50 w-fit rounded-full mx-auto">
+                          <Users className="h-7 w-7 text-slate-350 stroke-[1.5]" />
+                        </div>
+                        <p className="text-xs font-bold">
+                          {lang === 'bn' ? 'কোনো কন্টাক্ট নম্বর খুঁজে পাওয়া যায়নি' : 'No contacts matching search'}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return filtered.map((contact) => {
+                    const opDetails = OPERATORS[contact.operator];
+                    return (
+                      <button
+                        key={contact.id}
+                        type="button"
+                        onClick={() => {
+                          setPhoneNumber(contact.number);
+                          if (contact.operator) {
+                            setSelectedOp(contact.operator);
+                          }
+                          setShowContactBook(false);
+                          setContactSearch('');
+                        }}
+                        className="w-full text-left p-3.5 flex items-center justify-between rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-100/70"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${opDetails?.gradient || 'from-blue-600 to-sky-400'} text-white font-black flex items-center justify-center text-xs tracking-tight shadow-xs uppercase font-display`}>
+                            {contact.name.slice(0, 1)}
+                          </div>
+                          <div>
+                            <h4 className="text-xs text-slate-850 font-extrabold tracking-tight">
+                              {contact.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 font-mono font-bold mt-0.5 tracking-wider">
+                              {contact.number}
+                            </p>
+                          </div>
+                        </div>
+
+                        {opDetails && (
+                          <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg text-white ${opDetails.color} shadow-xs`}>
+                             {lang === 'bn' ? opDetails.nameBn : opDetails.id}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

@@ -1,6 +1,6 @@
 {
-  "name": "Flexiload App",
-  "description": "একটি আধুনিক ও প্রিমিয়াম ফ্লেক্সিলোড এবং রিচার্জ অ্যাপ্লিকেশন যা স্মুথ ফিনটেক এক্সপেরিয়েন্স প্রদান করে। A modern and premium Flexiload and mobile financial utilities app with high-fidelity, high-fidelity UI, smooth animations, and dual-language support.",
+  "name": "Nihad Telecom",
+  "description": "একটি আধুনিক ও প্রিমিয়াম ফ্লেক্সিলোড এবং রিচার্জ অ্যাপ্লিকেশন যা স্মুথ ফিনটেক এক্সপেরিয়েন্স প্রদান করে। A modern and premium Nihad Telecom and mobile financial utilities app with high-fidelity, high-fidelity UI, smooth animations, and dual-language support.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

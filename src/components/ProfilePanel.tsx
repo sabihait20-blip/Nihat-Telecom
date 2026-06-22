@@ -11,16 +11,16 @@ interface ProfilePanelProps {
   lang: Language;
   onLanguageToggle: () => void;
   onNotificationClick: () => void;
-  onResetBalance: () => void;
   onLogout: () => void;
+  onAdminClick?: () => void;
 }
 
 export default function ProfilePanel({
   lang,
   onLanguageToggle,
   onNotificationClick,
-  onResetBalance,
   onLogout,
+  onAdminClick,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -29,8 +29,8 @@ export default function ProfilePanel({
     ? currentUser.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : currentUser?.email
     ? currentUser.email.slice(0, 2).toUpperCase()
-    : 'FL';
-  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Flexiload User';
+    : 'NT';
+  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Nihad Telecom User';
   const userEmail = currentUser?.email || 'user@test.com';
 
   // Security States
@@ -142,30 +142,29 @@ export default function ProfilePanel({
             </div>
           </button>
 
-          {/* Quick Balance recharge testing reset button */}
-          <button
-            onClick={() => {
-              onResetBalance();
-              alert(lang === 'bn' ? 'আপনার ডেমো ব্যালেন্স ৫,০০০ টাকায় রিসেট করা হয়েছে!' : 'Your demo balance has been restored to ৳5,000!');
-            }}
-            id="profile-reset-btn"
-            className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                <Shield className="h-4.5 w-4.5" />
+          {/* Administrative Portal button */}
+          {onAdminClick && (
+            <button
+              onClick={onAdminClick}
+              id="profile-admin-btn"
+              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-[12px] flex items-center justify-center">
+                  <ShieldCheck className="h-4.5 w-4.5 text-blue-600" />
+                </div>
+                <div>
+                  <h4 className="text-slate-800 font-bold text-xs">
+                    {lang === 'bn' ? 'অ্যাডমিন কন্ট্রোল পোর্টাল' : 'Admin Portal Command'}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                    {lang === 'bn' ? 'অফার স্লাইড, প্যাক ও পেন্ডিং পেমেন্ট এপ্রুভাল' : 'Edit slider promos, celular packs & approve payments'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-slate-800 font-bold text-xs">
-                  {lang === 'bn' ? 'ডেমো ব্যালেন্স রিসেট' : 'Reset Demo Wallet'}
-                </h4>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                  {lang === 'bn' ? 'ব্যালেন্স পুনরায় ৫,০০০ টাকা করুন' : 'Restore testing balance to ৳5,000'}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
-          </button>
+              <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
 
           {/* Notifications config */}
           <button

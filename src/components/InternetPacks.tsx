@@ -6,18 +6,21 @@ import { POPULAR_PACKAGES } from '../data/mockData';
 
 interface InternetPacksProps {
   lang: Language;
+  packages?: RechargePackage[];
   onSelectPackage: (operator: Operator, price: number) => void;
 }
 
-export default function InternetPacks({ lang, onSelectPackage }: InternetPacksProps) {
+export default function InternetPacks({ lang, packages = [], onSelectPackage }: InternetPacksProps) {
   const [selectedOpFilter, setSelectedOpFilter] = useState<Operator | 'ALL'>('ALL');
   const [selectedCatFilter, setSelectedCatFilter] = useState<'all' | 'internet' | 'talktime' | 'bundle'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const t = TRANSLATIONS[lang];
 
+  const activePackages = packages.length > 0 ? packages : POPULAR_PACKAGES;
+
   // Filter packages based on Operator, Category, and text query
-  const filteredPackages = POPULAR_PACKAGES.filter((pkg) => {
+  const filteredPackages = activePackages.filter((pkg) => {
     const matchOp = selectedOpFilter === 'ALL' || pkg.operator === selectedOpFilter;
     const matchCat = selectedCatFilter === 'all' || pkg.category === selectedCatFilter;
     

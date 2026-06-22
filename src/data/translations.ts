@@ -1,7 +1,7 @@
 export const TRANSLATIONS = {
   bn: {
-    appName: 'ফ্লেক্সিলোড প্রো',
-    subTitle: 'স্মার্ট ও নিরাপদ ফ্লেক্সিলোড অ্যাপ',
+    appName: 'নিহাদ টেলিকম',
+    subTitle: 'স্মার্ট ও নিরাপদ টেলিকম অ্যাপ',
     home: 'হোম',
     packages: 'প্যাকেজ',
     history: 'ইতিহাস',
@@ -103,15 +103,15 @@ export const TRANSLATIONS = {
     biometricTitle: 'বায়োমেট্রিক লগইন',
     faceTouchId: 'ফেস আইডি / ফিঙ্গারপ্রিন্ট সেন্সর',
     biometricDesc: 'বায়োমেট্রিক স্পর্শ দিয়ে তাৎক্ষণিক অ্যাক্সেস করুন',
-    wrongPin: 'ভুল পিন! দয়া করে সঠিক পিন দিন (ডেমো পিন: ১২৩৪)',
+    wrongPin: 'ভুল পিন! দয়া করে সঠিক পিন দিন',
     biometricError: 'বায়োমেট্রিক যাচাইকরণ ব্যর্থ হয়েছে, আপনার পিন ব্যবহার করুন।',
     unlockBtn: 'ওয়ালেট আনলক করুন',
     registerBiometric: 'বায়োমেট্রিক রেজিস্ট্রেশন করুন',
     biometricRegistered: 'বায়োমেট্রিক সফলভাবে রেজিস্টার করা হয়েছে'
   },
   en: {
-    appName: 'Flexiload Pro',
-    subTitle: 'Smart & Secure Flexiload Solutions',
+    appName: 'Nihad Telecom',
+    subTitle: 'Smart & Secure Telecom Solutions',
     home: 'Home',
     packages: 'Packages',
     history: 'History',
@@ -213,7 +213,7 @@ export const TRANSLATIONS = {
     biometricTitle: 'Biometric Login',
     faceTouchId: 'Face ID / Fingerprint Sensor',
     biometricDesc: 'Use your biometric sensor for instant secure access',
-    wrongPin: 'Incorrect PIN! Please enter the correct PIN (Demo: 1234)',
+    wrongPin: 'Incorrect PIN! Please enter the correct PIN',
     biometricError: 'Biometric verification failed, please use your secure pin.',
     unlockBtn: 'Unlock Wallet',
     registerBiometric: 'Register Biometrics',

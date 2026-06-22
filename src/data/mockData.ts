@@ -156,14 +156,6 @@ export const POPULAR_PACKAGES: RechargePackage[] = [
   }
 ];
 
-export const MOCK_FAVORITE_CONTACTS: FavoriteContact[] = [
-  { id: 'fav-1', name: 'আম্মু (Mom)', number: '01712345678', operator: 'GP', color: 'from-blue-600 to-sky-400' },
-  { id: 'fav-2', name: 'আব্বু (Dad)', number: '01887654321', operator: 'Robi', color: 'from-orange-500 to-red-400' },
-  { id: 'fav-3', name: 'ভাইয়া (Brother)', number: '01911223344', operator: 'Banglalink', color: 'from-amber-500 to-orange-400' },
-  { id: 'fav-4', name: 'অফিস (Office)', number: '01655667788', operator: 'Airtel', color: 'from-red-600 to-pink-500' },
-  { id: 'fav-5', name: 'নিজ নম্বর (Self)', number: '01599887766', operator: 'Teletalk', color: 'from-emerald-600 to-teal-400' }
-];
-
 export const BILL_PROVIDERS: BillProvider[] = [
   { id: 'bill-desco', name: 'DESCO (Electricity)', nameBn: 'ডেসকো (বিদ্যুৎ)', category: 'Electricity', categoryBn: 'বিদ্যুৎ', logoColor: 'bg-green-600' },
   { id: 'bill-dpdc', name: 'DPDC (Electricity)', nameBn: 'ডিপিডিসি (বিদ্যুৎ)', category: 'Electricity', categoryBn: 'বিদ্যুৎ', logoColor: 'bg-emerald-600' },
@@ -171,55 +163,4 @@ export const BILL_PROVIDERS: BillProvider[] = [
   { id: 'bill-titas', name: 'Titas Gas (Gas)', nameBn: 'তিতাস গ্যাস (গ্যাস)', category: 'Gas', categoryBn: 'গ্যাস', logoColor: 'bg-amber-600' },
   { id: 'bill-amber', name: 'Amber IT (Internet)', nameBn: 'অ্যাম্বার আইটি (ইন্টারনেট)', category: 'Internet', categoryBn: 'ইন্টারনেট', logoColor: 'bg-purple-600' },
   { id: 'bill-edu', name: 'Dhaka University (Edu)', nameBn: 'ঢাকা বিশ্ববিদ্যালয় (শিক্ষা)', category: 'Education', categoryBn: 'শিক্ষা', logoColor: 'bg-indigo-600' },
-];
-
-export const INITIAL_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'tx-101',
-    type: 'Recharge',
-    operator: 'GP',
-    targetNumber: '01712345678',
-    amount: 199,
-    date: '2026-06-20 18:42',
-    txId: 'FLX77B28FA1',
-    status: 'Success'
-  },
-  {
-    id: 'tx-102',
-    type: 'Bill',
-    amount: 1450,
-    billerName: 'DESCO (Electricity)',
-    billerNameBn: 'ডেসকো (বিদ্যুৎ)',
-    date: '2026-06-19 11:15',
-    txId: 'FLX99K10PS2',
-    status: 'Success'
-  },
-  {
-    id: 'tx-103',
-    type: 'CashIn',
-    amount: 5000,
-    date: '2026-06-18 14:02',
-    txId: 'FLX34X29DA8',
-    status: 'Success'
-  },
-  {
-    id: 'tx-104',
-    type: 'Recharge',
-    operator: 'Robi',
-    targetNumber: '01887654321',
-    amount: 348,
-    date: '2026-06-16 09:30',
-    txId: 'FLX12O34PQ3',
-    status: 'Success'
-  },
-  {
-    id: 'tx-105',
-    type: 'Bill',
-    amount: 450,
-    billerName: 'Amber IT (Internet)',
-    billerNameBn: 'অ্যাম্বার আইটি (ইন্টারনেট)',
-    date: '2026-06-14 20:01',
-    txId: 'FLX45Z11EE9',
-    status: 'Success'
-  }
 ];

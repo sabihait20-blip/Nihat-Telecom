@@ -10,7 +10,7 @@ interface AddFundModalProps {
   lang: Language;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (amount: number, method: string) => void;
+  onSuccess: (amount: number, method: string, trxId: string, senderNumber: string) => void;
 }
 
 type DepositMethod = 'bkash' | 'nagad' | 'rocket';
@@ -118,7 +118,7 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
       
       // Complete transaction sync callback after success screen animations
       setTimeout(() => {
-        onSuccess(amt, getMethodName(method));
+        onSuccess(amt, getMethodName(method), trxId, senderNumber);
         setShowSuccessOverlay(false);
         // Reset states
         setAmountInput('');

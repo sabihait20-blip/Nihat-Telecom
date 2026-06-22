@@ -50,22 +50,27 @@ const PROMOS: PromoBanner[] = [
 
 interface BannersProps {
   lang: Language;
+  banners?: PromoBanner[];
   onSelectPromo: (operator: Operator, amount: number) => void;
 }
 
-export default function Banners({ lang, onSelectPromo }: BannersProps) {
+export default function Banners({ lang, banners = [], onSelectPromo }: BannersProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const t = TRANSLATIONS[lang];
 
+  const activeBanners = banners.length > 0 ? banners : PROMOS;
+
   const handleNext = () => {
-    setActiveIndex((prev) => (prev + 1) % PROMOS.length);
+    setActiveIndex((prev) => (prev + 1) % activeBanners.length);
   };
 
   const handlePrev = () => {
-    setActiveIndex((prev) => (prev - 1 + PROMOS.length) % PROMOS.length);
+    setActiveIndex((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
   };
 
-  const activePromo = PROMOS[activeIndex];
+  if (activeBanners.length === 0) return null;
+
+  const activePromo = activeBanners[activeIndex % activeBanners.length];
 
   return (
     <div className="px-4 py-3">

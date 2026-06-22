@@ -33,12 +33,17 @@ export interface Transaction {
   type: 'Recharge' | 'Bill' | 'CashIn';
   operator?: Operator;
   targetNumber?: string;
+  senderNumber?: string;
   amount: number;
   billerName?: string;
   billerNameBn?: string;
   date: string;
   txId: string;
   status: 'Success' | 'Pending' | 'Failed';
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  rejectionReason?: string;
 }
 
 export interface FavoriteContact {
@@ -56,6 +61,17 @@ export interface BillProvider {
   category: 'Electricity' | 'Water' | 'Gas' | 'Internet' | 'Education';
   categoryBn: string;
   logoColor: string;
+}
+
+export interface PromoBanner {
+  id: string;
+  title: string;
+  titleEn: string;
+  desc: string;
+  descEn: string;
+  operator: Operator;
+  prefillAmount: number;
+  gradient: string;
 }
 
 export type AppTab = 'home' | 'packages' | 'history' | 'profile';

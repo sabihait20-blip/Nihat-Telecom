@@ -66,7 +66,7 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
       }, 500);
     } else {
       setShake(true);
-      setErrorMsg(t.wrongPin || 'Incorrect PIN! Please try again. (Demo: 1234)');
+      setErrorMsg(t.wrongPin || 'Incorrect PIN! Please try again.');
       setPin('');
       setTimeout(() => {
         setShake(false);
