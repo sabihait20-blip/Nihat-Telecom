@@ -18,6 +18,116 @@ const ADMIN_EMAILS = [
   'dhukabuzz420@gmail.com'
 ];
 
+
+function translateBanglaToEnglish(banglaText: string): string {
+  if (!banglaText) return '';
+  
+  // 1. Convert Bangla numbers to English numbers
+  const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  let text = banglaText;
+  for (let i = 0; i < 10; i++) {
+    text = text.replace(new RegExp(banglaDigits[i], 'g'), englishDigits[i]);
+  }
+
+  // 2. Vocabulary translations (exact & substring mapping)
+  const dictionary: [RegExp, string][] = [
+    // Operators
+    [/গ্রামীণফোন/gi, 'GP'],
+    [/গ্রামীণ/gi, 'GP'],
+    [/জিপি/gi, 'GP'],
+    [/রবি/gi, 'Robi'],
+    [/এয়ারটেল/gi, 'Airtel'],
+    [/এয়ারটেল/gi, 'Airtel'],
+    [/বাংলালিংক/gi, 'Banglalink'],
+    [/টেলিটক/gi, 'Teletalk'],
+
+    // Volume & Units
+    [/জিবি/gi, 'GB'],
+    [/জি\.বি\./gi, 'GB'],
+    [/জি বি/gi, 'GB'],
+    [/এমবি/gi, 'MB'],
+    [/এম\.বি\./gi, 'MB'],
+    [/এম বি/gi, 'MB'],
+    [/মিনিট/gi, 'Minutes'],
+    [/টাকা/gi, 'Taka'],
+    [/টাকায়/gi, 'Taka'],
+    [/প্যাক/gi, 'Pack'],
+    [/প্যাকেজ/gi, 'Package'],
+    [/অফার/gi, 'Offer'],
+    [/সব/gi, 'All'],
+    [/দিন/gi, 'Days'],
+    [/ঘণ্টা/gi, 'Hours'],
+    [/ঘन्টা/gi, 'Hours'],
+    [/সপ্তাহ/gi, 'Week'],
+    [/মাস/gi, 'Month'],
+    [/মেয়াদঃ/gi, 'Validity:'],
+    [/মেয়াদ:/gi, 'Validity:'],
+    [/মেয়াদ/gi, 'Validity'],
+    [/আজকের/gi, "Today's"],
+    [/ধামাকা/gi, 'Dhamaka'],
+    [/স্পেশাল/gi, 'Special'],
+    [/ভয়েস/gi, 'Voice'],
+    [/টকটাইম/gi, 'Talktime'],
+    [/টকটইম/gi, 'Talktime'],
+    [/বান্ডেল/gi, 'Bundle'],
+    [/বান্ডিল/gi, 'Bundle'],
+    [/যেকোনো/gi, 'Any'],
+    [/যে কোনো/gi, 'Any'],
+    [/লোকাল/gi, 'Local'],
+    [/নাম্বার/gi, 'Number'],
+    [/নাম্বারে/gi, 'Number'],
+    [/সীমিত/gi, 'Limited'],
+    [/অফুরন্ত/gi, 'Unlimited'],
+    [/আনলিমিটেড/gi, 'Unlimited'],
+    [/হবে/gi, 'will be'],
+    [/এবং/gi, 'and'],
+    [/পাবেন/gi, 'will get'],
+    [/মাত্র/gi, 'Only'],
+    [/সাথে/gi, 'with'],
+    [/ফ্রি/gi, 'Free'],
+  ];
+
+  // Apply substitutions
+  dictionary.forEach(([regex, replacement]) => {
+    text = text.replace(regex, replacement);
+  });
+
+  const banglaToEnPhonetic: { [key: string]: string } = {
+    'ক': 'k', 'খ': 'kh', 'গ': 'g', 'ঘ': 'gh', 'ঙ': 'ng',
+    'চ': 'ch', 'ছ': 'chh', 'জ': 'j', 'ঝ': 'jh', 'ঞ': 'ny',
+    'ট': 't', 'ঠ': 'th', 'ড': 'd', 'ঢ': 'dh', 'ণ': 'n',
+    'ত': 't', 'থ': 'th', 'দ': 'd', 'ধ': 'dh', 'ন': 'n',
+    'প': 'p', 'ফ': 'f', 'ব': 'b', 'ভ': 'v', 'ম': 'm',
+    'য': 'y', 'র': 'r', 'ল': 'l', 'শ': 'sh', 'ष': 'sh', 'স': 's', 'হ': 'h',
+    'ড়': 'r', 'ঢ়': 'rh', 'য়': 'y',
+    'া': 'a', 'ি': 'i', 'ী': 'ee', 'ু': 'u', 'ূ': 'oo', 'ে': 'e', 'ৈ': 'oi', 'ো': 'o', 'ৌ': 'ou',
+    'ং': 'ng', 'ঃ': 'h', 'ঁ': 'n',
+    'ৎ': 't', '্': ''
+  };
+
+  let phoneticText = '';
+  for (let char of text) {
+    if (banglaToEnPhonetic[char] !== undefined) {
+      phoneticText += banglaToEnPhonetic[char];
+    } else {
+      phoneticText += char;
+    }
+  }
+
+  // Clean up whitespace
+  phoneticText = phoneticText.replace(/\s+/g, ' ').trim();
+
+  // Capitalize words elegantly (First letter of each word)
+  return phoneticText.split(' ').map(word => {
+    if (!word) return '';
+    if (word.toLowerCase() === 'gp') return 'GP';
+    if (word.toLowerCase() === 'gb') return 'GB';
+    if (word.toLowerCase() === 'mb') return 'MB';
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+}
+
 interface AdminPanelProps {
   lang: Language;
   isOpen: boolean;
@@ -1461,7 +1571,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Title (EN)</label>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase flex justify-between items-center">
+                        <span>Title (EN)</span>
+                        <span className="text-[8px] font-extrabold text-blue-500 lowercase bg-blue-50 px-1 py-0.5 rounded">auto-generated</span>
+                      </label>
                       <input 
                         type="text" 
                         required
@@ -1478,7 +1591,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         required
                         placeholder="রবি ৩০ জিবি প্যাক"
                         value={offerForm.titleBn}
-                        onChange={(e) => setOfferForm({...offerForm, titleBn: e.target.value})}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOfferForm({
+                            ...offerForm,
+                            titleBn: val,
+                            title: translateBanglaToEnglish(val)
+                          });
+                        }}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
                     </div>
@@ -1526,7 +1646,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Validity (EN)</label>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase flex justify-between items-center">
+                        <span>Validity (EN)</span>
+                        <span className="text-[8px] font-extrabold text-blue-500 lowercase bg-blue-50 px-1 py-0.5 rounded">auto-generated</span>
+                      </label>
                       <input 
                         type="text" 
                         required
@@ -1543,7 +1666,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         required
                         placeholder="৩০ দিন"
                         value={offerForm.validityBn}
-                        onChange={(e) => setOfferForm({...offerForm, validityBn: e.target.value})}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOfferForm({
+                            ...offerForm,
+                            validityBn: val,
+                            validity: translateBanglaToEnglish(val)
+                          });
+                        }}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
                     </div>
@@ -1551,7 +1681,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Volume Volume (EN)</label>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase flex justify-between items-center">
+                        <span>Volume Volume (EN)</span>
+                        <span className="text-[8px] font-extrabold text-blue-500 lowercase bg-blue-50 px-1 py-0.5 rounded">auto-generated</span>
+                      </label>
                       <input 
                         type="text" 
                         required
@@ -1568,14 +1701,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         required
                         placeholder="৩০ জিবি"
                         value={offerForm.volumeBn}
-                        onChange={(e) => setOfferForm({...offerForm, volumeBn: e.target.value})}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOfferForm({
+                            ...offerForm,
+                            volumeBn: val,
+                            volume: translateBanglaToEnglish(val)
+                          });
+                        }}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[9.5px] font-black text-slate-500 uppercase">Description (EN)</label>
+                    <label className="block text-[9.5px] font-black text-slate-500 uppercase flex justify-between items-center">
+                      <span>Description (EN)</span>
+                      <span className="text-[8px] font-extrabold text-blue-500 lowercase bg-blue-50 px-1 py-0.5 rounded">auto-generated</span>
+                    </label>
                     <textarea 
                       rows={2}
                       required
@@ -1592,7 +1735,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       required
                       placeholder="অফারের বর্ণনা..."
                       value={offerForm.descriptionBn}
-                      onChange={(e) => setOfferForm({...offerForm, descriptionBn: e.target.value})}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setOfferForm({
+                          ...offerForm,
+                          descriptionBn: val,
+                          description: translateBanglaToEnglish(val)
+                        });
+                      }}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 resize-none"
                     />
                   </div>
