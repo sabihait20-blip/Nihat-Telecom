@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
-  Monitor, LogOut, Globe, Plus, Home, Package, User
+  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent
 } from 'lucide-react';
 
 // Data types & assets
@@ -617,13 +617,13 @@ export default function App() {
     }
   };
 
-  // Home Dashboard quick shortcut grids
+  // Home Dashboard quick shortcut grids restored with bKash pink color design and macOS dock spring animation styles
   const gridServices = [
     {
       id: 'recharge',
       title: t.mobileRecharge,
       icon: Smartphone,
-      color: 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm shadow-blue-500/5',
+      color: 'bg-pink-50 text-[#e2125d] border border-pink-100/40 shadow-xs shadow-pink-500/2',
       action: () => {
         setPrefilledOp(null);
         setPrefilledAmt(null);
@@ -634,21 +634,21 @@ export default function App() {
       id: 'packs',
       title: t.internetPackage,
       icon: Wifi,
-      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm shadow-indigo-500/5',
+      color: 'bg-emerald-50 text-emerald-600 border border-emerald-100/40 shadow-xs shadow-emerald-500/2',
       action: () => setActiveTab('packages')
     },
     {
       id: 'bill',
       title: t.billPayment,
       icon: Landmark,
-      color: 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm shadow-emerald-500/5',
+      color: 'bg-amber-50 text-amber-600 border border-amber-100/40 shadow-xs shadow-amber-500/2',
       action: () => setIsBillPayOpen(true)
     },
     {
       id: 'history',
       title: t.transactionHistory,
       icon: History,
-      color: 'bg-amber-50 text-amber-600 border border-amber-100 shadow-sm shadow-amber-500/5',
+      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
       action: () => setActiveTab('history')
     },
   ];
@@ -1029,6 +1029,7 @@ export default function App() {
                     onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setIsAdminOpen(true) : undefined}
                     helplineNumber={appConfig.helplineNumber}
                     whatsappUrl={appConfig.whatsappUrl}
+                    onAddFundClick={() => setIsAddFundOpen(true)}
                   />
                 </div>
               )}
@@ -1142,25 +1143,37 @@ export default function App() {
                 onAddFundClick={() => setIsAddFundOpen(true)}
               />
 
-              {/* Grid block of Fintech Services */}
+              {/* Grid block of Fintech Services themed like bKash with macOS dock Magnification */}
               <div className="px-4 -mt-12 relative z-20">
-                <div className="bg-white border border-slate-100 rounded-[28px] p-5 shadow-xl grid grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-100/70 rounded-[32px] p-5 shadow-xl grid grid-cols-4 gap-y-5 gap-x-4">
                   {gridServices.map((srv) => {
                     const Icon = srv.icon;
                     return (
-                      <button
+                      <motion.button
                         key={srv.id}
                         onClick={srv.action}
                         id={`home-service-${srv.id}`}
-                        className="flex flex-col items-center justify-center text-center group cursor-pointer focus:outline-none"
+                        whileHover={{ 
+                          scale: 1.14, 
+                          y: -5,
+                          boxShadow: '0 10px 20px rgba(226,18,93,0.08)' 
+                        }}
+                        whileTap={{ scale: 0.92 }}
+                        transition={{ 
+                          type: 'spring', 
+                          stiffness: 400, 
+                          damping: 15 
+                        }}
+                        className="flex flex-col items-center justify-center text-center group cursor-pointer focus:outline-none selection:bg-transparent"
                       >
-                        <div className={`h-13 w-13 rounded-[20px] flex items-center justify-center group-hover:shadow-md group-hover:scale-105 active:scale-95 transition-all mb-2 ${srv.color}`}>
-                          <Icon className="h-5.5 w-5.5 stroke-[2.25]" />
+                        {/* Circular bKash-style icon base container */}
+                        <div className={`h-14 w-14 rounded-full flex items-center justify-center transition-all duration-300 mb-2 border border-white shadow-xs ${srv.color}`}>
+                          <Icon className="h-6 w-6 stroke-[2.25]" />
                         </div>
-                        <span className="text-[10.5px] font-bold text-slate-600 leading-tight block truncate w-full px-0.5">
+                        <span className="text-[10px] font-black text-slate-700 leading-tight block truncate w-full px-0.5 font-sans">
                           {srv.title}
                         </span>
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -1275,6 +1288,7 @@ export default function App() {
               onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setIsAdminOpen(true) : undefined}
               helplineNumber={appConfig.helplineNumber}
               whatsappUrl={appConfig.whatsappUrl}
+              onAddFundClick={() => setIsAddFundOpen(true)}
             />
           )}
         </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   User, Shield, Phone, BellRing, Info, LogOut, ChevronRight,
-  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X
+  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet
 } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
@@ -15,6 +15,7 @@ interface ProfilePanelProps {
   onAdminClick?: () => void;
   helplineNumber?: string;
   whatsappUrl?: string;
+  onAddFundClick?: () => void;
 }
 
 export default function ProfilePanel({
@@ -25,6 +26,7 @@ export default function ProfilePanel({
   onAdminClick,
   helplineNumber = '01970250988',
   whatsappUrl = 'https://wa.me/8801970250988',
+  onAddFundClick,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -121,6 +123,30 @@ export default function ProfilePanel({
         </h3>
 
         <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden shadow-sm divide-y divide-slate-100 font-medium">
+          {/* Add Fund / টাকা যোগ করুন button */}
+          {onAddFundClick && (
+            <button
+              onClick={onAddFundClick}
+              id="profile-add-fund-btn"
+              className="w-full text-left p-3.5 flex items-center justify-between bg-pink-50/20 hover:bg-pink-50/50 transition-colors cursor-pointer group animate-pulse-subtle"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-pink-50 text-[#e2125d] rounded-xl">
+                  <Wallet className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h4 className="text-slate-800 font-bold text-xs">
+                    {lang === 'bn' ? 'অ্যাড ফান্ড (টাকা যোগ করুন)' : 'Add Fund (Deposit)'}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                    {lang === 'bn' ? 'বিকাশ, রকেট বা নগদ দিয়ে ওয়ালেটে টাকা যোগ করুন' : 'Add balance instantly using bKash, Nagad or Rocket'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-[#e2125d] group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
+
           {/* Toggle language switch item */}
           <button
             onClick={onLanguageToggle}

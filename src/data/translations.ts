@@ -15,7 +15,7 @@ export const TRANSLATIONS = {
     
     // Services
     mobileRecharge: 'মোবাইল রিচার্জ',
-    internetPackage: 'ইন্টারনেট প্যাক',
+    internetPackage: 'আজকের অফার',
     billPayment: 'বিল পেমেন্ট',
     balanceCheck: 'ব্যালেন্স চেক',
     transactionHistory: 'লেনদেন ইতিহাস',
@@ -125,7 +125,7 @@ export const TRANSLATIONS = {
     
     // Services
     mobileRecharge: 'Mobile Recharge',
-    internetPackage: 'Internet Packs',
+    internetPackage: "Today's Offer",
     billPayment: 'Bill Pay',
     balanceCheck: 'Balance Check',
     transactionHistory: 'Transactions',

@@ -106,6 +106,16 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [rejectingTx, setRejectingTx] = useState<Transaction | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
 
+  // Added Add/Edit User states
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState({
+    displayName: '',
+    phone: '',
+    email: '',
+    balance: 0
+  });
+
   // New States for Advanced Search & Filters
   const [offerSearchQuery, setOfferSearchQuery] = useState('');
   const [offerOperatorFilter, setOfferOperatorFilter] = useState<string>('All');
@@ -564,6 +574,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
       if (collectionName) {
         await deleteDoc(doc(db, collectionName, id));
+      } else if (type === 'user') {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, 'registered_users', id));
+        batch.delete(doc(db, 'users', id, 'wallet', 'balance_doc'));
+        await batch.commit();
+        if (selectedUser?.uid === id) {
+          setSelectedUser(null);
+        }
       }
       setDeleteConfirm(null);
     } catch (err) {
@@ -745,6 +763,77 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     } finally {
       setIsSendingNotif(false);
     }
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const uid = editingUserId || `user-${Date.now()}`;
+      const userRef = doc(db, 'registered_users', uid);
+      const balanceRef = doc(db, 'users', uid, 'wallet', 'balance_doc');
+      
+      const batch = writeBatch(db);
+      
+      // Save/update registered_users profile doc
+      batch.set(userRef, {
+        uid,
+        displayName: userForm.displayName,
+        phone: userForm.phone,
+        email: userForm.email || (userForm.phone ? `${userForm.phone}@nihat-telecom.com` : `${uid}@nihat-telecom.com`),
+        lastActive: new Date().toISOString()
+      }, { merge: true });
+      
+      // Save/update user balance doc
+      batch.set(balanceRef, {
+        balance: Number(userForm.balance) || 0
+      }, { merge: true });
+      
+      await batch.commit();
+      
+      alert(lang === 'bn' ? 'ব্যবহারকারী তথ্য সফলভাবে সংরক্ষিত হয়েছে!' : 'User information saved successfully!');
+      
+      // Clear states
+      setShowUserForm(false);
+      setEditingUserId(null);
+      setUserForm({
+        displayName: '',
+        phone: '',
+        email: '',
+        balance: 0
+      });
+    } catch (err: any) {
+      console.error("Error saving user: ", err);
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditUser = async (userObj: any) => {
+    setEditingUserId(userObj.uid);
+    
+    let currentBal = 0;
+    try {
+      const balanceSnap = await getDoc(doc(db, 'users', userObj.uid, 'wallet', 'balance_doc'));
+      if (balanceSnap.exists()) {
+        currentBal = balanceSnap.data().balance || 0;
+      }
+    } catch (err) {
+      console.error("Error getting balance for editing: ", err);
+    }
+    
+    setUserForm({
+      displayName: userObj.displayName || '',
+      phone: userObj.phone || '',
+      email: userObj.email || '',
+      balance: currentBal
+    });
+    setShowUserForm(true);
+  };
+
+  const handleDeleteUser = (uid: string, name: string) => {
+    setDeleteConfirm({ id: uid, type: 'user', title: name });
   };
 
   // Localized texts
@@ -2139,26 +2228,131 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </p>
                 </div>
 
-                {/* Simple client-side search bar */}
-                <div className="w-full md:w-64 relative">
-                  <input
-                    type="text"
-                    placeholder={lang === 'bn' ? 'নাম বা নম্বর দিয়ে খুঁজুন...' : 'Search by name or number...'}
-                    value={searchUserQuery}
-                    onChange={(e) => setSearchUserQuery(e.target.value)}
-                    className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl py-1.5 px-3.5 text-xs font-semibold placeholder-slate-500 outline-none focus:border-blue-500 transition-all font-mono"
-                  />
-                  {searchUserQuery && (
-                    <button
+                <div className="flex gap-2 w-full md:w-auto items-center shrink-0">
+                  {/* Add New User button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingUserId(null);
+                      setUserForm({
+                        displayName: '',
+                        phone: '',
+                        email: '',
+                        balance: 0
+                      });
+                      setShowUserForm(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition-colors flex items-center gap-1 shadow-md shadow-blue-500/10 cursor-pointer active:scale-95 shrink-0"
+                  >
+                    <Plus className="h-4 w-4 stroke-[3]" />
+                    <span>{lang === 'bn' ? 'নতুন ইউজার' : 'Add User'}</span>
+                  </button>
+
+                  {/* Simple client-side search bar */}
+                  <div className="relative w-full md:w-64">
+                    <input
+                      type="text"
+                      placeholder={lang === 'bn' ? 'নাম বা নম্বর দিয়ে খুঁজুন...' : 'Search by name or number...'}
+                      value={searchUserQuery}
+                      onChange={(e) => setSearchUserQuery(e.target.value)}
+                      className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl py-1.5 px-3.5 text-xs font-semibold placeholder-slate-500 outline-none focus:border-blue-500 transition-all font-mono"
+                    />
+                    {searchUserQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchUserQuery('')}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Add/Edit User Inline Form Overlay Panel */}
+              {showUserForm && (
+                <form onSubmit={handleSaveUser} className="p-5 bg-white border border-slate-200 rounded-3xl space-y-4 text-slate-800 animate-slide-in">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <h4 className="text-slate-950 font-extrabold text-xs tracking-tight flex items-center gap-1.5">
+                      <User className="h-4.5 w-4.5 text-blue-600" />
+                      <span>{editingUserId ? (lang === 'bn' ? 'ইউজার তথ্য এডিট করুন' : 'Edit User Details') : (lang === 'bn' ? 'নতুন ইউজার রেজিস্টার করুন' : 'Register New User')}</span>
+                    </h4>
+                    <button 
                       type="button"
-                      onClick={() => setSearchUserQuery('')}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                      onClick={() => setShowUserForm(false)}
+                      className="p-1 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
-                  )}
-                </div>
-              </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Full Name (সম্পূর্ণ নাম)</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g. Nihat Ahmed"
+                        value={userForm.displayName}
+                        onChange={(e) => setUserForm({...userForm, displayName: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Mobile Number (মোবাইল নম্বর)</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g. 01970250988"
+                        value={userForm.phone}
+                        onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Email Address (ঐচ্ছিক / Optional Email)</label>
+                      <input 
+                        type="email" 
+                        placeholder="e.g. user@gmail.com"
+                        value={userForm.email}
+                        onChange={(e) => setUserForm({...userForm, email: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Initial Wallet Balance (৳)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={userForm.balance}
+                        onChange={(e) => setUserForm({...userForm, balance: parseFloat(e.target.value) || 0})}
+                        className="w-full bg-slate-50 border border-slate-400 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowUserForm(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-xl text-xs font-black shadow-md shadow-blue-500/10 cursor-pointer"
+                    >
+                      {loading ? (lang === 'bn' ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving...') : (lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save User')}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Two-Column Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -2247,6 +2441,26 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <p className="text-[11px] font-mono text-slate-400 font-medium">
                           {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
                         </p>
+
+                        {/* Edit / Delete control buttons */}
+                        <div className="flex gap-2.5 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => handleEditUser(selectedUser)}
+                            className="p-1 px-2.5 bg-white/5 hover:bg-blue-600/20 text-slate-300 hover:text-blue-400 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                            <span>{lang === 'bn' ? 'প্রোফাইল এডিট' : 'Edit Profile'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(selectedUser.uid, selectedUser.displayName)}
+                            className="p-1 px-2.5 bg-white/5 hover:bg-rose-600/20 text-slate-300 hover:text-rose-400 border border-white/5 hover:border-rose-500/20 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>{lang === 'bn' ? 'ইউজার ডিলেট' : 'Delete User'}</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Close display details button */}
@@ -2681,8 +2895,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             <div className="space-y-2 py-1">
               <p className="text-xs text-slate-500 font-medium leading-relaxed">
                 {lang === 'bn' 
-                  ? `আপনি কি নিশ্চিতভাবে এই ${deleteConfirm.type === 'offer' ? 'অফারটি' : deleteConfirm.type === 'banner' ? 'ব্যানারটি' : 'বিলারটি'} মুছে ফেলতে চান?` 
-                  : `Are you sure you want to permanently delete this ${deleteConfirm.type}?`}
+                  ? `আপনি কি নিশ্চিতভাবে এই ${deleteConfirm.type === 'offer' ? 'অফারটি' : deleteConfirm.type === 'banner' ? 'ব্যানারটি' : deleteConfirm.type === 'user' ? 'গ্রাহক প্রোফাইলটি' : 'বিলারটি'} মুছে ফেলতে চান?` 
+                  : `Are you sure you want to permanently delete this ${deleteConfirm.type === 'user' ? 'customer profile' : deleteConfirm.type}?`}
               </p>
               <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-3 text-rose-700 font-extrabold text-[12.5px] leading-snug">
                 {deleteConfirm.title}

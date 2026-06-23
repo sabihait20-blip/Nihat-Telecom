@@ -78,9 +78,9 @@ export default function FavoritesGrid({
         <button
           onClick={() => setIsAdding(!isAdding)}
           id="add-fav-toggle-btn"
-          className="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+          className="text-xs font-black text-[#e2125d] bg-pink-50 hover:bg-pink-100/80 px-3 py-1.5 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
         >
-          <Plus className="h-3 w-3" />
+          <Plus className="h-3 w-3 text-[#e2125d] stroke-[2.5px]" />
           <span>{isAdding ? t.close : t.addFav}</span>
         </button>
       </div>
@@ -126,7 +126,7 @@ export default function FavoritesGrid({
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/15 rounded-lg cursor-pointer"
+              className="px-4 py-1.5 text-[11px] font-black text-white bg-[#e2125d] hover:bg-pink-700 shadow-md shadow-pink-500/15 rounded-lg cursor-pointer transition-colors"
             >
               {lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save'}
             </button>

@@ -712,7 +712,7 @@ export default function RechargeModal({
               </div>
 
               {/* Secure Phone Native Contact Exporter Link (If applicable) */}
-              {typeof navigator !== 'undefined' && 'contacts' in navigator && typeof (navigator as any).contacts?.select === 'function' && (
+              {typeof navigator !== 'undefined' && 'contacts' in navigator && typeof (navigator as any).contacts?.select === 'function' && (typeof window !== 'undefined' && window.self === window.top) && (
                 <div className="mx-4 mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex items-center justify-between shadow-xs">
                   <div className="flex items-center gap-2.5">
                     <div className="p-1.5 bg-blue-500 text-white rounded-lg">
