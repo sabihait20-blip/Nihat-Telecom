@@ -254,33 +254,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
       <div className="absolute top-0 left-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-72 h-72 bg-blue-500/15 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Dynamic Firebase configuration setup button */}
-      <div className="absolute top-4 right-4 z-20">
-        <button
-          type="button"
-          onClick={() => {
-            setShowConfigModal(true);
-            setConfigError('');
-            setConfigSuccess('');
-            // Pre-fill with current config if custom config exists in localstorage
-            const saved = localStorage.getItem('custom_firebase_config');
-            if (saved) {
-              try {
-                const parsed = JSON.parse(saved);
-                setPastedConfigText(JSON.stringify(parsed, null, 2));
-              } catch (e) {
-                setPastedConfigText('');
-              }
-            } else {
-              setPastedConfigText('');
-            }
-          }}
-          className="px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 border border-white/10 rounded-full flex items-center gap-1.5 text-xs font-bold transition-all shadow-lg active:scale-95 cursor-pointer"
-        >
-          <Settings className="h-4 w-4" />
-          <span>{lang === 'bn' ? 'সিক্রেট কোড' : 'Secret Setup'}</span>
-        </button>
-      </div>
+
 
       {/* Top Header Logo Banner */}
       <div className="px-6 pt-10 pb-4 text-center relative z-10">
@@ -470,110 +444,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
         </button>
       </div>
 
-      {/* FIREBASE CONFIGURATION SECRET MODAL */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in text-slate-100 select-none">
-          <div className="bg-slate-900 border border-white/10 rounded-[28px] max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            
-            {/* Modal Header */}
-            <div className="bg-slate-950 px-6 py-5 border-b border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-emerald-400" />
-                <div>
-                  <h3 className="font-extrabold text-sm tracking-tight text-white leading-none">
-                    {lang === 'bn' ? 'ফায়ারবেস সিক্রেট কোড সেটআপ' : 'Firebase Developer Settings'}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-mono mt-1 uppercase tracking-wider">
-                    {lang === 'bn' ? 'নিজস্ব ফায়ারবেস ডেটাবেজ কানেকশন' : 'Custom Firebase Config'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConfigModal(false)}
-                className="p-1.5 rounded-full hover:bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer"
-              >
-                <span className="text-xs shrink-0 px-2 font-mono">{lang === 'bn' ? 'বন্ধ' : 'Close'} [X]</span>
-              </button>
-            </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-4 flex-1 text-xs leading-relaxed text-slate-300">
-              <p className="text-slate-300">
-                {lang === 'bn' 
-                  ? 'আপনার নিজের ফায়ারবেস অ্যাকাউন্ট নিয়োজিত করতে চান? আপনার Firebase Console > Project Settings > Web configuration থেকে SDK কোড বা স্ক্রিপ্টটি কপি করুন এবং নিচের বক্সে সম্পূর্ণ পেস্ট করুন।' 
-                  : 'To connect this telecom application to your own Firebase backend database, paste your Firebase SDK Client config snippet or object inside the text area below.'}
-              </p>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 font-mono">
-                  {lang === 'bn' ? 'আপনার ফায়ারবেস কোড (কোড বা টেক্সট পেস্ট করুন):' : 'PASTE CODE BLOCK / OBJECT HERE:'}
-                </label>
-                <textarea
-                  className="w-full bg-slate-950 border border-white/10 rounded-2xl p-4 font-mono text-[11px] text-emerald-300 focus:outline-none focus:border-emerald-500 h-44 placeholder-slate-600 leading-normal"
-                  value={pastedConfigText}
-                  onChange={(e) => setPastedConfigText(e.target.value)}
-                  placeholder={
-                    lang === 'bn'
-                      ? 'const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "your-project.firebaseapp.com",\n  projectId: "your-project",\n  ...\n};'
-                      : 'const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "your-project.firebaseapp.com",\n  projectId: "your-project",\n  ...\n};'
-                  }
-                />
-              </div>
-
-              {/* Status alerts */}
-              {configError && (
-                <div className="p-3 bg-red-500/15 border border-red-500/20 text-red-300 rounded-2xl flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{configError}</span>
-                </div>
-              )}
-
-              {configSuccess && (
-                <div className="p-3 bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 rounded-2xl flex items-center gap-2">
-                  <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-emerald-400" />
-                  <span>{configSuccess}</span>
-                </div>
-              )}
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveConfig}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl py-3 text-xs tracking-wide shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all cursor-pointer border-0"
-                >
-                  {lang === 'bn' ? 'কোড সেভ ও রিলোড করুন' : 'Save Config & Reload App'}
-                </button>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleResetConfig}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold rounded-2xl py-2.5 text-xs transition-all cursor-pointer border border-white/5 active:scale-[0.98]"
-                  >
-                    {lang === 'bn' ? 'রিমোভ কাস্টম / রিসেট করুন' : 'Remove Custom / Reset'}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setShowConfigModal(false)}
-                    className="flex-1 bg-slate-950 hover:bg-white/5 text-slate-400 font-bold rounded-2xl py-2.5 text-xs transition-all cursor-pointer border border-white/5"
-                  >
-                    {lang === 'bn' ? 'ফিরে যান' : 'Back'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-1 text-[10px] text-slate-500 text-center font-mono leading-normal">
-                {lang === 'bn' 
-                  ? 'রিলোড হওয়ার সাথে সাথে অ্যাপ্লিকেশনের সব ডেটা কানেকশন এই ফায়ারবেসে সুইটচ হবে।'
-                  : 'Requires valid Web Client initialized SDK fields (apiKey and projectId).'}
-              </div>
-            </div>
-            
-          </div>
-        </div>
-      )}
 
     </div>
   );
