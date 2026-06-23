@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings
+  LogOut, User, Settings, Copy
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
@@ -29,6 +29,15 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
+
+  const handleCopyToClipboard = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedFieldId(fieldId);
+    setTimeout(() => {
+      setCopiedFieldId(null);
+    }, 2000);
+  };
 
   // Dynamic App Settings State
   const [settingsForm, setSettingsForm] = useState({
@@ -1284,20 +1293,74 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                   </span>
                                 </h3>
                                 
-                                <div className="text-xs text-slate-300 font-medium mt-1 space-y-0.5">
+                                <div className="text-xs text-slate-300 font-medium mt-1 space-y-1">
                                   {req.type === 'CashIn' && (
                                     <>
-                                      <p>{lang === 'bn' ? `মোবাইল ব্যাংকিং মাধ্যম: ${req.targetNumber}` : `Depository Channel: ${req.targetNumber}`}</p>
-                                      <p className="text-blue-400 text-xs font-bold leading-none font-mono mt-1">
-                                        TrxID: {req.txId}
+                                      <p className="flex items-center gap-1.5 flex-wrap">
+                                        <span>{lang === 'bn' ? `মোবাইল ব্যাংকিং মাধ্যম: ${req.targetNumber}` : `Depository Channel: ${req.targetNumber}`}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCopyToClipboard(req.targetNumber || '', req.id + '-targetNumber')}
+                                          className="p-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded transition-all cursor-pointer inline-flex items-center gap-1 text-[9px] font-bold"
+                                          title={lang === 'bn' ? 'নম্বর কপি করুন' : 'Copy Number'}
+                                        >
+                                          {copiedFieldId === req.id + '-targetNumber' ? (
+                                            <span className="text-emerald-400">{lang === 'bn' ? 'কপি হয়েছে' : 'Copied'}</span>
+                                          ) : (
+                                            <Copy className="h-2.5 w-2.5" />
+                                          )}
+                                        </button>
+                                      </p>
+                                      <p className="text-blue-400 text-xs font-bold leading-none font-mono mt-1 flex items-center gap-1.5 flex-wrap">
+                                        <span>TrxID: {req.txId}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCopyToClipboard(req.txId || '', req.id + '-txId')}
+                                          className="p-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded transition-all cursor-pointer inline-flex items-center gap-1 text-[9px] font-bold"
+                                          title={lang === 'bn' ? 'ট্রানজেকশন আইডি কপি করুন' : 'Copy Transaction ID'}
+                                        >
+                                          {copiedFieldId === req.id + '-txId' ? (
+                                            <span className="text-emerald-400">{lang === 'bn' ? 'কপি হয়েছে' : 'Copied'}</span>
+                                          ) : (
+                                            <Copy className="h-2.5 w-2.5" />
+                                          )}
+                                        </button>
                                       </p>
                                     </>
                                   )}
                                   {req.type === 'Recharge' && (
-                                    <p>{lang === 'bn' ? `অপারেটর: ${req.operator} | রিচার্জ নম্বর: ${req.targetNumber}` : `Operator: ${req.operator} | Number: ${req.targetNumber}`}</p>
+                                    <p className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{lang === 'bn' ? `অপারেটর: ${req.operator} | রিচার্জ নম্বর: ${req.targetNumber}` : `Operator: ${req.operator} | Number: ${req.targetNumber}`}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyToClipboard(req.targetNumber || '', req.id + '-targetNumber')}
+                                        className="p-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded transition-all cursor-pointer inline-flex items-center gap-1 text-[9px] font-bold"
+                                        title={lang === 'bn' ? 'রিচার্জ নম্বর কপি করুন' : 'Copy Recharge Number'}
+                                      >
+                                        {copiedFieldId === req.id + '-targetNumber' ? (
+                                          <span className="text-emerald-400">{lang === 'bn' ? 'কপি হয়েছে' : 'Copied'}</span>
+                                        ) : (
+                                          <Copy className="h-2.5 w-2.5" />
+                                        )}
+                                      </button>
+                                    </p>
                                   )}
                                   {req.type === 'Bill' && (
-                                    <p>{lang === 'bn' ? `বিল দাতা: ${req.billerNameBn}` : `Biller: ${req.billerName}`}</p>
+                                    <p className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{lang === 'bn' ? `বিল দাতা: ${req.billerNameBn} | নম্বর/হিসাব: ${req.targetNumber}` : `Biller: ${req.billerName} | A/C: ${req.targetNumber}`}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyToClipboard(req.targetNumber || '', req.id + '-targetNumber')}
+                                        className="p-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded transition-all cursor-pointer inline-flex items-center gap-1 text-[9px] font-bold"
+                                        title={lang === 'bn' ? 'বিল নম্বর কপি করুন' : 'Copy Bill Number'}
+                                      >
+                                        {copiedFieldId === req.id + '-targetNumber' ? (
+                                          <span className="text-emerald-400">{lang === 'bn' ? 'কপি হয়েছে' : 'Copied'}</span>
+                                        ) : (
+                                          <Copy className="h-2.5 w-2.5" />
+                                        )}
+                                      </button>
+                                    </p>
                                   )}
                                 </div>
 

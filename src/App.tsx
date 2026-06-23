@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
@@ -144,6 +144,10 @@ export default function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
+  const knownNotifIdsRef = useRef<Set<string>>(new Set());
 
   // Auth State Listener
   useEffect(() => {
@@ -341,7 +345,18 @@ export default function App() {
 
   // Firestore notification observer scoped to logged in user
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      knownNotifIdsRef.current.clear();
+      return;
+    }
+
+    // Auto-prompt permission if default on user login
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((perm) => {
+        setNotificationPermission(perm);
+      });
+    }
+
     const notifCollectionRef = collection(db, 'users', currentUser.uid, 'notifications');
     const q = query(notifCollectionRef, orderBy('id', 'desc'));
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
@@ -365,13 +380,39 @@ export default function App() {
         querySnapshot.forEach((docSnap) => {
           notifList.push(docSnap.data() as NotificationItem);
         });
+
+        const isFirstLoad = knownNotifIdsRef.current.size === 0;
+
+        notifList.forEach((notif) => {
+          if (!knownNotifIdsRef.current.has(notif.id)) {
+            // Trigger push notification for subsequent new notifications
+            if (!isFirstLoad) {
+              const title = lang === 'bn' ? (notif.titleBn || notif.title) : (notif.title || notif.titleBn);
+              const body = lang === 'bn' ? (notif.descBn || notif.desc) : (notif.desc || notif.descBn);
+
+              if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                  new Notification(title || 'Nihat Telecom', {
+                    body: body || '',
+                    icon: '/favicon.ico',
+                    tag: notif.id,
+                  });
+                } catch (e) {
+                  console.error("Error displaying notification: ", e);
+                }
+              }
+            }
+            knownNotifIdsRef.current.add(notif.id);
+          }
+        });
+
         setNotifications(notifList);
         const hasUnread = notifList.some(n => !n.read);
         setUnreadNotifications(hasUnread);
       }
     });
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUser, lang]);
 
   const t = TRANSLATIONS[lang];
 
@@ -1385,6 +1426,34 @@ export default function App() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
+
+                {('Notification' in window) && notificationPermission !== 'granted' && (
+                  <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <span className="text-lg">🔔</span>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] text-blue-900 font-bold leading-normal">
+                          {lang === 'bn' ? 'ফেইসবুকের মতো পুশ নোটিফিকেশন' : 'Facebook-style Push Notifications'}
+                        </p>
+                        <p className="text-[10px] text-blue-700/80 font-medium leading-normal">
+                          {lang === 'bn' 
+                            ? 'আপনার রিচার্জ রিকুয়েষ্ট সফল বা বাতিল হলে ফোনের হোম স্ক্রিনে সাথে সাথে নোটিফিকেশন যাবে।' 
+                            : 'Get instant updates on your phone screen whenever your recharge request is processed.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const perm = await Notification.requestPermission();
+                        setNotificationPermission(perm);
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition-colors shadow-sm cursor-pointer select-none border-0"
+                    >
+                      {lang === 'bn' ? 'অনুমতি দিন এবং নোটিফিকেশন চালু করুন' : 'Enable & Allow Notifications'}
+                    </button>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   {notifications.map((notif) => (

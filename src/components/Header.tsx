@@ -209,13 +209,7 @@ export default function Header({
         </div>
       </div>
 
-      {/* Floating bKash Banner Promo tag */}
-      <div className="absolute left-1/2 -translate-x-1/2 bottom-3 flex items-center justify-center gap-1.5 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 w-fit">
-        <span className="text-[10px] text-pink-100 font-extrabold capitalize text-center drop-shadow-sm font-sans flex items-center gap-1 select-none">
-          <Sparkles className="h-3.5 w-3.5 text-yellow-300 animate-spin" style={{ animationDuration: '6s' }} />
-          <span>{lang === 'bn' ? 'অ্যাড মানি করে রিচার্জ করুন অফুরন্ত!' : 'Add money & enjoy unlimited rewards'}</span>
-        </span>
-      </div>
+
     </div>
   );
 }
