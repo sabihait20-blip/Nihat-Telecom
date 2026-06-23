@@ -13,6 +13,8 @@ interface ProfilePanelProps {
   onNotificationClick: () => void;
   onLogout: () => void;
   onAdminClick?: () => void;
+  helplineNumber?: string;
+  whatsappUrl?: string;
 }
 
 export default function ProfilePanel({
@@ -21,6 +23,8 @@ export default function ProfilePanel({
   onNotificationClick,
   onLogout,
   onAdminClick,
+  helplineNumber = '01970250988',
+  whatsappUrl = 'https://wa.me/8801970250988',
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -280,15 +284,28 @@ export default function ProfilePanel({
             {t.support}
           </h4>
           <p className="text-slate-600 text-[10px] leading-relaxed font-semibold">
-            {t.supportDesc}
+            {lang === 'bn' ? 'আমাদের কাস্টমার কেয়ার এর সাথে ২৪/৭ যোগাযোগ করতে পারেন।' : 'You can connect with our dedicated helpdesk for 24/7 priority response.'}
           </p>
-          <a
-            href="tel:01970250988"
-            className="inline-flex items-center gap-1 text-xs font-bold text-sky-600 pt-1"
-          >
-            <span>০১৯৭০২৫০৯৮৮ (01970250988)</span>
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
+            <a
+              href={`tel:${helplineNumber}`}
+              className="inline-flex items-center gap-1 text-xs font-bold text-sky-600 hover:underline"
+            >
+              <span>📞 {helplineNumber}</span>
+              <ExternalLink className="h-3 w-3 inline" />
+            </a>
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline"
+              >
+                <span>💬 WhatsApp Support</span>
+                <ExternalLink className="h-3 w-3 inline" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
 

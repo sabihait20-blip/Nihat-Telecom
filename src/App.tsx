@@ -91,6 +91,46 @@ export default function App() {
   const [dbBanners, setDbBanners] = useState<PromoBanner[]>([]);
   const [dbBillers, setDbBillers] = useState<BillProvider[]>([]);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [appConfig, setAppConfig] = useState<any>({
+    bkashNumber: '01970250988',
+    nagadNumber: '01970250988',
+    rocketNumber: '019702509883',
+    helplineNumber: '01970250988',
+    whatsappUrl: 'https://wa.me/8801970250988',
+    minAddFund: 100,
+    maxAddFund: 25000,
+    globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
+    globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
+    showNotice: true
+  });
+
+  // Dynamic App Settings / Notice Ticker observer
+  useEffect(() => {
+    const settingsDocRef = doc(db, 'settings', 'app_config');
+    const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setAppConfig(docSnap.data());
+      } else {
+        // Seed default config document if empty
+        const docRef = doc(db, 'settings', 'app_config');
+        setDoc(docRef, {
+          bkashNumber: '01970250988',
+          nagadNumber: '01970250988',
+          rocketNumber: '019702509883',
+          helplineNumber: '01970250988',
+          whatsappUrl: 'https://wa.me/8801970250988',
+          minAddFund: 100,
+          maxAddFund: 25000,
+          globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
+          globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
+          showNotice: true
+        }).catch(err => console.error("Error seeding config: ", err));
+      }
+    }, (error) => {
+      console.error("Error loading app config in App: ", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Modal triggers
   const [isRechargeOpen, setIsRechargeOpen] = useState(false);
@@ -841,6 +881,24 @@ export default function App() {
 
               {activeTab === 'home' && (
                 <div className="space-y-6">
+                  {/* Dynamic Warning Marquee notice ticker */}
+                  {appConfig.showNotice && (
+                    <div id="notice-ticker" className="bg-amber-500/10 border border-amber-500/20 rounded-2xl py-2 px-4 flex items-center gap-3 overflow-hidden shadow-xs">
+                      <div className="p-1 px-1.5 bg-amber-500/10 border border-amber-500/10 text-amber-600 rounded-lg shrink-0 flex items-center justify-center gap-1.5 font-bold text-[10px] tracking-wide uppercase">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                        </span>
+                        <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
+                      </div>
+                      <div className="flex-1 overflow-hidden relative">
+                        <div className="animate-marquee whitespace-nowrap text-slate-700 text-[11px] font-bold font-sans">
+                          {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Banner promotions on top */}
                   <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">
                     <Banners
@@ -969,6 +1027,8 @@ export default function App() {
                     onNotificationClick={() => setIsNotificationsOpen(true)}
                     onLogout={handleLogout}
                     onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setIsAdminOpen(true) : undefined}
+                    helplineNumber={appConfig.helplineNumber}
+                    whatsappUrl={appConfig.whatsappUrl}
                   />
                 </div>
               )}
@@ -1113,6 +1173,24 @@ export default function App() {
                 onSelectPromo={handleSelectPromo}
               />
 
+              {/* Dynamic Warning Marquee notice ticker */}
+              {appConfig.showNotice && (
+                <div id="notice-ticker" className="mx-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl py-2 px-3.5 flex items-center gap-2.5 overflow-hidden shadow-xs">
+                  <div className="p-1 px-1.5 bg-amber-500/10 border border-amber-500/10 text-amber-600 rounded-lg shrink-0 flex items-center justify-center gap-1 font-bold text-[10px] tracking-wide uppercase">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                    </span>
+                    <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden relative">
+                    <div className="animate-marquee whitespace-nowrap text-slate-700 text-[10.5px] font-bold font-sans">
+                      {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Favorable Operators Quick Contacts list */}
               <FavoritesGrid
                 favorites={favorites}
@@ -1195,6 +1273,8 @@ export default function App() {
               onNotificationClick={handleNotificationClick}
               onLogout={handleLogout}
               onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setIsAdminOpen(true) : undefined}
+              helplineNumber={appConfig.helplineNumber}
+              whatsappUrl={appConfig.whatsappUrl}
             />
           )}
         </div>

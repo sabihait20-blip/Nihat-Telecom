@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Landmark, Smartphone, LandmarkIcon, Check, ShieldCheck, 
   HelpCircle, Sparkles, Plus, RefreshCw, AlertCircle, ArrowRight 
 } from 'lucide-react';
 import { Language } from '../types';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface AddFundModalProps {
   lang: Language;
@@ -26,6 +28,35 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
   const [validationError, setValidationError] = useState<string>('');
   const [showSuccessOverlay, setShowSuccessOverlay] = useState<boolean>(false);
 
+  // Dynamic system settings configuration
+  const [settings, setSettings] = useState({
+    bkashNumber: '01970250988',
+    nagadNumber: '01970250988',
+    rocketNumber: '019702509883',
+    minAddFund: 100,
+    maxAddFund: 25000,
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const settingsDocRef = doc(db, 'settings', 'app_config');
+    const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSettings({
+          bkashNumber: data.bkashNumber || '01970250988',
+          nagadNumber: data.nagadNumber || '01970250988',
+          rocketNumber: data.rocketNumber || '019702509883',
+          minAddFund: typeof data.minAddFund === 'number' ? data.minAddFund : 100,
+          maxAddFund: typeof data.maxAddFund === 'number' ? data.maxAddFund : 25000,
+        });
+      }
+    }, (error) => {
+      console.error("Error loading settings in AddFundModal: ", error);
+    });
+    return () => unsubscribe();
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Localized string packs
@@ -39,7 +70,7 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
     trxLabel: lang === 'bn' ? 'লেনদেনের ট্রানজেকশন আইডি (TrxID)' : 'Payment Transaction ID (TrxID)',
     placeholderTrx: lang === 'bn' ? 'যেমন: bK92H7K0L' : 'e.g. BK92H7K0L',
     placeholderSender: lang === 'bn' ? 'যেমন: 017XXXXXXXX' : 'e.g. 017XXXXXXXX',
-    placeholderAmt: lang === 'bn' ? 'ন্যূনতম ১০০ টাকা' : 'Minimum ৳100',
+    placeholderAmt: lang === 'bn' ? `ন্যূনতম ${settings.minAddFund} টাকা` : `Minimum ৳${settings.minAddFund}`,
     cancel: lang === 'bn' ? 'বাতিল' : 'Cancel',
     submit: lang === 'bn' ? 'টাকা যোগ করুন' : 'Verify & Add Fund',
     successTitle: lang === 'bn' ? 'টাকা যোগ সফল হয়েছে!' : 'Fund Added Successfully!',
@@ -49,10 +80,10 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
 
   const getPersonalNumber = (m: DepositMethod) => {
     switch (m) {
-      case 'bkash': return '01970250988';
-      case 'nagad': return '01970250988';
-      case 'rocket': return '019702509883';
-      default: return '01970250988';
+      case 'bkash': return settings.bkashNumber;
+      case 'nagad': return settings.nagadNumber;
+      case 'rocket': return settings.rocketNumber;
+      default: return settings.bkashNumber;
     }
   };
 
@@ -78,13 +109,13 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
     setValidationError('');
 
     const amt = parseFloat(amountInput);
-    if (isNaN(amt) || amt < 100) {
-      setValidationError(lang === 'bn' ? 'অনুগ্রহ করে কমপক্ষে ১০০ টাকা বা তার বেশি প্রবেশ করান!' : 'Minimum deposit limit is ৳100.');
+    if (isNaN(amt) || amt < settings.minAddFund) {
+      setValidationError(lang === 'bn' ? `অনুগ্রহ করে কমপক্ষে ${settings.minAddFund} টাকা বা তার বেশি প্রবেশ করান!` : `Minimum deposit limit is ৳${settings.minAddFund}.`);
       return;
     }
 
-    if (amt > 25000) {
-      setValidationError(lang === 'bn' ? 'একবারে সর্বোচ্চ ২৫,০০০ টাকা যোগ করা যাবে!' : 'Maximum deposit limit is ৳25,000 per request.');
+    if (amt > settings.maxAddFund) {
+      setValidationError(lang === 'bn' ? `একবারে সর্বোচ্চ ${settings.maxAddFund.toLocaleString()} টাকা যোগ করা যাবে!` : `Maximum deposit limit is ৳${settings.maxAddFund.toLocaleString()} per request.`);
       return;
     }
 

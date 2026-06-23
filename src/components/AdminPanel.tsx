@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User
+  LogOut, User, Settings
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
@@ -26,9 +26,62 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+  // Dynamic App Settings State
+  const [settingsForm, setSettingsForm] = useState({
+    bkashNumber: '01970250988',
+    nagadNumber: '01970250988',
+    rocketNumber: '019702509883',
+    helplineNumber: '01970250988',
+    whatsappUrl: 'https://wa.me/8801970250988',
+    minAddFund: 100,
+    maxAddFund: 25000,
+    globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
+    globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
+    showNotice: true,
+  });
+
+  useEffect(() => {
+    const settingsDocRef = doc(db, 'settings', 'app_config');
+    const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSettingsForm({
+          bkashNumber: data.bkashNumber || '01970250988',
+          nagadNumber: data.nagadNumber || '01970250988',
+          rocketNumber: data.rocketNumber || '019702509883',
+          helplineNumber: data.helplineNumber || '01970250988',
+          whatsappUrl: data.whatsappUrl || 'https://wa.me/8801970250988',
+          minAddFund: typeof data.minAddFund === 'number' ? data.minAddFund : 100,
+          maxAddFund: typeof data.maxAddFund === 'number' ? data.maxAddFund : 25000,
+          globalNoticeEn: data.globalNoticeEn || '',
+          globalNoticeBn: data.globalNoticeBn || '',
+          showNotice: typeof data.showNotice === 'boolean' ? data.showNotice : true,
+        });
+      }
+    }, (error) => {
+      console.error("Error loading settings from DB: ", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const docRef = doc(db, 'settings', 'app_config');
+      await setDoc(docRef, settingsForm);
+      alert(lang === 'bn' ? 'সেটিংস সফলভাবে সেভ করা হয়েছে!' : 'System settings successfully saved!');
+    } catch (err: any) {
+      console.error("Error saving settings: ", err);
+      alert('Error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Users Management State Helpers
   const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
@@ -52,6 +105,18 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   // Rejection modal state
   const [rejectingTx, setRejectingTx] = useState<Transaction | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
+
+  // New States for Advanced Search & Filters
+  const [offerSearchQuery, setOfferSearchQuery] = useState('');
+  const [offerOperatorFilter, setOfferOperatorFilter] = useState<string>('All');
+  const [offerCategoryFilter, setOfferCategoryFilter] = useState<string>('All');
+
+  const [billerSearchQuery, setBillerSearchQuery] = useState('');
+  const [billerCategoryFilter, setBillerCategoryFilter] = useState<string>('All');
+
+  const [requestSearchQuery, setRequestSearchQuery] = useState('');
+  const [requestStatusFilter, setRequestStatusFilter] = useState<string>('All');
+  const [requestTypeFilter, setRequestTypeFilter] = useState<string>('All');
   
   // Dynamic collections loaders
   const [offers, setOffers] = useState<RechargePackage[]>([]);
@@ -823,10 +888,169 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           >
             {labels.users} ({registeredUsers.length})
           </button>
+          <button
+            onClick={() => setActiveSubTab('settings')}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeSubTab === 'settings' 
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+            }`}
+          >
+            <Settings className="h-3.5 w-3.5" />
+            <span>{lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings'}</span>
+          </button>
         </div>
 
         {/* Scrollable Workspace panel viewport */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 relative z-10 bg-slate-900/30">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 relative z-10 bg-slate-900/30">
+          
+          {/* Dynamic math counters for net system audit */}
+          {(() => {
+            const totalApprovedVolume = pendingRequests
+              .filter(r => r.status === 'Success')
+              .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);
+
+            const totalUserBalance = registeredUsers
+              .reduce((acc, u) => acc + (parseFloat(u.balance + '') || 0), 0);
+
+            const totalSuccessfulCashIns = pendingRequests
+              .filter(r => r.status === 'Success' && r.type === 'CashIn')
+              .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);
+
+            const totalSuccessfulDebits = pendingRequests
+              .filter(r => r.status === 'Success' && (r.type === 'Recharge' || r.type === 'Bill'))
+              .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);
+
+            return (
+              <>
+                {/* Dynamic Grid System Counters Section */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+                  {/* Counter 1: Pending */}
+                  <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 backdrop-blur-md border border-amber-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                    <div>
+                      <span className="text-[9px] font-black tracking-widest text-amber-400 uppercase">
+                        {lang === 'bn' ? 'অপেক্ষমান লেনদেন' : 'Pending Tasks'}
+                      </span>
+                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                        <span>{pendingRequests.filter(r => r.status === 'Pending').length}</span>
+                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'টি' : 'Pnd'}</span>
+                      </div>
+                    </div>
+                    <div className={`p-2 bg-amber-500/15 border border-amber-500/25 rounded-2xl text-amber-400 shrink-0 ${pendingRequests.filter(r => r.status === 'Pending').length > 0 ? "animate-bounce" : ""}`}>
+                      <RefreshCw className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  {/* Counter 2: Users */}
+                  <div className="bg-gradient-to-br from-blue-500/10 to-indigo-600/5 backdrop-blur-md border border-blue-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                    <div>
+                      <span className="text-[9px] font-black tracking-widest text-blue-400 uppercase">
+                        {lang === 'bn' ? 'নিবন্ধিত গ্রাহক' : 'Total Clients'}
+                      </span>
+                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                        <span>{registeredUsers.length}</span>
+                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'জন' : 'Users'}</span>
+                      </div>
+                    </div>
+                    <div className="p-2 bg-blue-500/15 border border-blue-500/25 rounded-2xl text-blue-400 shrink-0">
+                      <User className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  {/* Counter 3: Offers */}
+                  <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-md border border-emerald-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                    <div>
+                      <span className="text-[9px] font-black tracking-widest text-emerald-400 uppercase">
+                        {lang === 'bn' ? 'সক্রিয় অফার প্যাক' : 'Active Packages'}
+                      </span>
+                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                        <span>{offers.length}</span>
+                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'টি' : 'Packs'}</span>
+                      </div>
+                    </div>
+                    <div className="p-2 bg-emerald-500/15 border border-emerald-500/25 rounded-2xl text-emerald-400 shrink-0">
+                      <Gift className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  {/* Counter 4: Billers */}
+                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/5 backdrop-blur-md border border-purple-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                    <div>
+                      <span className="text-[9px] font-black tracking-widest text-purple-400 uppercase">
+                        {lang === 'bn' ? 'ইউটিলিটি বিলার্স' : 'System Billers'}
+                      </span>
+                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                        <span>{billers.length}</span>
+                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'টি' : 'Billers'}</span>
+                      </div>
+                    </div>
+                    <div className="p-2 bg-purple-500/15 border border-purple-500/25 rounded-2xl text-purple-400 shrink-0 font-bold">
+                      <CreditCard className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real-Time Platform Business Audit & Reserves Metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-2.5">
+                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                    <div>
+                      <span className="text-[8px] font-black tracking-wider text-emerald-400 uppercase opacity-90 block">
+                        {lang === 'bn' ? 'মোট ডিপোজিট ভলিউম' : 'Net Deposit Volume'}
+                      </span>
+                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                        ৳{totalSuccessfulCashIns.toLocaleString()}
+                      </span>
+                    </div>
+                    <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                      IN
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                    <div>
+                      <span className="text-[8px] font-black tracking-wider text-rose-400 uppercase opacity-90 block">
+                        {lang === 'bn' ? 'মোট পরিশোধিত ব্যালেন্স' : 'Disbursed Out'}
+                      </span>
+                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                        ৳{totalSuccessfulDebits.toLocaleString()}
+                      </span>
+                    </div>
+                    <span className="text-[8px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                      OUT
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                    <div>
+                      <span className="text-[8px] font-black tracking-wider text-blue-400 uppercase opacity-90 block">
+                        {lang === 'bn' ? 'মোট ট্রানজেকশন ভলিউম' : 'Approved Volume'}
+                      </span>
+                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                        ৳{totalApprovedVolume.toLocaleString()}
+                      </span>
+                    </div>
+                    <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                      TXS
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                    <div>
+                      <span className="text-[8px] font-black tracking-wider text-violet-400 uppercase opacity-90 block">
+                        {lang === 'bn' ? 'গ্রাহকদের মোট ফান্ড' : 'Customer Credit'}
+                      </span>
+                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                        ৳{totalUserBalance.toLocaleString()}
+                      </span>
+                    </div>
+                    <span className="text-[8px] font-black text-violet-400 bg-violet-500/10 border border-violet-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                      HELD
+                    </span>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
           
           {actionError && (
             <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-2 text-rose-400 text-xs font-semibold">
@@ -836,124 +1060,200 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           )}
 
           {/* TAB 1: PENDING USER REQUESTS */}
-          {activeSubTab === 'requests' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[10px] font-extrabold text-slate-400 tracking-widest uppercase">
-                  ACTIVE TRANSACTIONS POOL
-                </span>
-                <span className="text-[10px] text-blue-400 font-bold hover:text-blue-300 transition-colors">
-                  {lang === 'bn' ? 'রিয়েল-টাইমে আপডেট হচ্ছে' : 'Listening Live via snapshots'}
-                </span>
-              </div>
+          {activeSubTab === 'requests' && (() => {
+            const filteredRequests = pendingRequests.filter((req) => {
+              const queryLower = requestSearchQuery.toLowerCase().trim();
+              const matchesSearch = !queryLower || 
+                (req.id || '').toLowerCase().includes(queryLower) ||
+                (req.userName || '').toLowerCase().includes(queryLower) ||
+                (req.userEmail || '').toLowerCase().includes(queryLower) ||
+                (req.targetNumber || '').toLowerCase().includes(queryLower) ||
+                (req.txId || '').toLowerCase().includes(queryLower) ||
+                (req.billerName || '').toLowerCase().includes(queryLower) ||
+                (req.billerNameBn || '').toLowerCase().includes(queryLower);
 
-              {pendingRequests.length === 0 ? (
-                <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-2">
-                  <FileText className="h-10 w-10 text-slate-600" />
-                  <h4 className="text-white font-bold text-xs">
-                    {lang === 'bn' ? 'কোনো পেন্ডিং রিকোয়েস্ট নেই' : 'All clear! No pending requests'}
-                  </h4>
-                  <p className="text-slate-400 text-[10.5px] max-w-xs leading-relaxed font-semibold">
-                    {lang === 'bn' ? 'যখন ইউজার রিচার্জ, বিল পরিশোধ বা অ্যাড ফান্ড রিকোয়েস্ট সাবমিট করবে তা এখানে জমা হবে।' : 'When client users trigger a cash-in, recharge, or utility pay request, it manifests here in real-time.'}
-                  </p>
+              const matchesStatus = requestStatusFilter === 'All' || req.status === requestStatusFilter;
+              const matchesType = requestTypeFilter === 'All' || req.type === requestTypeFilter;
+
+              return matchesSearch && matchesStatus && matchesType;
+            });
+
+            return (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[10px] font-extrabold text-slate-400 tracking-widest uppercase">
+                    ACTIVE TRANSACTIONS POOL
+                  </span>
+                  <span className="text-[10px] text-blue-400 font-bold hover:text-blue-300 transition-colors">
+                    {lang === 'bn' ? 'রিয়েল-টাইমে আপডেট হচ্ছে' : 'Listening Live via snapshots'}
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingRequests.map((req) => {
-                    const isTxPending = req.status === 'Pending';
-                    return (
-                      <div 
-                        key={req.id} 
-                        className={`bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-lg transition-all relative overflow-hidden flex flex-col justify-between ${
-                          !isTxPending ? 'opacity-50 bg-slate-950/40 border-slate-800/60' : ''
-                        }`}
-                      >
-                        {/* Top banner tag detailing operator or type */}
-                        <div className="absolute right-0 top-0 h-5 px-3 rounded-bl-lg text-[9px] font-black uppercase flex items-center text-white bg-slate-950 border-l border-b border-white/10 tracking-wide">
-                          {req.type}
-                        </div>
 
-                        <div className="space-y-2.5">
-                          {/* User metadata */}
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 font-semibold leading-none">
-                            <span className="bg-white/10 text-slate-200 font-bold size-4 text-[9px] flex items-center justify-center rounded-sm">U</span>
-                            <span className="text-slate-200 font-bold">{req.userName || req.userEmail || 'Client ID'}</span>
-                            <span className="text-slate-500">|</span>
-                            <span className="font-mono text-[9px] font-medium text-slate-400">{req.date}</span>
+                {/* Advanced Filter Toolbar */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-950/30 p-3 rounded-2xl border border-white/5">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={lang === 'bn' ? 'নাম্বার, TrxID বা ইউজার...' : 'Number, TxID, or User...'}
+                      value={requestSearchQuery}
+                      onChange={(e) => setRequestSearchQuery(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 text-white placeholder-slate-500 rounded-xl py-1.5 px-3 text-xs outline-none focus:border-blue-500 transition-all font-mono font-bold"
+                    />
+                    {requestSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setRequestSearchQuery('')}
+                        className="absolute right-2.5 top-2 text-slate-500 hover:text-white"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={requestStatusFilter}
+                    onChange={(e) => setRequestStatusFilter(e.target.value)}
+                    className="bg-slate-950 border border-white/10 text-slate-300 rounded-xl py-1.5 px-2.5 text-xs outline-none focus:border-blue-500 cursor-pointer font-extrabold"
+                  >
+                    <option value="All">{lang === 'bn' ? 'সকল স্ট্যাটাস (All)' : 'All Statuses'}</option>
+                    <option value="Pending">{lang === 'bn' ? '⏳ অপেক্ষমান (Pending)' : '⏳ Pending'}</option>
+                    <option value="Success">{lang === 'bn' ? '✅ সফল (Approved)' : '✅ Approved'}</option>
+                    <option value="Failed">{lang === 'bn' ? '❌ বাতিল (Rejected)' : '❌ Rejected'}</option>
+                  </select>
+
+                  <select
+                    value={requestTypeFilter}
+                    onChange={(e) => setRequestTypeFilter(e.target.value)}
+                    className="bg-slate-950 border border-white/10 text-slate-300 rounded-xl py-1.5 px-2.5 text-xs outline-none focus:border-blue-500 cursor-pointer font-extrabold"
+                  >
+                    <option value="All">{lang === 'bn' ? 'সকল প্রকার লেনদেন' : 'All transaction types'}</option>
+                    <option value="CashIn">{lang === 'bn' ? '📥 ডিপোজিট (Add Fund)' : '📥 Add Fund (CashIn)'}</option>
+                    <option value="Recharge">{lang === 'bn' ? '📱 মোবাইল রিচার্জ' : '📱 Mobile Recharge'}</option>
+                    <option value="Bill">{lang === 'bn' ? '⚡ ইউটিলিটি বিল' : '⚡ Utility Bill'}</option>
+                  </select>
+                </div>
+
+                {filteredRequests.length === 0 ? (
+                  <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-2">
+                    <FileText className="h-10 w-10 text-slate-600" />
+                    <h4 className="text-white font-bold text-xs">
+                      {lang === 'bn' ? 'কোনো মেলানো লেনদেন নেই' : 'No matching transactions'}
+                    </h4>
+                    <p className="text-slate-400 text-[10.5px] max-w-xs leading-relaxed font-semibold">
+                      {lang === 'bn' ? 'আপনার সার্চ কুয়েরি বা ফিল্টার পরিবর্তন করে পুনরায় চেষ্টা করুন।' : 'Change filter queries or reset toolbars to see transaction rows.'}
+                    </p>
+                    {(requestSearchQuery || requestStatusFilter !== 'All' || requestTypeFilter !== 'All') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRequestSearchQuery('');
+                          setRequestStatusFilter('All');
+                          setRequestTypeFilter('All');
+                        }}
+                        className="mt-1 px-3 py-1 bg-white/5 border border-white/5 rounded-lg text-[10px] text-blue-400 font-extrabold hover:bg-white/10 cursor-pointer"
+                      >
+                        {lang === 'bn' ? 'ফিল্টার রিসেট করুন' : 'Clear Filters'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredRequests.map((req) => {
+                      const isTxPending = req.status === 'Pending';
+                      return (
+                        <div 
+                          key={req.id} 
+                          className={`bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-lg transition-all relative overflow-hidden flex flex-col justify-between ${
+                            !isTxPending ? 'opacity-50 bg-slate-950/40 border-slate-800/60' : ''
+                          }`}
+                        >
+                          {/* Top banner tag detailing operator or type */}
+                          <div className="absolute right-0 top-0 h-5 px-3 rounded-bl-lg text-[9px] font-black uppercase flex items-center text-white bg-slate-950 border-l border-b border-white/10 tracking-wide">
+                            {req.type}
                           </div>
 
-                          {/* Primary content row */}
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="text-base text-white font-extrabold leading-tight flex items-center gap-2">
-                                <span>৳{req.amount}</span>
-                                <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-bold ${
-                                  req.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                  req.status === 'Failed' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                                  'bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black animate-pulse'
-                                }`}>
-                                  {req.status}
-                                </span>
-                              </h3>
-                              
-                              <div className="text-xs text-slate-300 font-medium mt-1 space-y-0.5">
-                                {req.type === 'CashIn' && (
-                                  <>
-                                    <p>{lang === 'bn' ? `মোবাইল ব্যাংকিং মাধ্যম: ${req.targetNumber}` : `Depository Channel: ${req.targetNumber}`}</p>
-                                    <p className="text-blue-400 text-xs font-bold leading-none font-mono mt-1">
-                                      TrxID: {req.txId}
-                                    </p>
-                                  </>
-                                )}
-                                {req.type === 'Recharge' && (
-                                  <p>{lang === 'bn' ? `অপারেটর: ${req.operator} | রিচার্জ নম্বর: ${req.targetNumber}` : `Operator: ${req.operator} | Number: ${req.targetNumber}`}</p>
-                                )}
-                                {req.type === 'Bill' && (
-                                  <p>{lang === 'bn' ? `বিল দাতা: ${req.billerNameBn}` : `Biller: ${req.billerName}`}</p>
+                          <div className="space-y-2.5">
+                            {/* User metadata */}
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 font-semibold leading-none">
+                              <span className="bg-white/10 text-slate-200 font-bold size-4 text-[9px] flex items-center justify-center rounded-sm">U</span>
+                              <span className="text-slate-200 font-bold">{req.userName || req.userEmail || 'Client ID'}</span>
+                              <span className="text-slate-500">|</span>
+                              <span className="font-mono text-[9px] font-medium text-slate-400">{req.date}</span>
+                            </div>
+
+                            {/* Primary content row */}
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="text-base text-white font-extrabold leading-tight flex items-center gap-2">
+                                  <span>৳{req.amount}</span>
+                                  <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-bold ${
+                                    req.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                    req.status === 'Failed' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                                    'bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black animate-pulse'
+                                  }`}>
+                                    {req.status}
+                                  </span>
+                                </h3>
+                                
+                                <div className="text-xs text-slate-300 font-medium mt-1 space-y-0.5">
+                                  {req.type === 'CashIn' && (
+                                    <>
+                                      <p>{lang === 'bn' ? `মোবাইল ব্যাংকিং মাধ্যম: ${req.targetNumber}` : `Depository Channel: ${req.targetNumber}`}</p>
+                                      <p className="text-blue-400 text-xs font-bold leading-none font-mono mt-1">
+                                        TrxID: {req.txId}
+                                      </p>
+                                    </>
+                                  )}
+                                  {req.type === 'Recharge' && (
+                                    <p>{lang === 'bn' ? `অপারেটর: ${req.operator} | রিচার্জ নম্বর: ${req.targetNumber}` : `Operator: ${req.operator} | Number: ${req.targetNumber}`}</p>
+                                  )}
+                                  {req.type === 'Bill' && (
+                                    <p>{lang === 'bn' ? `বিল দাতা: ${req.billerNameBn}` : `Biller: ${req.billerName}`}</p>
+                                  )}
+                                </div>
+
+                                {req.rejectionReason && (
+                                  <p className="text-rose-400 font-semibold text-[10px] mt-1.5 p-1 px-2 bg-rose-500/10 rounded-lg inline-block border border-rose-500/15">
+                                    {lang === 'bn' ? `বাতিলের কারণ: ${req.rejectionReason}` : `Declined Reason: ${req.rejectionReason}`}
+                                  </p>
                                 )}
                               </div>
-
-                              {req.rejectionReason && (
-                                <p className="text-rose-400 font-semibold text-[10px] mt-1.5 p-1 px-2 bg-rose-500/10 rounded-lg inline-block border border-rose-500/15">
-                                  {lang === 'bn' ? `বাতিলের কারণ: ${req.rejectionReason}` : `Declined Reason: ${req.rejectionReason}`}
-                                </p>
-                              )}
                             </div>
                           </div>
-                        </div>
 
-                        {/* Action buttons if pending */}
-                        {isTxPending && (
-                          <div className="flex gap-2.5 border-t border-white/10 pt-3.5 mt-3.5 justify-end">
-                            <button
-                              disabled={isProcessing === req.id}
-                              onClick={() => setRejectingTx(req)}
-                              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 shrink-0 border border-rose-500/10"
-                            >
-                              <X className="h-3.5 w-3.5 shrink-0" />
-                              <span>{lang === 'bn' ? 'রিজেক্ট করুন' : 'Reject / Flag'}</span>
-                            </button>
-                            <button
-                              disabled={isProcessing === req.id}
-                              onClick={() => handleApprove(req)}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 text-center shrink-0"
-                            >
-                              {isProcessing === req.id ? (
-                                <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
-                              )}
-                              <span>{lang === 'bn' ? 'সরাসরি এপ্রুভ করুন' : 'Verify & Approve'}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                          {/* Action buttons if pending */}
+                          {isTxPending && (
+                            <div className="flex gap-2.5 border-t border-white/10 pt-3.5 mt-3.5 justify-end">
+                              <button
+                                disabled={isProcessing === req.id}
+                                onClick={() => setRejectingTx(req)}
+                                className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 shrink-0 border border-rose-500/10"
+                              >
+                                <X className="h-3.5 w-3.5 shrink-0" />
+                                <span>{lang === 'bn' ? 'রিজেক্ট করুন' : 'Reject / Flag'}</span>
+                              </button>
+                              <button
+                                disabled={isProcessing === req.id}
+                                onClick={() => handleApprove(req)}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 text-center shrink-0"
+                              >
+                                {isProcessing === req.id ? (
+                                  <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+                                )}
+                                <span>{lang === 'bn' ? 'সরাসরি এপ্রুভ করুন' : 'Verify & Approve'}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* TAB 2: MANAGE PACKS / PACKAGES */}
           {activeSubTab === 'offers' && (
@@ -1188,59 +1488,152 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 </form>
               )}
 
-              {/* Offers list */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {offers.map((pkg) => (
-                  <div key={pkg.id} className="bg-white border border-slate-200/60 p-4 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
-                    <span className="absolute right-0 top-0 text-[8.5px] uppercase font-black bg-slate-150 text-slate-600 px-2 py-0.5 rounded-bl-lg">
-                      {pkg.operator}
-                    </span>
-                    <div className="flex gap-3">
-                      {pkg.imageUrl && (
-                        <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 border border-slate-100/50 shadow-sm relative self-start mt-1">
-                          <img 
-                            src={pkg.imageUrl} 
-                            alt="pkg logo" 
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="space-y-1 flex-1 pr-8">
-                        <h4 className="text-xs text-slate-900 font-extrabold leading-tight">
-                          {lang === 'bn' ? pkg.titleBn : pkg.title}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-extrabold font-mono uppercase tracking-wide">
-                          {pkg.category} | {lang === 'bn' ? pkg.validityBn : pkg.validity}
-                        </p>
-                        <p className="text-[10.5px] text-slate-500 leading-normal font-semibold">
-                          {lang === 'bn' ? pkg.descriptionBn : pkg.description}
-                        </p>
-                      </div>
-                    </div>
+              {/* Offers Search & Filters Toolbar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-950/30 p-3 rounded-2xl border border-white/5">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={lang === 'bn' ? 'অফার টাইটেল, ভলিউম বা বিবরণ...' : 'Offer title, volume, desc...'}
+                    value={offerSearchQuery}
+                    onChange={(e) => setOfferSearchQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 text-white placeholder-slate-500 rounded-xl py-1.5 px-3 text-xs outline-none focus:border-blue-500 transition-all font-bold"
+                  />
+                  {offerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setOfferSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-slate-500 hover:text-white"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
-                      <span className="text-blue-600 font-extrabold text-sm">৳{pkg.price}</span>
-                      <div className="flex gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleEditOffer(pkg)}
-                          className="p-1 px-2.0 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
-                        >
-                          <Edit2 className="h-3 w-3 shrink-0" />
-                          <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOffer(pkg.id, lang === 'bn' ? pkg.titleBn : pkg.title)}
-                          className="p-1 px-2.0 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
-                        >
-                          <Trash2 className="h-3 w-3 shrink-0" />
-                          <span>{lang === 'bn' ? 'ডিলিট' : 'Del'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <select
+                  value={offerOperatorFilter}
+                  onChange={(e) => setOfferOperatorFilter(e.target.value)}
+                  className="bg-slate-950 border border-white/10 text-slate-300 rounded-xl py-1.5 px-2.5 text-xs outline-none focus:border-blue-500 cursor-pointer font-extrabold"
+                >
+                  <option value="All">{lang === 'bn' ? 'সকল অপারেটর' : 'All Operators'}</option>
+                  <option value="GP">Grameenphone (GP)</option>
+                  <option value="Robi">Robi</option>
+                  <option value="Airtel">Airtel</option>
+                  <option value="Banglalink">Banglalink (BL)</option>
+                  <option value="Teletalk">Teletalk</option>
+                </select>
+
+                <select
+                  value={offerCategoryFilter}
+                  onChange={(e) => setOfferCategoryFilter(e.target.value)}
+                  className="bg-slate-950 border border-white/10 text-slate-300 rounded-xl py-1.5 px-2.5 text-xs outline-none focus:border-blue-500 cursor-pointer font-extrabold"
+                >
+                  <option value="All">{lang === 'bn' ? 'সকল ক্যাটাগরি' : 'All Categories'}</option>
+                  <option value="internet">{lang === 'bn' ? 'ইন্টারনেট (Internet)' : 'Internet Pack'}</option>
+                  <option value="minutes">{lang === 'bn' ? 'টকটাইম (Minutes)' : 'Minutes Pack'}</option>
+                  <option value="combo">{lang === 'bn' ? 'কম্বো (Combo)' : 'Combo Pack'}</option>
+                </select>
               </div>
+
+              {/* Offers list */}
+              {(() => {
+                const filteredOffers = offers.filter((pkg) => {
+                  const queryLower = offerSearchQuery.toLowerCase().trim();
+                  const matchesSearch = !queryLower ||
+                    (pkg.title || '').toLowerCase().includes(queryLower) ||
+                    (pkg.titleBn || '').toLowerCase().includes(queryLower) ||
+                    (pkg.volume || '').toLowerCase().includes(queryLower) ||
+                    (pkg.volumeBn || '').toLowerCase().includes(queryLower) ||
+                    (pkg.description || '').toLowerCase().includes(queryLower) ||
+                    (pkg.descriptionBn || '').toLowerCase().includes(queryLower);
+
+                  const matchesOperator = offerOperatorFilter === 'All' || pkg.operator === offerOperatorFilter;
+                  const matchesCategory = offerCategoryFilter === 'All' || pkg.category === offerCategoryFilter;
+
+                  return matchesSearch && matchesOperator && matchesCategory;
+                });
+
+                if (filteredOffers.length === 0) {
+                  return (
+                    <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-2">
+                      <Gift className="h-10 w-10 text-slate-600" />
+                      <h4 className="text-white font-bold text-xs">
+                        {lang === 'bn' ? 'কোনো মেলানো অফার পাওয়া যায়নি' : 'No matching packages found'}
+                      </h4>
+                      <p className="text-slate-400 text-[10.5px] max-w-xs leading-relaxed font-semibold">
+                        {lang === 'bn' ? 'সার্চ কুয়েরি বা অপারেটর ফিল্টারিং পরিবর্তন করে পুনরায় চেষ্টা করুন।' : 'Modify your filters or search keywords to view cellular plans.'}
+                      </p>
+                      {(offerSearchQuery || offerOperatorFilter !== 'All' || offerCategoryFilter !== 'All') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOfferSearchQuery('');
+                            setOfferOperatorFilter('All');
+                            setOfferCategoryFilter('All');
+                          }}
+                          className="mt-1 px-3 py-1 bg-white/5 border border-white/5 rounded-lg text-[10px] text-blue-400 font-extrabold hover:bg-white/10 cursor-pointer"
+                        >
+                          {lang === 'bn' ? 'ফিল্টার রিসেট করুন' : 'Clear Filters'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filteredOffers.map((pkg) => (
+                      <div key={pkg.id} className="bg-white border border-slate-200/60 p-4 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+                        <span className="absolute right-0 top-0 text-[8.5px] uppercase font-black bg-slate-150 text-slate-600 px-2 py-0.5 rounded-bl-lg">
+                          {pkg.operator}
+                        </span>
+                        <div className="flex gap-3">
+                          {pkg.imageUrl && (
+                            <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 border border-slate-100/50 shadow-sm relative self-start mt-1">
+                              <img 
+                                src={pkg.imageUrl} 
+                                alt="pkg logo" 
+                                referrerPolicy="no-referrer"
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="space-y-1 flex-1 pr-8">
+                            <h4 className="text-xs text-slate-900 font-extrabold leading-tight">
+                              {lang === 'bn' ? pkg.titleBn : pkg.title}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 font-extrabold font-mono uppercase tracking-wide">
+                              {pkg.category} | {lang === 'bn' ? pkg.validityBn : pkg.validity}
+                            </p>
+                            <p className="text-[10.5px] text-slate-500 leading-normal font-semibold">
+                              {lang === 'bn' ? pkg.descriptionBn : pkg.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+                          <span className="text-blue-600 font-extrabold text-sm">৳{pkg.price}</span>
+                          <div className="flex gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEditOffer(pkg)}
+                              className="p-1 px-2.0 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
+                            >
+                              <Edit2 className="h-3 w-3 shrink-0" />
+                              <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteOffer(pkg.id, lang === 'bn' ? pkg.titleBn : pkg.title)}
+                              className="p-1 px-2.0 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
+                            >
+                              <Trash2 className="h-3 w-3 shrink-0" />
+                              <span>{lang === 'bn' ? 'ডিলিট' : 'Del'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1321,7 +1714,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <select
                         value={bannerForm.operator}
                         onChange={(e) => setBannerForm({...bannerForm, operator: e.target.value as Operator})}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 cursor-pointer"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 cursor-pointer text-[10.5px]"
                       >
                         <option value="GP" className="bg-slate-900">Grameenphone</option>
                         <option value="Robi" className="bg-slate-900">Robi</option>
@@ -1337,7 +1730,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         required
                         value={bannerForm.prefillAmount}
                         onChange={(e) => setBannerForm({...bannerForm, prefillAmount: parseInt(e.target.value) || 0})}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700 font-mono"
                       />
                     </div>
                     <div>
@@ -1410,12 +1803,12 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
               )}
 
               {/* Banners slider control checklist */}
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {banners.map((ban) => (
-                  <div key={ban.id} className="bg-slate-900/40 backdrop-blur-md border border-white/15 p-4 rounded-3xl flex items-center justify-between gap-3 group hover:bg-slate-900/60 hover:border-white/20 transition-all duration-300">
-                    <div className="flex items-center gap-3.5 max-w-[75%]">
+                  <div key={ban.id} className="bg-slate-900/40 backdrop-blur-md border border-white/15 p-4 rounded-3xl flex flex-col justify-between gap-3.5 group hover:bg-slate-900/60 hover:border-white/20 transition-all duration-300">
+                    <div className="flex items-start gap-3.5">
                       {ban.imageUrl ? (
-                        <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md relative group-hover:scale-105 transition-transform">
+                        <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md relative group-hover:scale-105 transition-transform mt-0.5">
                           <img 
                             src={ban.imageUrl} 
                             alt="preview" 
@@ -1424,11 +1817,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           />
                         </div>
                       ) : (
-                        <div className="h-12 w-12 rounded-xl shrink-0 bg-slate-950 border border-white/5 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                        <div className="h-12 w-12 rounded-xl shrink-0 bg-slate-950 border border-white/5 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase tracking-tighter mt-0.5">
                           {ban.operator}
                         </div>
                       )}
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[9px] font-black tracking-widest text-blue-400 uppercase">
                             {ban.operator} SLIDER
@@ -1436,30 +1829,30 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           <span className="text-[10px] text-slate-400 font-bold font-mono">Prefill: ৳{ban.prefillAmount}</span>
                           {ban.imageUrl && (
                             <span className="text-[8.5px] uppercase font-bold bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/10 font-mono">
-                              Image Banner
+                              Image
                             </span>
                           )}
                         </div>
-                        <h4 className="text-xs text-white font-extrabold leading-tight">
+                        <h4 className="text-xs text-white font-extrabold leading-tight truncate">
                           {lang === 'bn' ? ban.title : ban.titleEn}
                         </h4>
-                        <p className="text-[10.5px] text-slate-400 leading-normal font-semibold">
+                        <p className="text-[10.5px] text-slate-400 leading-normal font-semibold line-clamp-2">
                           {lang === 'bn' ? ban.desc : ban.descEn}
                         </p>
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-1 shrink-0">
+ 
+                    <div className="flex gap-2 border-t border-white/5 pt-3.5 mt-1">
                       <button
                         onClick={() => handleEditBanner(ban)}
-                        className="p-1.5 px-3 bg-white/5 hover:bg-blue-500/20 text-slate-300 hover:text-blue-400 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center gap-1"
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-blue-500/20 text-slate-300 hover:text-blue-400 rounded-xl text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1"
                       >
                         <Edit2 className="h-3 w-3 shrink-0" />
                         <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
                       </button>
                       <button
                         onClick={() => handleDeleteBanner(ban.id, lang === 'bn' ? ban.title : ban.titleEn)}
-                        className="p-1.5 px-3 bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center gap-1"
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 rounded-xl text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1"
                       >
                         <Trash2 className="h-3 w-3 shrink-0" />
                         <span>{lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}</span>
@@ -1604,54 +1997,132 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 </form>
               )}
 
-              {/* Billers listing */}
-              <div className="space-y-3">
-                {billers.map((biller) => (
-                  <div key={biller.id} className="bg-white border border-slate-150 p-4 rounded-3xl flex items-center justify-between group">
-                    <div className="flex items-center gap-3.5">
-                      {biller.imageUrl ? (
-                        <div className="h-11 w-11 rounded-2xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
-                          <img 
-                            src={biller.imageUrl} 
-                            alt="biller logo" 
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className={`h-11 w-11 rounded-2xl ${biller.logoColor || 'bg-slate-500'} text-white font-bold flex items-center justify-center shadow-sm`}>
-                          {biller.name ? biller.name[0] : 'B'}
-                        </div>
-                      )}
-                      <div className="space-y-0.5">
-                        <span className="text-[8.5px] font-black tracking-widest text-slate-400 uppercase">
-                          {lang === 'bn' ? biller.categoryBn : biller.category}
-                        </span>
-                        <h4 className="text-xs text-slate-900 font-extrabold">
-                          {lang === 'bn' ? biller.nameBn : biller.name}
-                        </h4>
-                      </div>
-                    </div>
+              {/* Biller Search & Filters Toolbar */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-950/30 p-3 rounded-2xl border border-white/5">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={lang === 'bn' ? 'বিলার নাম...' : 'Biller name...'}
+                    value={billerSearchQuery}
+                    onChange={(e) => setBillerSearchQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 text-white placeholder-slate-500 rounded-xl py-1.5 px-3 text-xs outline-none focus:border-blue-500 transition-all font-bold"
+                  />
+                  {billerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setBillerSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-slate-500 hover:text-white"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
 
-                    <div className="flex gap-1 shrink-0">
-                      <button
-                        onClick={() => handleEditBiller(biller)}
-                        className="p-1 px-3 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Edit2 className="h-3 w-3 shrink-0" />
-                        <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBiller(biller.id, lang === 'bn' ? biller.nameBn : biller.name)}
-                        className="p-1 px-3 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Trash2 className="h-3 w-3 shrink-0" />
-                        <span>{lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <select
+                  value={billerCategoryFilter}
+                  onChange={(e) => setBillerCategoryFilter(e.target.value)}
+                  className="bg-slate-950 border border-white/10 text-slate-300 rounded-xl py-1.5 px-2.5 text-xs outline-none focus:border-blue-500 cursor-pointer font-extrabold"
+                >
+                  <option value="All">{lang === 'bn' ? 'সকল বিল ক্যাটাগরি' : 'All Bill Categories'}</option>
+                  <option value="Electricity">{lang === 'bn' ? 'বিদ্যুৎ (Electricity)' : 'Electricity'}</option>
+                  <option value="Gas">{lang === 'bn' ? 'গ্যাস (Gas)' : 'Gas'}</option>
+                  <option value="Water">{lang === 'bn' ? 'পানি (Water)' : 'Water'}</option>
+                  <option value="Internet">{lang === 'bn' ? 'ইন্টারনেট (Internet)' : 'Internet'}</option>
+                  <option value="TV">{lang === 'bn' ? 'টেলিভিশন (TV)' : 'TV / Cable'}</option>
+                  <option value="Telephone">{lang === 'bn' ? 'টেলিফোন (Telephone)' : 'Telephone'}</option>
+                  <option value="Other">{lang === 'bn' ? 'অন্যান্য (Other)' : 'Other'}</option>
+                </select>
               </div>
+
+              {/* Billers listing */}
+              {(() => {
+                const filteredBillers = billers.filter((biller) => {
+                  const queryLower = billerSearchQuery.toLowerCase().trim();
+                  const matchesSearch = !queryLower ||
+                    (biller.name || '').toLowerCase().includes(queryLower) ||
+                    (biller.nameBn || '').toLowerCase().includes(queryLower);
+
+                  const matchesCategory = billerCategoryFilter === 'All' || biller.category === billerCategoryFilter;
+
+                  return matchesSearch && matchesCategory;
+                });
+
+                if (filteredBillers.length === 0) {
+                  return (
+                    <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-2">
+                      <CreditCard className="h-10 w-10 text-slate-600" />
+                      <h4 className="text-white font-bold text-xs">
+                        {lang === 'bn' ? 'কোনো মেলানো বিলার পাওয়া যায়নি' : 'No matching utility billers found'}
+                      </h4>
+                      <p className="text-slate-400 text-[10.5px] max-w-xs leading-relaxed font-semibold">
+                        {lang === 'bn' ? 'সার্চ কুয়েরি বা ক্যাটাগরি ফিল্টারিং পরিবর্তন করে পুনরায় চেষ্টা করুন।' : 'Modify your filters or search keywords to view biller operations.'}
+                      </p>
+                      {(billerSearchQuery || billerCategoryFilter !== 'All') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBillerSearchQuery('');
+                            setBillerCategoryFilter('All');
+                          }}
+                          className="mt-1 px-3 py-1 bg-white/5 border border-white/5 rounded-lg text-[10px] text-blue-400 font-extrabold hover:bg-white/10 cursor-pointer"
+                        >
+                          {lang === 'bn' ? 'ফিল্টার রিসেট করুন' : 'Clear Filters'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {filteredBillers.map((biller) => (
+                      <div key={biller.id} className="bg-white border border-slate-150 p-4 rounded-3xl flex flex-col justify-between gap-3.5 shadow-xs group hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3.5">
+                          {biller.imageUrl ? (
+                            <div className="h-11 w-11 rounded-2xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
+                              <img 
+                                src={biller.imageUrl} 
+                                alt="biller logo" 
+                                referrerPolicy="no-referrer"
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className={`h-11 w-11 rounded-2xl ${biller.logoColor || 'bg-slate-500'} text-white font-bold flex items-center justify-center shadow-xs shrink-0`}>
+                              {biller.name ? biller.name[0] : 'B'}
+                            </div>
+                          )}
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <span className="text-[8.5px] font-black tracking-widest text-slate-400 uppercase truncate block">
+                              {lang === 'bn' ? biller.categoryBn : biller.category}
+                            </span>
+                            <h4 className="text-xs text-slate-900 font-extrabold truncate">
+                              {lang === 'bn' ? biller.nameBn : biller.name}
+                            </h4>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1.5 border-t border-slate-100 pt-3 mt-1 shrink-0">
+                          <button
+                            onClick={() => handleEditBiller(biller)}
+                            className="flex-1 py-1 px-3 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-xl text-[10px] font-black transition-colors cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            <Edit2 className="h-3 w-3 shrink-0" />
+                            <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBiller(biller.id, lang === 'bn' ? biller.nameBn : biller.name)}
+                            className="flex-1 py-1 px-3 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-xl text-[10px] font-black transition-colors cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3 shrink-0" />
+                            <span>{lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1999,6 +2470,193 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB 6: SETTINGS MANAGEMENT */}
+          {activeSubTab === 'settings' && (
+            <div className="space-y-5 text-slate-100 animate-scale-up">
+              <div className="px-1">
+                <span className="text-[10px] font-extrabold text-blue-400 tracking-widest uppercase font-mono">
+                  GLOBAL SYSTEM INITIALS & BANKING
+                </span>
+                <p className="text-xs text-slate-400 mt-1 font-semibold">
+                  {lang === 'bn' ? 'সরাসরি ওয়ালেট ও কাস্টমার কেয়ার হেল্পলাইন সেটিংস আপডেট করুন।' : 'Configure active payment phone numbers, transaction limits, and dynamic warning alert banners.'}
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 space-y-6">
+                
+                {/* Section A: Active Mobile Banking Numbers */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">
+                    1. Active Deposit Numbers (Personal / Send Money)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        bKash Personal Number
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.bkashNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, bkashNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        Nagad Personal Number
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.nagadNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, nagadNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        Rocket Personal Number
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.rocketNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, rocketNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section B: Financial Limit Parameters */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">
+                    2. Add Fund Transaction Limits
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        Minimum Deposit Limit (৳)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={settingsForm.minAddFund}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, minAddFund: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        Maximum Deposit Limit (৳)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={settingsForm.maxAddFund}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, maxAddFund: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section C: Support & Helps */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">
+                    3. Helpline Support Configuration
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        Voice Support (Phone Number)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.helplineNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, helplineNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        WhatsApp Link URL
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.whatsappUrl}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, whatsappUrl: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section D: Warning Announcement Marquee Ticker */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono flex items-center justify-between">
+                    <span>4. Portal Notice Ticker Announcement</span>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsForm({ ...settingsForm, showNotice: !settingsForm.showNotice })}
+                      className={`px-3 py-1 text-[9px] font-black rounded-lg uppercase tracking-wider border transition-all ${
+                        settingsForm.showNotice 
+                          ? 'bg-blue-600/10 border-blue-500/20 text-blue-400' 
+                          : 'bg-white/5 border-white/5 text-slate-500'
+                      }`}
+                    >
+                      {settingsForm.showNotice ? 'Status: Visible' : 'Status: Disabled'}
+                    </button>
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        English Ticker Message
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={settingsForm.globalNoticeEn}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, globalNoticeEn: e.target.value })}
+                        placeholder="Type alert warning or promotional text in English..."
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-medium outline-none focus:border-blue-500 font-semibold"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        বাংলা বার্তা (Bengali Notice Message)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={settingsForm.globalNoticeBn}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, globalNoticeBn: e.target.value })}
+                        placeholder="বাংলায় নোটিশ বার্তা লিখুন..."
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-medium outline-none focus:border-blue-500 font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/5 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-800 disabled:to-indigo-800 text-white rounded-2xl text-xs font-black shadow-lg shadow-blue-500/15 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                  >
+                    {loading ? (lang === 'bn' ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving Changes...') : (lang === 'bn' ? 'সেটিংস আপডেট করুন' : 'Save System Settings')}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
