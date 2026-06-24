@@ -9,7 +9,7 @@ interface HistoryListProps {
 }
 
 export default function HistoryList({ transactions, lang }: HistoryListProps) {
-  const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn'>('All');
+  const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn' | 'Transfer'>('All');
   const [query, setQuery] = useState('');
   
   const t = TRANSLATIONS[lang];
@@ -22,6 +22,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
       (tx.targetNumber && tx.targetNumber.includes(query)) ||
       (tx.billerName && tx.billerName.toLowerCase().includes(query.toLowerCase())) ||
       (tx.billerNameBn && tx.billerNameBn.includes(query)) ||
+      (tx.transferMethod && tx.transferMethod.toLowerCase().includes(query.toLowerCase())) ||
       tx.txId.toLowerCase().includes(query.toLowerCase());
 
     return matchesFilter && matchesSearch;
@@ -35,6 +36,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         return 'bg-amber-50 text-amber-600 border-amber-100/50';
       case 'CashIn':
         return 'bg-emerald-50 text-emerald-600 border-emerald-100/50';
+      case 'Transfer':
+        return 'bg-violet-50 text-violet-600 border-violet-100/50';
       default:
         return 'bg-slate-50 text-slate-500 border-slate-100';
     }
@@ -48,6 +51,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         return <Landmark className="h-4.5 w-4.5" />;
       case 'CashIn':
         return <ArrowDownLeft className="h-4.5 w-4.5" />;
+      case 'Transfer':
+        return <ArrowUpRight className="h-4.5 w-4.5" />;
       default:
         return <FileText className="h-4.5 w-4.5" />;
     }
@@ -81,7 +86,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
 
       {/* Category horizontal tabs */}
       <div className="flex gap-2.5 border-b border-slate-100 pb-1 overflow-x-auto scrollbar-none">
-        {(['All', 'Recharge', 'Bill', 'CashIn'] as const).map((type) => {
+        {(['All', 'Recharge', 'Bill', 'CashIn', 'Transfer'] as const).map((type) => {
           const isActive = filter === type;
           let label: string = type;
           if (lang === 'bn') {
@@ -89,6 +94,9 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
             else if (type === 'Recharge') label = t.filterRecharge;
             else if (type === 'Bill') label = t.filterBill;
             else if (type === 'CashIn') label = t.filterCashin;
+            else if (type === 'Transfer') label = 'ব্যালেন্স ট্রান্সফার';
+          } else {
+            if (type === 'Transfer') label = 'Balance Transfer';
           }
           return (
             <button
@@ -128,6 +136,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                         ? `${lang === 'bn' ? 'মোবাইল রিচার্জ' : 'Mobile Recharge'}`
                         : tx.type === 'Bill'
                         ? `${lang === 'bn' ? tx.billerNameBn : tx.billerName}`
+                        : tx.type === 'Transfer'
+                        ? `${tx.transferMethod} ${lang === 'bn' ? 'ট্রান্সফার' : 'Transfer'}`
                         : `${lang === 'bn' ? 'এড ফান্ড (ওয়ালেট রিচার্জ)' : 'Add Fund (Wallet Deposit)'}`}
                     </h4>
                   </div>
@@ -137,6 +147,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                     <span className="text-[10px] text-slate-500 font-bold block">
                       {tx.type === 'CashIn' 
                         ? (lang === 'bn' ? `জমাকৃত মাধ্যম: ${tx.targetNumber}` : `Received via ${tx.targetNumber}`)
+                        : tx.type === 'Transfer'
+                        ? (lang === 'bn' ? `প্রাপক নম্বর: ${tx.targetNumber}` : `Recipient Number: ${tx.targetNumber}`)
                         : `${tx.targetNumber} (${tx.operator})`}
                     </span>
                   )}

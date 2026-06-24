@@ -40,6 +40,7 @@ import ProfilePanel from './components/ProfilePanel';
 import RechargeModal from './components/RechargeModal';
 import BillPayModal from './components/BillPayModal';
 import AddFundModal from './components/AddFundModal';
+import TransferModal from './components/TransferModal';
 import SecureLockModal from './components/SecureLockModal';
 import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
@@ -139,6 +140,7 @@ export default function App() {
 
   const [isBillPayOpen, setIsBillPayOpen] = useState(false);
   const [isAddFundOpen, setIsAddFundOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -604,6 +606,61 @@ export default function App() {
     }
   };
 
+  const handleTransferSuccess = async (amount: number, method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay', targetNumber: string) => {
+    if (!currentUser) return;
+
+    if (balance < amount) {
+      alert(lang === 'bn' ? 'দুঃখিত, আপনার ব্যালেন্স অপর্যাপ্ত!' : 'Insufficient wallet balance!');
+      return;
+    }
+
+    const newTxId = `tx-${Date.now()}`;
+    const txReferenceId = `TRF${Math.random().toString(36).substr(2, 11).toUpperCase()}`;
+
+    const userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+    const userEmail = currentUser.email || 'user@test.com';
+
+    const newTx: Transaction = {
+      id: newTxId,
+      type: 'Transfer',
+      amount,
+      targetNumber,
+      transferMethod: method,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      txId: txReferenceId,
+      status: 'Pending',
+      userId: currentUser.uid,
+      userEmail,
+      userName
+    };
+
+    const addedNotifId = `notif-${Date.now()}`;
+    const addedNotif: NotificationItem = {
+      id: addedNotifId,
+      title: 'Transfer Request Submitted',
+      titleBn: 'ট্রান্সফার অনুরোধ পাঠানো হয়েছে',
+      desc: `Your transfer of ৳${amount} to ${method} (${targetNumber}) is pending admin verification.`,
+      descBn: `আপনার ${method} নম্বরে (${targetNumber}) ৳${amount} টাকা ট্রান্সফারের অনুরোধ যাচাইয়ের অপেক্ষায় আছে।`,
+      time: 'Just now',
+      read: false,
+    };
+
+    try {
+      const batch = writeBatch(db);
+      
+      batch.set(doc(db, 'users', currentUser.uid, 'transactions', newTxId), newTx);
+      batch.set(doc(db, 'admin_requests', newTxId), newTx);
+      batch.set(doc(db, 'users', currentUser.uid, 'notifications', addedNotifId), addedNotif);
+      
+      const newBalanceVal = Math.max(balance - amount, 0);
+      batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Error submitting transfer: ", err);
+    }
+  };
+
   const handleAddFundSuccess = async (amount: number, method: string, trxId: string, senderNumber: string) => {
     if (!currentUser) return;
     const newTxId = `tx-${Date.now()}`;
@@ -684,6 +741,13 @@ export default function App() {
       icon: Landmark,
       color: 'bg-amber-50 text-amber-600 border border-amber-100/40 shadow-xs shadow-amber-500/2',
       action: () => setIsBillPayOpen(true)
+    },
+    {
+      id: 'transfer',
+      title: lang === 'bn' ? 'ব্যালেন্স ট্রান্সফার' : 'Balance Transfer',
+      icon: Send,
+      color: 'bg-violet-50 text-violet-600 border border-violet-100/40 shadow-xs shadow-violet-500/2',
+      action: () => setIsTransferOpen(true)
     },
     {
       id: 'history',
@@ -1386,6 +1450,17 @@ export default function App() {
               isOpen={isAddFundOpen}
               onClose={() => setIsAddFundOpen(false)}
               onSuccess={handleAddFundSuccess}
+            />
+          )}
+
+          {/* BALANCE TRANSFER DIALOGUE */}
+          {isTransferOpen && (
+            <TransferModal
+              lang={lang}
+              isOpen={isTransferOpen}
+              onClose={() => setIsTransferOpen(false)}
+              currentBalance={balance}
+              onSuccess={handleTransferSuccess}
             />
           )}
 

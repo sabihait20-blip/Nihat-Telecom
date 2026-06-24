@@ -128,6 +128,182 @@ function translateBanglaToEnglish(banglaText: string): string {
   }).join(' ');
 }
 
+function parseSmartOfferText(rawText: string, currentOperator: Operator): Partial<Omit<RechargePackage, 'id'>> {
+  if (!rawText) return {};
+
+  // Convert Bangla numbers in the whole string to English first for easier processing
+  const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  
+  let englishText = rawText;
+  for (let i = 0; i < 10; i++) {
+    englishText = englishText.replace(new RegExp(banglaDigits[i], 'g'), englishDigits[i]);
+  }
+
+  // Normalize spaces and lower case for search
+  const normalized = englishText.toLowerCase().replace(/\s+/g, ' ');
+
+  // 1. Detect Operator
+  let operator: Operator = currentOperator;
+  if (normalized.includes('robi') || normalized.includes('রবি')) {
+    operator = 'Robi';
+  } else if (normalized.includes('gp') || normalized.includes('গ্রামীণ') || normalized.includes('জিপি') || normalized.includes('grameen')) {
+    operator = 'GP';
+  } else if (normalized.includes('airtel') || normalized.includes('এয়ারটেল') || normalized.includes('এয়ারটেল')) {
+    operator = 'Airtel';
+  } else if (normalized.includes('banglalink') || normalized.includes('bl') || normalized.includes('বাংলালিংক')) {
+    operator = 'Banglalink';
+  } else if (normalized.includes('teletalk') || normalized.includes('টেলিটক')) {
+    operator = 'Teletalk';
+  }
+
+  const operatorNamesBn: Record<Operator, string> = {
+    'GP': 'জিপি',
+    'Robi': 'রবি',
+    'Airtel': 'এয়ারটেল',
+    'Banglalink': 'বাংলালিংক',
+    'Teletalk': 'টেলিটক'
+  };
+
+  const operatorNameBn = operatorNamesBn[operator] || '';
+
+  // 2. Extract Price
+  let price = 0;
+  // Match patterns like "টাকা: ৩১২", "টাকা : ১৬", "টাকা:১৫", "৳ ৩১২", "312 টাকা", "price: 312"
+  const priceRegexes = [
+    /(?:টাকা|৳|tk|price|টাকা\s*:\s*|টাকা\s*ঃ\s*|price\s*:\s*)\s*(\d+)/i,
+    /(\d+)\s*(?:টাকা|৳|tk)/i,
+    /(\d+)\s*$/m // last number in the line
+  ];
+
+  for (const regex of priceRegexes) {
+    const match = englishText.match(regex);
+    if (match && match[1]) {
+      price = parseInt(match[1], 10);
+      if (price > 0) break;
+    }
+  }
+
+  // 3. Extract Validity
+  let validityBn = '';
+  // Match patterns like "মেয়াদ: ৩০ দিন", "মেয়াদ : ১ দিন", "মেয়াদ : ৩ দিন", "মেয়াদ:৩০ দিন"
+  const validityRegex = /(?:মেয়াদ|validity)\s*[:ঃ]?\s*([^\n,৳]+)/i;
+  const validityMatch = rawText.match(validityRegex);
+  if (validityMatch && validityMatch[1]) {
+    validityBn = validityMatch[1].trim();
+  } else {
+    // Fallback search for days/hours in rawText
+    const daysMatch = rawText.match(/(\d+|[০-৯]+)\s*(?:দিন|day|days)/i);
+    if (daysMatch) {
+      validityBn = daysMatch[0].trim();
+    } else {
+      const hoursMatch = rawText.match(/(\d+|[০-৯]+)\s*(?:ঘণ্টা|ঘन्টা|hour|hours)/i);
+      if (hoursMatch) {
+        validityBn = hoursMatch[0].trim();
+      }
+    }
+  }
+
+  // Ensure validityBn is cleanly formatted
+  validityBn = validityBn.replace(/টাকা.*/g, '').replace(/tk.*/gi, '').trim();
+
+  // Translate validity to English
+  const validity = translateBanglaToEnglish(validityBn);
+
+  // 4. Extract Internet (GB/MB) and Minutes
+  let internetBn = '';
+  let minutesBn = '';
+  let smsBn = '';
+
+  // Find gb/mb
+  // matches e.g. "১০ জিবি", "১ জিবি", "10 GB", "500 MB", "৫০০ এমবি"
+  const internetRegex = /(\d+(?:\.\d+)?|[০-৯]+(?:\.[০-৯]+)?)\s*(?:জিবি|জি\.বি|জি বি|এমবি|এম\.বি|এম বি|gb|mb)/gi;
+  const internetMatches = rawText.match(internetRegex);
+  if (internetMatches) {
+    internetBn = internetMatches.join(' + ');
+  }
+
+  // Find minutes
+  // matches e.g. "৩৫০ মিনিট", "২৩ মিনিট", "350 minute", "23 min"
+  const minutesRegex = /(\d+|[০-৯]+)\s*(?:মিনিট|মিঃ|min|mins|minute|minutes)/gi;
+  const minutesMatches = rawText.match(minutesRegex);
+  if (minutesMatches) {
+    minutesBn = minutesMatches.join(' + ');
+  }
+
+  // Find SMS
+  // matches e.g. "১০০ এসএমএস", "100 SMS"
+  const smsRegex = /(\d+|[০-৯]+)\s*(?:এসএমএস|sms)/gi;
+  const smsMatches = rawText.match(smsRegex);
+  if (smsMatches) {
+    smsBn = smsMatches.join(' + ');
+  }
+
+  // 5. Determine category and volumes
+  let category: 'internet' | 'bundle' | 'talktime' = 'internet';
+  let volumeBn = '';
+
+  if (internetBn && minutesBn) {
+    category = 'bundle';
+    volumeBn = `${internetBn} + ${minutesBn}`;
+    if (smsBn) {
+      volumeBn += ` + ${smsBn}`;
+    }
+  } else if (minutesBn) {
+    category = 'talktime';
+    volumeBn = minutesBn;
+  } else if (internetBn) {
+    category = 'internet';
+    volumeBn = internetBn;
+  } else if (smsBn) {
+    category = 'bundle';
+    volumeBn = smsBn;
+  } else {
+    // Default fallback: parse the first part of the text up to "টাকা" or newline
+    const firstLine = rawText.split('\n')[0].split(',')[0].split('টাকা')[0].trim();
+    volumeBn = firstLine;
+  }
+
+  const volume = translateBanglaToEnglish(volumeBn);
+
+  // 6. Build a beautiful descriptive title and description
+  // Let's strip away "টাকা: ..." and "মেয়াদ: ..." from the raw text to make a clean descriptionBn
+  let descriptionBn = rawText
+    .replace(/(?:টাকা|৳|tk|price|মেয়াদ|validity)\s*[:ঃ]?\s*[^\n]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // If there's multiple commas or trailing characters, clean them up
+  descriptionBn = descriptionBn.replace(/^[,\s]+|[,\s]+$/g, '');
+
+  if (!descriptionBn) {
+    descriptionBn = `${volumeBn} মেয়াদ ${validityBn}`;
+  }
+
+  const description = translateBanglaToEnglish(descriptionBn);
+
+  // Auto title builder
+  // e.g. "রবি ১০ জিবি + ৩৫০ মিনিট (৩০ দিন)"
+  let titleBn = `${operatorNameBn} ${volumeBn} (${validityBn})`;
+  // Clean up any extra spaces
+  titleBn = titleBn.replace(/\s+/g, ' ').trim();
+  const title = translateBanglaToEnglish(titleBn);
+
+  return {
+    operator,
+    price,
+    validity,
+    validityBn,
+    volume,
+    volumeBn,
+    category,
+    description,
+    descriptionBn,
+    title,
+    titleBn
+  };
+}
+
 interface AdminPanelProps {
   lang: Language;
   isOpen: boolean;
@@ -270,6 +446,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     isPopular: false,
     imageUrl: ''
   });
+  const [smartText, setSmartText] = useState<string>('');
 
   // Banner Form States
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
@@ -466,21 +643,25 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           read: false
         });
       } else {
-        // For Recharge and Bill, the balance is docked immediately during request creation.
+        // For Recharge, Bill, and Transfer, the balance is docked immediately during request creation.
         // So upon approval, we simply notify the user of transaction execution.
         const notifId = `notif-${Date.now()}`;
         const notifRef = doc(db, 'users', tx.userId, 'notifications', notifId);
         let detailText = tx.type === 'Recharge' 
           ? `Your recharge of ৳${tx.amount} to ${tx.targetNumber} has been approved.`
+          : tx.type === 'Transfer'
+          ? `Your transfer of ৳${tx.amount} to ${tx.transferMethod} (${tx.targetNumber}) has been approved.`
           : `Your payment of ৳${tx.amount} to ${tx.billerName} has been approved.`;
         let detailTextBn = tx.type === 'Recharge'
           ? `আপনার ${tx.targetNumber} নম্বরে ৳${tx.amount} টাকা রিচার্জের অনুরোধ সফল হয়েছে।`
+          : tx.type === 'Transfer'
+          ? `আপনার ${tx.transferMethod} নম্বরে (${tx.targetNumber}) ৳${tx.amount} টাকা ট্রান্সফারের অনুরোধ অনুমোদিত হয়েছে।`
           : `আপনার ${tx.billerNameBn} বিলে ৳${tx.amount} টাকা ফি পরিশোধ অনুমোদিত হয়েছে।`;
 
         batch.set(notifRef, {
           id: notifId,
-          title: tx.type === 'Recharge' ? 'Recharge Approved' : 'Bill Approved',
-          titleBn: tx.type === 'Recharge' ? 'রিচার্জ অনুমোদিত' : 'বিল পরিশোধ অনুমোদিত',
+          title: tx.type === 'Recharge' ? 'Recharge Approved' : tx.type === 'Transfer' ? 'Transfer Approved' : 'Bill Approved',
+          titleBn: tx.type === 'Recharge' ? 'রিচার্জ অনুমোদিত' : tx.type === 'Transfer' ? 'ট্রান্সফার অনুমোদিত' : 'বিল পরিশোধ অনুমোদিত',
           desc: detailText,
           descBn: detailTextBn,
           time: 'Just now',
@@ -528,8 +709,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         rejectionReason: rejectReason 
       });
 
-      // If Recharge or Bill, refund docked user balance
-      if (tx.type === 'Recharge' || tx.type === 'Bill') {
+      // If Recharge, Bill, or Transfer, refund docked user balance
+      if (tx.type === 'Recharge' || tx.type === 'Bill' || tx.type === 'Transfer') {
         const balanceDocRef = doc(db, 'users', tx.userId, 'wallet', 'balance_doc');
         const balanceSnap = await getDoc(balanceDocRef);
         let curBalance = 0;
@@ -543,11 +724,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       const notifId = `notif-${Date.now()}`;
       const notifRef = doc(db, 'users', tx.userId, 'notifications', notifId);
       
-      let title = tx.type === 'CashIn' ? 'Deposit Rejected' : tx.type === 'Recharge' ? 'Recharge Rejected' : 'Bill Rejected';
-      let titleBn = tx.type === 'CashIn' ? 'টাকা যোগ প্রত্যাখ্যাত' : tx.type === 'Recharge' ? 'রিচার্জ প্রত্যাখ্যাত' : 'বিল পরিশোধ প্রত্যাখ্যাত';
+      let title = tx.type === 'CashIn' ? 'Deposit Rejected' : tx.type === 'Recharge' ? 'Recharge Rejected' : tx.type === 'Transfer' ? 'Transfer Rejected' : 'Bill Rejected';
+      let titleBn = tx.type === 'CashIn' ? 'টাকা যোগ প্রত্যাখ্যাত' : tx.type === 'Recharge' ? 'রিচার্জ প্রত্যাখ্যাত' : tx.type === 'Transfer' ? 'ট্রান্সফার প্রত্যাখ্যাত' : 'বিল পরিশোধ প্রত্যাখ্যাত';
       
-      let desc = `Your ৳${tx.amount} ${tx.type} requested has been declined. Reason: ${rejectReason}`;
-      let descBn = `আপনার ৳${tx.amount} টাকার ${tx.type === 'CashIn' ? 'টাকা যোগ' : tx.type === 'Recharge' ? 'রিচার্জ' : 'বিল পরিশোধ'} বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      let desc = `Your ৳${tx.amount} ${tx.type === 'Transfer' ? 'transfer' : tx.type} requested has been declined. Reason: ${rejectReason}`;
+      let descBn = `আপনার ৳${tx.amount} টাকার ${tx.type === 'CashIn' ? 'টাকা যোগ' : tx.type === 'Recharge' ? 'রিচার্জ' : tx.type === 'Transfer' ? 'ট্রান্সফার' : 'বিল পরিশোধ'} বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
 
       batch.set(notifRef, {
         id: notifId,
@@ -585,6 +766,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
       setShowOfferForm(false);
       setEditingOfferId(null);
+      setSmartText('');
       setOfferForm({
         title: '',
         titleBn: '',
@@ -609,6 +791,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   const handleEditOffer = (pkg: RechargePackage) => {
     setEditingOfferId(pkg.id);
+    setSmartText('');
     setOfferForm({
       title: pkg.title,
       titleBn: pkg.titleBn,
@@ -1472,6 +1655,23 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                       </button>
                                     </p>
                                   )}
+                                  {req.type === 'Transfer' && (
+                                    <p className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{lang === 'bn' ? `টাকা স্থানান্তর (${req.transferMethod}): ${req.targetNumber}` : `Transfer (${req.transferMethod}): ${req.targetNumber}`}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyToClipboard(req.targetNumber || '', req.id + '-targetNumber')}
+                                        className="p-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded transition-all cursor-pointer inline-flex items-center gap-1 text-[9px] font-bold"
+                                        title={lang === 'bn' ? 'নম্বর কপি করুন' : 'Copy Number'}
+                                      >
+                                        {copiedFieldId === req.id + '-targetNumber' ? (
+                                          <span className="text-emerald-400">{lang === 'bn' ? 'কপি হয়েছে' : 'Copied'}</span>
+                                        ) : (
+                                          <Copy className="h-2.5 w-2.5" />
+                                        )}
+                                      </button>
+                                    </p>
+                                  )}
                                 </div>
 
                                 {req.rejectionReason && (
@@ -1528,6 +1728,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   type="button"
                   onClick={() => {
                     setEditingOfferId(null);
+                    setSmartText('');
                     setOfferForm({
                       title: '',
                       titleBn: '',
@@ -1567,6 +1768,48 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
+                  </div>
+
+                  {/* Smart Autofill Box */}
+                  <div className="p-4 bg-blue-50/60 border border-blue-100 rounded-2xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] font-black text-blue-900 uppercase flex items-center gap-1">
+                        <span>✨ Smart Autofill (স্মার্ট অটোফিল)</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const parsed = parseSmartOfferText(smartText, offerForm.operator);
+                          setOfferForm(prev => ({
+                            ...prev,
+                            ...parsed
+                          }));
+                        }}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold rounded-lg transition-colors cursor-pointer select-none border-0"
+                      >
+                        {lang === 'bn' ? 'প্রয়োগ করুন' : 'Apply'}
+                      </button>
+                    </div>
+                    <textarea
+                      rows={3}
+                      placeholder={lang === 'bn' ? "এখানে কপি করা অফার পেস্ট করুন...\nযেমন:\n১০ জিবি , ৩৫০ মিনিট এবং ১০০ এসএমএস\nটাকা: ৩১২\nমেয়াদ: ৩০ দিন" : "Paste copy-pasted offer text here...\ne.g.\n10 GB, 350 Min\nTaka: 312\nValidity: 30 Days"}
+                      value={smartText}
+                      onChange={(e) => {
+                        const text = e.target.value;
+                        setSmartText(text);
+                        const parsed = parseSmartOfferText(text, offerForm.operator);
+                        setOfferForm(prev => ({
+                          ...prev,
+                          ...parsed
+                        }));
+                      }}
+                      className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 placeholder-slate-400 font-mono text-slate-800"
+                    />
+                    <p className="text-[10px] text-blue-700 font-semibold leading-normal">
+                      {lang === 'bn' 
+                        ? '💡 এখানে শুধু অফার ডিটেইলস লিখলেই ক্যাটাগরি, প্রাইস, ভলিউম, ভ্যালিডিটি এবং টাইটেল ইংরেজি ও বাংলা অটোমেটিক পূরণ হয়ে যাবে!' 
+                        : '💡 Simply paste details here; category, price, volume, validity, and titles will be auto-generated instantly!'}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3.5">
