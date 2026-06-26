@@ -643,25 +643,41 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           read: false
         });
       } else {
-        // For Recharge, Bill, and Transfer, the balance is docked immediately during request creation.
+        // For Recharge, Bill, Transfer, and Voucher, the balance is docked immediately during request creation.
         // So upon approval, we simply notify the user of transaction execution.
         const notifId = `notif-${Date.now()}`;
         const notifRef = doc(db, 'users', tx.userId, 'notifications', notifId);
-        let detailText = tx.type === 'Recharge' 
-          ? `Your recharge of ৳${tx.amount} to ${tx.targetNumber} has been approved.`
-          : tx.type === 'Transfer'
-          ? `Your transfer of ৳${tx.amount} to ${tx.transferMethod} (${tx.targetNumber}) has been approved.`
-          : `Your payment of ৳${tx.amount} to ${tx.billerName} has been approved.`;
-        let detailTextBn = tx.type === 'Recharge'
-          ? `আপনার ${tx.targetNumber} নম্বরে ৳${tx.amount} টাকা রিচার্জের অনুরোধ সফল হয়েছে।`
-          : tx.type === 'Transfer'
-          ? `আপনার ${tx.transferMethod} নম্বরে (${tx.targetNumber}) ৳${tx.amount} টাকা ট্রান্সফারের অনুরোধ অনুমোদিত হয়েছে।`
-          : `আপনার ${tx.billerNameBn} বিলে ৳${tx.amount} টাকা ফি পরিশোধ অনুমোদিত হয়েছে।`;
+        let detailText = '';
+        let detailTextBn = '';
+        let title = '';
+        let titleBn = '';
+
+        if (tx.type === 'Recharge') {
+          detailText = `Your recharge of ৳${tx.amount} to ${tx.targetNumber} has been approved.`;
+          detailTextBn = `আপনার ${tx.targetNumber} নম্বরে ৳${tx.amount} টাকা রিচার্জের অনুরোধ সফল হয়েছে।`;
+          title = 'Recharge Approved';
+          titleBn = 'রিচার্জ অনুমোদিত';
+        } else if (tx.type === 'Transfer') {
+          detailText = `Your transfer of ৳${tx.amount} to ${tx.transferMethod} (${tx.targetNumber}) has been approved.`;
+          detailTextBn = `আপনার ${tx.transferMethod} নম্বরে (${tx.targetNumber}) ৳${tx.amount} টাকা ট্রান্সফারের অনুরোধ অনুমোদিত হয়েছে।`;
+          title = 'Transfer Approved';
+          titleBn = 'ট্রান্সফার অনুমোদিত';
+        } else if (tx.type === 'Voucher') {
+          detailText = `Your purchase of ${tx.voucherItem} (${tx.voucherCode}) for ৳${tx.amount} has been approved and delivered.`;
+          detailTextBn = `আপনার ${tx.voucherItem} (${tx.voucherCode}) এর ৳${tx.amount} টাকার ভাউচার অনুরোধটি সফলভাবে ডেলিভারি করা হয়েছে।`;
+          title = 'Voucher Delivered';
+          titleBn = 'ভাউচার ডেলিভারি সফল';
+        } else {
+          detailText = `Your payment of ৳${tx.amount} to ${tx.billerName} has been approved.`;
+          detailTextBn = `আপনার ${tx.billerNameBn} বিলে ৳${tx.amount} টাকা ফি পরিশোধ অনুমোদিত হয়েছে।`;
+          title = 'Bill Approved';
+          titleBn = 'বিল পরিশোধ অনুমোদিত';
+        }
 
         batch.set(notifRef, {
           id: notifId,
-          title: tx.type === 'Recharge' ? 'Recharge Approved' : tx.type === 'Transfer' ? 'Transfer Approved' : 'Bill Approved',
-          titleBn: tx.type === 'Recharge' ? 'রিচার্জ অনুমোদিত' : tx.type === 'Transfer' ? 'ট্রান্সফার অনুমোদিত' : 'বিল পরিশোধ অনুমোদিত',
+          title,
+          titleBn,
           desc: detailText,
           descBn: detailTextBn,
           time: 'Just now',
@@ -709,8 +725,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         rejectionReason: rejectReason 
       });
 
-      // If Recharge, Bill, or Transfer, refund docked user balance
-      if (tx.type === 'Recharge' || tx.type === 'Bill' || tx.type === 'Transfer') {
+      // If Recharge, Bill, Transfer, or Voucher, refund docked user balance
+      if (tx.type === 'Recharge' || tx.type === 'Bill' || tx.type === 'Transfer' || tx.type === 'Voucher') {
         const balanceDocRef = doc(db, 'users', tx.userId, 'wallet', 'balance_doc');
         const balanceSnap = await getDoc(balanceDocRef);
         let curBalance = 0;
@@ -724,11 +740,37 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       const notifId = `notif-${Date.now()}`;
       const notifRef = doc(db, 'users', tx.userId, 'notifications', notifId);
       
-      let title = tx.type === 'CashIn' ? 'Deposit Rejected' : tx.type === 'Recharge' ? 'Recharge Rejected' : tx.type === 'Transfer' ? 'Transfer Rejected' : 'Bill Rejected';
-      let titleBn = tx.type === 'CashIn' ? 'টাকা যোগ প্রত্যাখ্যাত' : tx.type === 'Recharge' ? 'রিচার্জ প্রত্যাখ্যাত' : tx.type === 'Transfer' ? 'ট্রান্সফার প্রত্যাখ্যাত' : 'বিল পরিশোধ প্রত্যাখ্যাত';
-      
-      let desc = `Your ৳${tx.amount} ${tx.type === 'Transfer' ? 'transfer' : tx.type} requested has been declined. Reason: ${rejectReason}`;
-      let descBn = `আপনার ৳${tx.amount} টাকার ${tx.type === 'CashIn' ? 'টাকা যোগ' : tx.type === 'Recharge' ? 'রিচার্জ' : tx.type === 'Transfer' ? 'ট্রান্সফার' : 'বিল পরিশোধ'} বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      let title = '';
+      let titleBn = '';
+      let desc = '';
+      let descBn = '';
+
+      if (tx.type === 'CashIn') {
+        title = 'Deposit Rejected';
+        titleBn = 'টাকা যোগ প্রত্যাখ্যাত';
+        desc = `Your deposit request of ৳${tx.amount} has been declined. Reason: ${rejectReason}`;
+        descBn = `আপনার ৳${tx.amount} টাকা যোগের অনুরোধ বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      } else if (tx.type === 'Recharge') {
+        title = 'Recharge Rejected';
+        titleBn = 'রিচার্জ প্রত্যাখ্যাত';
+        desc = `Your mobile recharge of ৳${tx.amount} has been declined. Reason: ${rejectReason}`;
+        descBn = `আপনার ৳${tx.amount} টাকা রিচার্জের অনুরোধ বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      } else if (tx.type === 'Transfer') {
+        title = 'Transfer Rejected';
+        titleBn = 'ট্রান্সফার প্রত্যাখ্যাত';
+        desc = `Your transfer of ৳${tx.amount} has been declined. Reason: ${rejectReason}`;
+        descBn = `আপনার ৳${tx.amount} টাকা ট্রান্সফারের অনুরোধ বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      } else if (tx.type === 'Voucher') {
+        title = 'Voucher Rejected';
+        titleBn = 'ভাউচার অনুরোধ প্রত্যাখ্যাত';
+        desc = `Your voucher purchase of ${tx.voucherItem} for ৳${tx.amount} has been declined. Reason: ${rejectReason}`;
+        descBn = `আপনার ${tx.voucherItem} এর ৳${tx.amount} টাকার ভাউচার অনুরোধ বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      } else {
+        title = 'Bill Rejected';
+        titleBn = 'বিল পরিশোধ প্রত্যাখ্যাত';
+        desc = `Your bill payment of ৳${tx.amount} has been declined. Reason: ${rejectReason}`;
+        descBn = `আপনার ৳${tx.amount} টাকার বিল পরিশোধ অনুরোধ বাতিল করা হয়েছে। কারণ: ${rejectReason}`;
+      }
 
       batch.set(notifRef, {
         id: notifId,
@@ -1521,6 +1563,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     <option value="CashIn">{lang === 'bn' ? '📥 ডিপোজিট (Add Fund)' : '📥 Add Fund (CashIn)'}</option>
                     <option value="Recharge">{lang === 'bn' ? '📱 মোবাইল রিচার্জ' : '📱 Mobile Recharge'}</option>
                     <option value="Bill">{lang === 'bn' ? '⚡ ইউটিলিটি বিল' : '⚡ Utility Bill'}</option>
+                    <option value="Transfer">{lang === 'bn' ? '💸 ব্যালেন্স ট্রান্সফার' : '💸 Balance Transfer'}</option>
+                    <option value="Voucher">{lang === 'bn' ? '🎁 গেমিং ও ওটিটি ভাউচার' : '🎁 Gaming & OTT Voucher'}</option>
                   </select>
                 </div>
 
@@ -1671,6 +1715,29 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                         )}
                                       </button>
                                     </p>
+                                  )}
+                                  {req.type === 'Voucher' && (
+                                    <div className="space-y-1">
+                                      <p className="font-extrabold text-blue-400 flex items-center gap-1">
+                                        <span>🎁 {req.voucherItem} ({req.voucherCode})</span>
+                                        <span className="text-[9px] px-1.5 py-0.5 bg-blue-500/10 text-blue-300 rounded font-normal uppercase tracking-wider">{req.voucherCategory}</span>
+                                      </p>
+                                      <p className="flex items-center gap-1.5 flex-wrap">
+                                        <span>{lang === 'bn' ? `একাউন্ট/আইডি: ${req.targetNumber}` : `Account ID / UID: ${req.targetNumber}`}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCopyToClipboard(req.targetNumber || '', req.id + '-targetNumber')}
+                                          className="p-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded transition-all cursor-pointer inline-flex items-center gap-1 text-[9px] font-bold"
+                                          title={lang === 'bn' ? 'কপি করুন' : 'Copy'}
+                                        >
+                                          {copiedFieldId === req.id + '-targetNumber' ? (
+                                            <span className="text-emerald-400">{lang === 'bn' ? 'কপি হয়েছে' : 'Copied'}</span>
+                                          ) : (
+                                            <Copy className="h-2.5 w-2.5" />
+                                          )}
+                                        </button>
+                                      </p>
+                                    </div>
                                   )}
                                 </div>
 

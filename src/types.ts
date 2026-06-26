@@ -31,7 +31,7 @@ export interface RechargePackage {
 
 export interface Transaction {
   id: string;
-  type: 'Recharge' | 'Bill' | 'CashIn' | 'Transfer';
+  type: 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher';
   operator?: Operator;
   targetNumber?: string;
   senderNumber?: string;
@@ -46,6 +46,9 @@ export interface Transaction {
   userName?: string;
   rejectionReason?: string;
   transferMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay';
+  voucherItem?: string;
+  voucherCode?: string;
+  voucherCategory?: 'Gaming' | 'OTT';
 }
 
 export interface FavoriteContact {

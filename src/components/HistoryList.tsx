@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Flame, ArrowUpRight, ArrowDownLeft, Landmark, FileText, Smartphone } from 'lucide-react';
+import { Search, Flame, ArrowUpRight, ArrowDownLeft, Landmark, FileText, Smartphone, Gift } from 'lucide-react';
 import { Transaction, Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 
@@ -9,7 +9,7 @@ interface HistoryListProps {
 }
 
 export default function HistoryList({ transactions, lang }: HistoryListProps) {
-  const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn' | 'Transfer'>('All');
+  const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher'>('All');
   const [query, setQuery] = useState('');
   
   const t = TRANSLATIONS[lang];
@@ -23,6 +23,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
       (tx.billerName && tx.billerName.toLowerCase().includes(query.toLowerCase())) ||
       (tx.billerNameBn && tx.billerNameBn.includes(query)) ||
       (tx.transferMethod && tx.transferMethod.toLowerCase().includes(query.toLowerCase())) ||
+      (tx.voucherItem && tx.voucherItem.toLowerCase().includes(query.toLowerCase())) ||
+      (tx.voucherCode && tx.voucherCode.toLowerCase().includes(query.toLowerCase())) ||
       tx.txId.toLowerCase().includes(query.toLowerCase());
 
     return matchesFilter && matchesSearch;
@@ -38,6 +40,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         return 'bg-emerald-50 text-emerald-600 border-emerald-100/50';
       case 'Transfer':
         return 'bg-violet-50 text-violet-600 border-violet-100/50';
+      case 'Voucher':
+        return 'bg-rose-50 text-rose-600 border-rose-100/50';
       default:
         return 'bg-slate-50 text-slate-500 border-slate-100';
     }
@@ -53,6 +57,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         return <ArrowDownLeft className="h-4.5 w-4.5" />;
       case 'Transfer':
         return <ArrowUpRight className="h-4.5 w-4.5" />;
+      case 'Voucher':
+        return <Gift className="h-4.5 w-4.5" />;
       default:
         return <FileText className="h-4.5 w-4.5" />;
     }
@@ -86,7 +92,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
 
       {/* Category horizontal tabs */}
       <div className="flex gap-2.5 border-b border-slate-100 pb-1 overflow-x-auto scrollbar-none">
-        {(['All', 'Recharge', 'Bill', 'CashIn', 'Transfer'] as const).map((type) => {
+        {(['All', 'Recharge', 'Bill', 'CashIn', 'Transfer', 'Voucher'] as const).map((type) => {
           const isActive = filter === type;
           let label: string = type;
           if (lang === 'bn') {
@@ -95,8 +101,10 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
             else if (type === 'Bill') label = t.filterBill;
             else if (type === 'CashIn') label = t.filterCashin;
             else if (type === 'Transfer') label = 'ব্যালেন্স ট্রান্সফার';
+            else if (type === 'Voucher') label = 'গেমিং ও ওটিটি';
           } else {
             if (type === 'Transfer') label = 'Balance Transfer';
+            else if (type === 'Voucher') label = 'Gaming & OTT';
           }
           return (
             <button
@@ -138,6 +146,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                         ? `${lang === 'bn' ? tx.billerNameBn : tx.billerName}`
                         : tx.type === 'Transfer'
                         ? `${tx.transferMethod} ${lang === 'bn' ? 'ট্রান্সফার' : 'Transfer'}`
+                        : tx.type === 'Voucher'
+                        ? `${tx.voucherItem} ${lang === 'bn' ? 'ভাউচার' : 'Voucher'}`
                         : `${lang === 'bn' ? 'এড ফান্ড (ওয়ালেট রিচার্জ)' : 'Add Fund (Wallet Deposit)'}`}
                     </h4>
                   </div>
@@ -149,6 +159,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                         ? (lang === 'bn' ? `জমাকৃত মাধ্যম: ${tx.targetNumber}` : `Received via ${tx.targetNumber}`)
                         : tx.type === 'Transfer'
                         ? (lang === 'bn' ? `প্রাপক নম্বর: ${tx.targetNumber}` : `Recipient Number: ${tx.targetNumber}`)
+                        : tx.type === 'Voucher'
+                        ? (lang === 'bn' ? `একাউন্ট/আইডি: ${tx.targetNumber} (${tx.voucherCode})` : `Account/ID: ${tx.targetNumber} (${tx.voucherCode})`)
                         : `${tx.targetNumber} (${tx.operator})`}
                     </span>
                   )}

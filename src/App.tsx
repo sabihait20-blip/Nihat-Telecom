@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
-  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent
+  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift
 } from 'lucide-react';
 
 // Data types & assets
@@ -42,6 +42,7 @@ import BillPayModal from './components/BillPayModal';
 import AddFundModal from './components/AddFundModal';
 import TransferModal from './components/TransferModal';
 import SecureLockModal from './components/SecureLockModal';
+import VoucherModal from './components/VoucherModal';
 import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
 
@@ -141,6 +142,7 @@ export default function App() {
   const [isBillPayOpen, setIsBillPayOpen] = useState(false);
   const [isAddFundOpen, setIsAddFundOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isVoucherOpen, setIsVoucherOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -661,6 +663,69 @@ export default function App() {
     }
   };
 
+  const handleVoucherSuccess = async (
+    amount: number, 
+    item: string, 
+    packName: string, 
+    targetAccount: string, 
+    category: 'Gaming' | 'OTT'
+  ) => {
+    if (!currentUser) return;
+
+    if (balance < amount) {
+      alert(lang === 'bn' ? 'দুঃখিত, আপনার ব্যালেন্স অপর্যাপ্ত!' : 'Insufficient wallet balance!');
+      return;
+    }
+
+    const newTxId = `tx-${Date.now()}`;
+    const txReferenceId = `VCH${Math.random().toString(36).substr(2, 11).toUpperCase()}`;
+
+    const userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+    const userEmail = currentUser.email || 'user@test.com';
+
+    const newTx: Transaction = {
+      id: newTxId,
+      type: 'Voucher',
+      amount,
+      targetNumber: targetAccount,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      txId: txReferenceId,
+      status: 'Pending',
+      userId: currentUser.uid,
+      userEmail,
+      userName,
+      voucherItem: item,
+      voucherCode: packName,
+      voucherCategory: category
+    };
+
+    const addedNotifId = `notif-${Date.now()}`;
+    const addedNotif: NotificationItem = {
+      id: addedNotifId,
+      title: 'Voucher Purchase Pending',
+      titleBn: 'ভাউচার ক্রয় অনুরোধ যাচাইধীন',
+      desc: `Your purchase of ${item} (${packName}) for account ${targetAccount} is pending delivery.`,
+      descBn: `আপনার ${item} (${packName}) এর জন্য ${targetAccount} অ্যাকাউন্টের অনুরোধটি ডেলিভারির অপেক্ষায় রয়েছে।`,
+      time: 'Just now',
+      read: false,
+    };
+
+    try {
+      const batch = writeBatch(db);
+      
+      batch.set(doc(db, 'users', currentUser.uid, 'transactions', newTxId), newTx);
+      batch.set(doc(db, 'admin_requests', newTxId), newTx);
+      batch.set(doc(db, 'users', currentUser.uid, 'notifications', addedNotifId), addedNotif);
+      
+      const newBalanceVal = Math.max(balance - amount, 0);
+      batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Error submitting voucher transaction: ", err);
+    }
+  };
+
   const handleAddFundSuccess = async (amount: number, method: string, trxId: string, senderNumber: string) => {
     if (!currentUser) return;
     const newTxId = `tx-${Date.now()}`;
@@ -748,6 +813,13 @@ export default function App() {
       icon: Send,
       color: 'bg-violet-50 text-violet-600 border border-violet-100/40 shadow-xs shadow-violet-500/2',
       action: () => setIsTransferOpen(true)
+    },
+    {
+      id: 'voucher',
+      title: lang === 'bn' ? 'ভাউচার স্টোর' : 'Voucher Store',
+      icon: Gift,
+      color: 'bg-rose-50 text-rose-600 border border-rose-100/40 shadow-xs shadow-rose-500/2',
+      action: () => setIsVoucherOpen(true)
     },
     {
       id: 'history',
@@ -1461,6 +1533,17 @@ export default function App() {
               onClose={() => setIsTransferOpen(false)}
               currentBalance={balance}
               onSuccess={handleTransferSuccess}
+            />
+          )}
+
+          {/* VOUCHER STORE DIALOGUE */}
+          {isVoucherOpen && (
+            <VoucherModal
+              lang={lang}
+              isOpen={isVoucherOpen}
+              onClose={() => setIsVoucherOpen(false)}
+              currentBalance={balance}
+              onSuccess={handleVoucherSuccess}
             />
           )}
 
