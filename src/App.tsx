@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
-  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift
+  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare
 } from 'lucide-react';
 
 // Data types & assets
@@ -43,6 +43,7 @@ import AddFundModal from './components/AddFundModal';
 import TransferModal from './components/TransferModal';
 import SecureLockModal from './components/SecureLockModal';
 import VoucherModal from './components/VoucherModal';
+import SupportModal from './components/SupportModal';
 import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
 
@@ -143,6 +144,7 @@ export default function App() {
   const [isAddFundOpen, setIsAddFundOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isVoucherOpen, setIsVoucherOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -827,6 +829,13 @@ export default function App() {
       icon: History,
       color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
       action: () => setActiveTab('history')
+    },
+    {
+      id: 'support',
+      title: lang === 'bn' ? 'সাপোর্ট ও চ্যাট' : 'Support & Chat',
+      icon: MessageSquare,
+      color: 'bg-blue-50 text-blue-600 border border-blue-100/40 shadow-xs shadow-blue-500/2',
+      action: () => setIsSupportOpen(true)
     },
   ];
 
@@ -1533,6 +1542,7 @@ export default function App() {
               onClose={() => setIsTransferOpen(false)}
               currentBalance={balance}
               onSuccess={handleTransferSuccess}
+              favorites={favorites}
             />
           )}
 
@@ -1544,6 +1554,15 @@ export default function App() {
               onClose={() => setIsVoucherOpen(false)}
               currentBalance={balance}
               onSuccess={handleVoucherSuccess}
+            />
+          )}
+
+          {/* HELP & SUPPORT PORTAL */}
+          {isSupportOpen && (
+            <SupportModal
+              lang={lang}
+              isOpen={isSupportOpen}
+              onClose={() => setIsSupportOpen(false)}
             />
           )}
 

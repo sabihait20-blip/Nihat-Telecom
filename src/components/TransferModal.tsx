@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Landmark, Smartphone, Check, ShieldCheck, 
-  HelpCircle, Sparkles, RefreshCw, AlertCircle, ArrowUpRight 
+  HelpCircle, Sparkles, RefreshCw, AlertCircle, ArrowUpRight,
+  Users, ArrowLeft, Search
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, FavoriteContact } from '../types';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -14,11 +15,12 @@ interface TransferModalProps {
   onClose: () => void;
   currentBalance: number;
   onSuccess: (amount: number, method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay', targetNumber: string) => void;
+  favorites?: FavoriteContact[];
 }
 
 type TransferMethod = 'bKash' | 'Nagad' | 'Rocket' | 'Upay';
 
-export default function TransferModal({ lang, isOpen, onClose, currentBalance, onSuccess }: TransferModalProps) {
+export default function TransferModal({ lang, isOpen, onClose, currentBalance, onSuccess, favorites = [] }: TransferModalProps) {
   const [method, setMethod] = useState<TransferMethod>('bKash');
   const [amountInput, setAmountInput] = useState<string>('');
   const [targetNumber, setTargetNumber] = useState<string>('');
@@ -27,6 +29,10 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>('');
   const [showSuccessOverlay, setShowSuccessOverlay] = useState<boolean>(false);
+
+  // Contact book state managers
+  const [showContactBook, setShowContactBook] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
 
   // Dynamic limits configuration
   const [settings, setSettings] = useState({
@@ -225,8 +231,16 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
                 value={targetNumber}
                 onChange={(e) => setTargetNumber(e.target.value.replace(/\D/g, ''))}
                 placeholder={labels.placeholderNumber}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-11 pr-4 text-xs font-bold outline-none focus:border-violet-500 focus:bg-white transition-all text-slate-800 font-mono"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-11 pr-12 text-xs font-bold outline-none focus:border-violet-500 focus:bg-white transition-all text-slate-800 font-mono"
               />
+              <button
+                type="button"
+                onClick={() => setShowContactBook(true)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-violet-50 hover:bg-violet-100 text-violet-600 rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center border-0 outline-none"
+                title={lang === 'bn' ? 'কন্টাক্ট তালিকা এবং ফোন ডিরেক্টরি' : 'Choose from contact book'}
+              >
+                <Users className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
@@ -339,6 +353,126 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
               <p className="text-[11px] text-slate-500 font-semibold max-w-[280px] leading-relaxed">
                 {labels.successDesc}
               </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* SECURE OVERLAY CONTACT PICKER & DIRECTORY COMPONENT */}
+        <AnimatePresence>
+          {showContactBook && (
+            <motion.div
+              initial={{ opacity: 0, y: '100%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="absolute inset-0 bg-white z-30 flex flex-col"
+            >
+              {/* Directory Header Banner */}
+              <div className="px-5 py-4.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContactBook(false);
+                      setContactSearch('');
+                    }}
+                    className="p-1 rounded-full hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <span className="font-extrabold text-sm text-slate-800 tracking-tight">
+                    {lang === 'bn' ? 'কন্টাক্ট নম্বর সিলেক্ট করুন' : 'Select Contact Number'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowContactBook(false);
+                    setContactSearch('');
+                  }}
+                  className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Dynamic Instant Search Filter */}
+              <div className="p-4 border-b border-slate-100 bg-white">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Search className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder={lang === 'bn' ? 'নাম বা ফোন নম্বর দিয়ে খুঁজুন...' : 'Search name or mobile number...'}
+                    className="w-full text-xs text-slate-800 bg-slate-50 border border-slate-200/80 rounded-xl py-3 pl-10 pr-10 outline-none focus:border-violet-500 font-medium transition-all"
+                  />
+                  {contactSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setContactSearch('')}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-slate-200 text-slate-500 text-[10px] hover:bg-slate-300 font-bold flex items-center justify-center cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Dynamic Database Contacts list */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+                {(() => {
+                  const filtered = favorites.filter(contact => {
+                    const query = contactSearch.toLowerCase();
+                    return contact.name.toLowerCase().includes(query) || contact.number.includes(query);
+                  });
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-12 text-center text-slate-400 space-y-2">
+                        <div className="p-3 bg-slate-50 w-fit rounded-full mx-auto">
+                          <Users className="h-7 w-7 text-slate-350 stroke-[1.5]" />
+                        </div>
+                        <p className="text-xs font-bold">
+                          {lang === 'bn' ? 'কোনো কন্টাক্ট নম্বর খুঁজে পাওয়া যায়নি' : 'No contacts matching search'}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return filtered.map((contact) => {
+                    return (
+                      <button
+                        key={contact.id}
+                        type="button"
+                        onClick={() => {
+                          setTargetNumber(contact.number);
+                          setShowContactBook(false);
+                          setContactSearch('');
+                        }}
+                        className="w-full text-left p-3.5 flex items-center justify-between rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-100/70"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${contact.color || 'from-violet-600 to-indigo-400'} text-white font-black flex items-center justify-center text-xs tracking-tight shadow-xs uppercase font-display`}>
+                            {contact.name.slice(0, 1)}
+                          </div>
+                          <div>
+                            <h4 className="text-xs text-slate-850 font-extrabold tracking-tight">
+                              {contact.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 font-mono font-bold mt-0.5 tracking-wider">
+                              {contact.number}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-violet-50 text-violet-600">
+                          {contact.operator}
+                        </span>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

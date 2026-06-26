@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings, Copy
+  LogOut, User, Settings, Copy, MessageSquare
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
@@ -312,7 +312,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
@@ -422,6 +422,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [requestSearchQuery, setRequestSearchQuery] = useState('');
   const [requestStatusFilter, setRequestStatusFilter] = useState<string>('All');
   const [requestTypeFilter, setRequestTypeFilter] = useState<string>('All');
+  
+  // Support Tickets States
+  const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState('');
   
   // Dynamic collections loaders
   const [offers, setOffers] = useState<RechargePackage[]>([]);
@@ -557,6 +562,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       setRegisteredUsers(list);
     }, (error) => {
       console.error("Error loading registered users list: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 5b. Listen for support_tickets list
+  useEffect(() => {
+    const q = collection(db, 'support_tickets');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id });
+      });
+      // Sort in-memory to prevent requiring composite index creation in emulator or firebase console
+      list.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+      setSupportTickets(list);
+    }, (error) => {
+      console.error("Error loading support tickets: ", error);
     });
 
     return () => unsubscribe();
@@ -1225,6 +1248,55 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     );
   }
 
+  const handleSendAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminReplyText.trim() || !selectedTicketId) return;
+    
+    const ticketRef = doc(db, 'support_tickets', selectedTicketId);
+    const ticketDoc = supportTickets.find(t => t.id === selectedTicketId);
+    if (!ticketDoc) return;
+    
+    const newMessage = {
+      id: 'msg-' + Date.now(),
+      senderId: 'admin',
+      senderName: 'Admin Operations Panel',
+      text: adminReplyText.trim(),
+      time: Date.now()
+    };
+    
+    const updatedMessages = [...(ticketDoc.messages || []), newMessage];
+    
+    try {
+      await setDoc(ticketRef, {
+        messages: updatedMessages,
+        lastMessageText: newMessage.text,
+        lastMessageSender: 'admin',
+        lastMessageTime: newMessage.time,
+        status: 'Open' // auto re-open if admin replies
+      }, { merge: true });
+      
+      setAdminReplyText('');
+    } catch (err) {
+      console.error("Error sending admin reply: ", err);
+    }
+  };
+
+  const handleToggleTicketStatus = async (ticketId: string) => {
+    const ticketRef = doc(db, 'support_tickets', ticketId);
+    const ticketDoc = supportTickets.find(t => t.id === ticketId);
+    if (!ticketDoc) return;
+    
+    const newStatus = ticketDoc.status === 'Closed' ? 'Open' : 'Closed';
+    
+    try {
+      await updateDoc(ticketRef, {
+        status: newStatus
+      });
+    } catch (err) {
+      console.error("Error updating ticket status: ", err);
+    }
+  };
+
   const adminPanelBody = (
     <>
       <div className={isStandalone ? "w-full h-full bg-slate-950 flex flex-col relative overflow-hidden text-slate-100" : "relative bg-slate-900/85 backdrop-blur-2xl w-full max-w-2xl h-[90%] rounded-[36px] shadow-2xl border border-white/10 flex flex-col relative z-10 overflow-hidden text-slate-100 animate-scale-up"}>
@@ -1331,6 +1403,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           >
             <Settings className="h-3.5 w-3.5" />
             <span>{lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings'}</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('support')}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeSubTab === 'support' 
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+            }`}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>{lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets'}</span>
           </button>
         </div>
 
@@ -3394,6 +3477,214 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* SUPPORT TICKETS AND CHAT TAB */}
+          {activeSubTab === 'support' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[500px]">
+              {/* Left Side: Ticket List */}
+              <div className="lg:col-span-5 bg-slate-950/40 border border-white/5 rounded-3xl p-4 flex flex-col space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <h3 className="font-extrabold text-sm tracking-tight text-white flex items-center gap-1.5">
+                    <MessageSquare className="h-4.5 w-4.5 text-blue-500" />
+                    <span>{lang === 'bn' ? 'সাপোর্ট টিকিট সমূহ' : 'Customer Support Tickets'}</span>
+                  </h3>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-400 font-extrabold px-2.5 py-1 rounded-full border border-blue-500/10">
+                    {supportTickets.length} Total
+                  </span>
+                </div>
+
+                {/* Tickets scroller */}
+                <div className="flex-1 overflow-y-auto max-h-[500px] space-y-2 scroller-hidden">
+                  {supportTickets.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 space-y-2">
+                      <div className="p-3 bg-white/5 w-fit rounded-full mx-auto">
+                        <MessageSquare className="h-7 w-7 text-slate-500" />
+                      </div>
+                      <p className="text-xs font-bold">
+                        {lang === 'bn' ? 'কোনো সাপোর্ট টিকিট তৈরি হয়নি' : 'No support tickets found'}
+                      </p>
+                    </div>
+                  ) : (
+                    supportTickets.map((ticket) => {
+                      const isActive = selectedTicketId === ticket.id;
+                      const hasUnread = ticket.lastMessageSender === 'user' && ticket.status === 'Open';
+                      return (
+                        <button
+                          key={ticket.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTicketId(ticket.id);
+                          }}
+                          className={`w-full text-left p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col space-y-2 text-xs relative ${
+                            isActive 
+                              ? 'bg-blue-600 border-transparent text-white shadow-lg shadow-blue-600/10' 
+                              : 'bg-white/5 hover:bg-white/10 border-white/5 text-slate-300'
+                          }`}
+                        >
+                          {/* Unread indicator */}
+                          {hasUnread && !isActive && (
+                            <span className="absolute top-3.5 right-3.5 h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse border border-slate-900" />
+                          )}
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-slate-100 truncate max-w-[130px]">
+                              {ticket.userName || 'Unknown Customer'}
+                            </span>
+                            <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-md ${
+                              ticket.status === 'Closed' 
+                                ? 'bg-slate-800 text-slate-400' 
+                                : isActive 
+                                ? 'bg-white/20 text-white' 
+                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10'
+                            }`}>
+                              {ticket.status}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] font-bold tracking-tight text-slate-350 truncate">
+                            {ticket.subject}
+                          </div>
+
+                          {ticket.lastMessageText && (
+                            <div className={`text-[10px] truncate max-w-[240px] italic ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
+                              <strong>{ticket.lastMessageSender === 'admin' ? 'You: ' : 'User: '}</strong>
+                              {ticket.lastMessageText}
+                            </div>
+                          )}
+
+                          <div className={`text-[9px] font-mono font-bold text-right ${isActive ? 'text-blue-200' : 'text-slate-500'}`}>
+                            {new Date(ticket.lastMessageTime || ticket.createdAt).toLocaleString()}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Side: Chat Session Window */}
+              <div className="lg:col-span-7 bg-slate-950/40 border border-white/5 rounded-3xl p-4 flex flex-col justify-between min-h-[500px]">
+                {(() => {
+                  const activeTicket = supportTickets.find(t => t.id === selectedTicketId);
+                  if (!activeTicket) {
+                    return (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-3">
+                        <div className="p-4 bg-white/5 text-slate-400 rounded-full">
+                          <MessageSquare className="h-9 w-9 stroke-[1.5]" />
+                        </div>
+                        <div>
+                          <h4 className="text-white text-xs font-extrabold">
+                            {lang === 'bn' ? 'চ্যাট শুরু করতে একটি টিকিট সিলেক্ট করুন' : 'Select a Ticket to Begin Chatting'}
+                          </h4>
+                          <p className="text-[11px] font-medium max-w-[220px] mx-auto mt-1 leading-relaxed">
+                            {lang === 'bn' 
+                              ? 'বাম পাশের তালিকা থেকে যেকোনো সক্রিয় টিকিট সিলেক্ট করে গ্রাহকের সাথে সরাসরি লাইভ চ্যাট করুন।' 
+                              : 'Select any active ticket from the list to reply to the user in real-time.'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex flex-col h-full flex-1 justify-between">
+                      {/* Chat Window Header */}
+                      <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-9 w-9 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs uppercase shadow-sm">
+                            {(activeTicket.userName || 'U').slice(0, 1)}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-xs text-white leading-tight">
+                              {activeTicket.userName || 'Customer'}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              {activeTicket.userEmail}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Toggle Ticket Status */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTicketStatus(activeTicket.id)}
+                          className={`text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                            activeTicket.status === 'Closed'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'
+                          }`}
+                        >
+                          {activeTicket.status === 'Closed' 
+                            ? (lang === 'bn' ? 'টিকিট পুনরায় খুলুন' : 'Re-open Ticket') 
+                            : (lang === 'bn' ? 'টিকিট বন্ধ করুন' : 'Close Ticket')}
+                        </button>
+                      </div>
+
+                      {/* Messages body */}
+                      <div className="flex-1 overflow-y-auto max-h-[350px] my-4 p-2 space-y-3 scroller-hidden">
+                        {/* Initial system message */}
+                        <div className="bg-slate-900/60 border border-white/5 p-3 rounded-2xl space-y-1">
+                          <div className="flex items-center justify-between text-[9px] font-mono font-black text-blue-400 uppercase tracking-wider">
+                            <span>Ticket Created</span>
+                            <span>{new Date(activeTicket.createdAt).toLocaleTimeString()}</span>
+                          </div>
+                          <p className="text-xs text-slate-250 font-bold leading-normal">
+                            Subject: {activeTicket.subject}
+                          </p>
+                        </div>
+
+                        {/* Array messages log */}
+                        {activeTicket.messages && activeTicket.messages.map((msg: any) => {
+                          const isAdmin = msg.senderId === 'admin';
+                          return (
+                            <div 
+                              key={msg.id} 
+                              className={`flex flex-col max-w-[80%] ${isAdmin ? 'ml-auto items-end' : 'mr-auto items-start'}`}
+                            >
+                              <div className={`p-3 rounded-2xl text-[11.5px] font-medium leading-relaxed ${
+                                isAdmin 
+                                  ? 'bg-blue-600 text-white rounded-tr-none shadow-md shadow-blue-600/10' 
+                                  : 'bg-white/10 text-slate-100 rounded-tl-none border border-white/5'
+                              }`}>
+                                {msg.text}
+                              </div>
+                              <span className="text-[8.5px] font-mono text-slate-500 mt-1 font-bold">
+                                {msg.senderName} • {new Date(msg.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Reply form submission */}
+                      <form onSubmit={handleSendAdminReply} className="border-t border-white/5 pt-3.5 flex gap-2">
+                        <input
+                          type="text"
+                          required
+                          value={adminReplyText}
+                          onChange={(e) => setAdminReplyText(e.target.value)}
+                          placeholder={
+                            activeTicket.status === 'Closed' 
+                              ? (lang === 'bn' ? 'এই টিকিটটি বন্ধ রয়েছে...' : 'This ticket is closed...')
+                              : (lang === 'bn' ? 'গ্রাহকের জন্য বার্তা লিখুন...' : 'Write reply message for customer...')
+                          }
+                          disabled={activeTicket.status === 'Closed'}
+                          className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500 focus:bg-white/10 transition-all disabled:opacity-50"
+                        />
+                        <button
+                          type="submit"
+                          disabled={activeTicket.status === 'Closed'}
+                          className="px-5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-800 text-white font-extrabold rounded-2xl text-xs transition-colors shadow-md flex items-center justify-center cursor-pointer active:scale-95 disabled:scale-100 disabled:opacity-50"
+                        >
+                          <Send className="h-4 w-4" />
+                        </button>
+                      </form>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
 
