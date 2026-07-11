@@ -81,6 +81,44 @@
       "read": {
         "type": "boolean"
       }
+    },
+    "support_tickets": {
+      "id": {
+        "type": "string"
+      },
+      "userId": {
+        "type": "string"
+      },
+      "userEmail": {
+        "type": "string"
+      },
+      "userName": {
+        "type": "string"
+      },
+      "subject": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "number"
+      },
+      "lastMessageText": {
+        "type": "string"
+      },
+      "lastMessageSender": {
+        "type": "string"
+      },
+      "lastMessageTime": {
+        "type": "number"
+      },
+      "messages": {
+        "type": "array"
+      }
     }
   }
 }

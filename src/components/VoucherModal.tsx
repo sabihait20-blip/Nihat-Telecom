@@ -170,8 +170,9 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
       return;
     }
 
-    if (pinInput !== '1234') {
-      setErrorMsg(lang === 'bn' ? 'ভুল পিন নম্বর! (টেস্ট পিন: 1234)' : 'Invalid PIN! (Demo PIN: 1234)');
+    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
+    if (pinInput !== savedPin) {
+      setErrorMsg(lang === 'bn' ? `ভুল পিন নম্বর! (টেস্ট পিন: ${savedPin})` : `Invalid PIN! (Demo PIN: ${savedPin})`);
       return;
     }
 

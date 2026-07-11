@@ -40,15 +40,16 @@ export interface Transaction {
   billerNameBn?: string;
   date: string;
   txId: string;
-  status: 'Success' | 'Pending' | 'Failed';
+  status: 'Success' | 'Pending' | 'Failed' | 'Approved' | 'Rejected';
   userId?: string;
   userEmail?: string;
   userName?: string;
   rejectionReason?: string;
-  transferMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay';
+  transferMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)' | 'Received from User';
   voucherItem?: string;
   voucherCode?: string;
   voucherCategory?: 'Gaming' | 'OTT';
+  note?: string;
 }
 
 export interface FavoriteContact {

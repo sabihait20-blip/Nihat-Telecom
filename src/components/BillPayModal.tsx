@@ -92,7 +92,8 @@ export default function BillPayModal({
   };
 
   const handlePinNext = () => {
-    if (pin === '1234') {
+    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
+    if (pin === savedPin) {
       setPinError(false);
       setStep('confirm');
     } else {

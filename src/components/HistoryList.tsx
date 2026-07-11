@@ -47,6 +47,20 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
     }
   };
 
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'Success':
+      case 'Approved':
+        return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+      case 'Failed':
+      case 'Rejected':
+        return 'bg-rose-50 text-rose-600 border-rose-200';
+      case 'Pending':
+      default:
+        return 'bg-amber-50 text-amber-600 border-amber-200';
+    }
+  };
+
   const getTxTypeIcon = (type: string) => {
     switch (type) {
       case 'Recharge':
@@ -145,10 +159,14 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                         : tx.type === 'Bill'
                         ? `${lang === 'bn' ? tx.billerNameBn : tx.billerName}`
                         : tx.type === 'Transfer'
-                        ? `${tx.transferMethod} ${lang === 'bn' ? 'ট্রান্সফার' : 'Transfer'}`
+                        ? (tx.transferMethod === 'Nihad Wallet (User)'
+                            ? `${lang === 'bn' ? 'ইউজার টু ইউজার সেন্ড মানি' : 'P2P Send Money'}`
+                            : `${tx.transferMethod} ${lang === 'bn' ? 'ট্রান্সফার' : 'Transfer'}`)
                         : tx.type === 'Voucher'
                         ? `${tx.voucherItem} ${lang === 'bn' ? 'ভাউচার' : 'Voucher'}`
-                        : `${lang === 'bn' ? 'এড ফান্ড (ওয়ালেট রিচার্জ)' : 'Add Fund (Wallet Deposit)'}`}
+                        : (tx.transferMethod === 'Received from User'
+                            ? `${lang === 'bn' ? 'সেন্ড মানি গ্রহণ' : 'Money Received (P2P)'}`
+                            : `${lang === 'bn' ? 'এড ফান্ড (ওয়ালেট রিচার্জ)' : 'Add Fund (Wallet Deposit)'}`)}
                     </h4>
                   </div>
                   
@@ -156,9 +174,13 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                   {tx.targetNumber && (
                     <span className="text-[10px] text-slate-500 font-bold block">
                       {tx.type === 'CashIn' 
-                        ? (lang === 'bn' ? `জমাকৃত মাধ্যম: ${tx.targetNumber}` : `Received via ${tx.targetNumber}`)
+                        ? (tx.transferMethod === 'Received from User'
+                            ? (lang === 'bn' ? `প্রেরক: ${tx.operator || ''} (${tx.targetNumber})` : `Sender: ${tx.operator || ''} (${tx.targetNumber})`)
+                            : (lang === 'bn' ? `জমাকৃত মাধ্যম: ${tx.targetNumber}` : `Received via ${tx.targetNumber}`))
                         : tx.type === 'Transfer'
-                        ? (lang === 'bn' ? `প্রাপক নম্বর: ${tx.targetNumber}` : `Recipient Number: ${tx.targetNumber}`)
+                        ? (tx.transferMethod === 'Nihad Wallet (User)'
+                            ? (lang === 'bn' ? `প্রাপক: ${tx.operator || ''} (${tx.targetNumber})` : `Recipient: ${tx.operator || ''} (${tx.targetNumber})`)
+                            : (lang === 'bn' ? `প্রাপক নম্বর: ${tx.targetNumber}` : `Recipient Number: ${tx.targetNumber}`))
                         : tx.type === 'Voucher'
                         ? (lang === 'bn' ? `একাউন্ট/আইডি: ${tx.targetNumber} (${tx.voucherCode})` : `Account/ID: ${tx.targetNumber} (${tx.voucherCode})`)
                         : `${tx.targetNumber} (${tx.operator})`}
@@ -174,6 +196,11 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                       TxId: <span className="font-mono text-slate-600 font-bold">{tx.txId}</span>
                     </span>
                   )}
+                  {tx.note && (
+                    <span className="text-[10px] text-violet-700 font-bold block bg-violet-50 px-2 py-0.5 rounded-md w-fit mt-0.5">
+                      💬 {tx.note}
+                    </span>
+                  )}
                   
                   <span className="text-[9px] text-slate-400 font-semibold font-mono block">
                     {tx.date}
@@ -183,8 +210,12 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
 
               {/* Status block & financial pricing alignment */}
               <div className="text-right space-y-1">
-                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getTxTypeBadgeColor(tx.type)}`}>
-                  {tx.status}
+                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusBadgeColor(tx.status)}`}>
+                  {tx.status === 'Success' || tx.status === 'Approved'
+                    ? (lang === 'bn' ? 'সফল' : 'Success')
+                    : tx.status === 'Failed' || tx.status === 'Rejected'
+                    ? (lang === 'bn' ? 'ব্যর্থ' : 'Failed')
+                    : (lang === 'bn' ? 'অপেক্ষমান' : 'Pending')}
                 </span>
                 <p className={`font-display font-bold text-sm ${tx.type === 'CashIn' ? 'text-emerald-600' : 'text-slate-900'}`}>
                   {tx.type === 'CashIn' ? '+' : '-'}৳{tx.amount.toLocaleString()}

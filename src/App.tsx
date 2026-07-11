@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
-  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare
+  Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare,
+  Calculator
 } from 'lucide-react';
 
 // Data types & assets
@@ -19,6 +20,7 @@ import {
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   setDoc,
   deleteDoc,
@@ -46,6 +48,7 @@ import VoucherModal from './components/VoucherModal';
 import SupportModal from './components/SupportModal';
 import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
+import CashOutCalculatorModal from './components/CashOutCalculatorModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -94,6 +97,7 @@ export default function App() {
   const [dbBanners, setDbBanners] = useState<PromoBanner[]>([]);
   const [dbBillers, setDbBillers] = useState<BillProvider[]>([]);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [adminUserViewMode, setAdminUserViewMode] = useState<'admin' | 'user'>('admin');
   const [appConfig, setAppConfig] = useState<any>({
     bkashNumber: '01970250988',
     nagadNumber: '01970250988',
@@ -145,6 +149,7 @@ export default function App() {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isVoucherOpen, setIsVoucherOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [isCashOutCalcOpen, setIsCashOutCalcOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -286,13 +291,19 @@ export default function App() {
     const syncProfile = async () => {
       try {
         const userProfileRef = doc(db, 'registered_users', currentUser.uid);
+        const profileSnap = await getDoc(userProfileRef);
+        let existingPhone = '';
+        if (profileSnap.exists()) {
+          existingPhone = profileSnap.data().phone || '';
+        }
+
         await setDoc(userProfileRef, {
           uid: currentUser.uid,
           displayName: currentUser.displayName || 'Unknown User',
           email: currentUser.email || '',
-          phone: currentUser.email?.endsWith('@nihat-telecom.com') 
+          phone: existingPhone || (currentUser.email?.endsWith('@nihat-telecom.com') 
             ? currentUser.email.split('@')[0] 
-            : '',
+            : ''),
           lastActive: new Date().toISOString()
         }, { merge: true });
       } catch (err) {
@@ -610,7 +621,15 @@ export default function App() {
     }
   };
 
-  const handleTransferSuccess = async (amount: number, method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay', targetNumber: string) => {
+  const handleTransferSuccess = async (
+    amount: number, 
+    method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)', 
+    targetNumber: string,
+    note?: string,
+    recipientUid?: string,
+    recipientName?: string,
+    recipientEmail?: string
+  ) => {
     if (!currentUser) return;
 
     if (balance < amount) {
@@ -618,50 +637,150 @@ export default function App() {
       return;
     }
 
-    const newTxId = `tx-${Date.now()}`;
-    const txReferenceId = `TRF${Math.random().toString(36).substr(2, 11).toUpperCase()}`;
+    if (method === 'Nihad Wallet (User)') {
+      if (!recipientUid) {
+        alert(lang === 'bn' ? 'গ্রাহক তথ্য পাওয়া যায়নি!' : 'Recipient info not found!');
+        return;
+      }
 
-    const userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
-    const userEmail = currentUser.email || 'user@test.com';
+      try {
+        const recipientBalanceRef = doc(db, 'users', recipientUid, 'wallet', 'balance_doc');
+        const recipientBalanceSnap = await getDoc(recipientBalanceRef);
+        let recipientCurrentBalance = 0;
+        if (recipientBalanceSnap.exists()) {
+          recipientCurrentBalance = recipientBalanceSnap.data().balance || 0;
+        }
 
-    const newTx: Transaction = {
-      id: newTxId,
-      type: 'Transfer',
-      amount,
-      targetNumber,
-      transferMethod: method,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      txId: txReferenceId,
-      status: 'Pending',
-      userId: currentUser.uid,
-      userEmail,
-      userName
-    };
+        const batch = writeBatch(db);
 
-    const addedNotifId = `notif-${Date.now()}`;
-    const addedNotif: NotificationItem = {
-      id: addedNotifId,
-      title: 'Transfer Request Submitted',
-      titleBn: 'ট্রান্সফার অনুরোধ পাঠানো হয়েছে',
-      desc: `Your transfer of ৳${amount} to ${method} (${targetNumber}) is pending admin verification.`,
-      descBn: `আপনার ${method} নম্বরে (${targetNumber}) ৳${amount} টাকা ট্রান্সফারের অনুরোধ যাচাইয়ের অপেক্ষায় আছে।`,
-      time: 'Just now',
-      read: false,
-    };
+        // Update Sender's Balance
+        const newSenderBalance = Math.max(balance - amount, 0);
+        batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newSenderBalance });
 
-    try {
-      const batch = writeBatch(db);
-      
-      batch.set(doc(db, 'users', currentUser.uid, 'transactions', newTxId), newTx);
-      batch.set(doc(db, 'admin_requests', newTxId), newTx);
-      batch.set(doc(db, 'users', currentUser.uid, 'notifications', addedNotifId), addedNotif);
-      
-      const newBalanceVal = Math.max(balance - amount, 0);
-      batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+        // Update Recipient's Balance
+        batch.set(recipientBalanceRef, { balance: recipientCurrentBalance + amount });
 
-      await batch.commit();
-    } catch (err) {
-      console.error("Error submitting transfer: ", err);
+        // Create Sender's Transaction Document
+        const senderTxId = `tx-${Date.now()}`;
+        const txReferenceId = `P2P${Math.random().toString(36).substr(2, 11).toUpperCase()}`;
+        const senderTx: Transaction = {
+          id: senderTxId,
+          type: 'Transfer',
+          amount,
+          targetNumber, // recipient phone/email
+          transferMethod: 'Nihad Wallet (User)',
+          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          txId: txReferenceId,
+          status: 'Success', // P2P is instant
+          userId: currentUser.uid,
+          userEmail: currentUser.email || 'user@test.com',
+          userName: currentUser.displayName || 'Sender',
+          operator: recipientName as any,
+          note: note || undefined
+        };
+        batch.set(doc(db, 'users', currentUser.uid, 'transactions', senderTxId), senderTx);
+
+        // Create Recipient's Transaction Document (Received)
+        const recipientTxId = `tx-rx-${Date.now()}`;
+        const senderPhone = currentUser.email?.endsWith('@nihat-telecom.com') 
+          ? currentUser.email.split('@')[0] 
+          : currentUser.email || '';
+        const recipientTx: Transaction = {
+          id: recipientTxId,
+          type: 'CashIn',
+          amount,
+          targetNumber: senderPhone, // sender identifier
+          transferMethod: 'Received from User',
+          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          txId: txReferenceId,
+          status: 'Success',
+          userId: recipientUid,
+          userEmail: recipientEmail || '',
+          userName: recipientName || 'Recipient',
+          operator: (currentUser.displayName || 'Sender') as any,
+          note: note || undefined
+        };
+        batch.set(doc(db, 'users', recipientUid, 'transactions', recipientTxId), recipientTx);
+
+        // Create Sender's Notification
+        const senderNotifId = `notif-${Date.now()}`;
+        const senderNotif: NotificationItem = {
+          id: senderNotifId,
+          title: 'Send Money Successful',
+          titleBn: 'সেন্ড মানি সফল হয়েছে',
+          desc: `You have successfully sent ৳${amount} to ${recipientName} (${targetNumber}).`,
+          descBn: `আপনি সফলভাবে ${recipientName}-কে (${targetNumber}) ৳${amount} টাকা পাঠিয়েছেন।`,
+          time: 'Just now',
+          read: false
+        };
+        batch.set(doc(db, 'users', currentUser.uid, 'notifications', senderNotifId), senderNotif);
+
+        // Create Recipient's Notification
+        const recipientNotifId = `notif-rx-${Date.now()}`;
+        const recipientNotif: NotificationItem = {
+          id: recipientNotifId,
+          title: 'Received Send Money',
+          titleBn: 'টাকা গ্রহণ করেছেন',
+          desc: `You have received ৳${amount} from ${currentUser.displayName || 'User'} (${senderPhone}).`,
+          descBn: `আপনি ${currentUser.displayName || 'ইউজার'} (${senderPhone}) এর থেকে ৳${amount} টাকা গ্রহণ করেছেন।`,
+          time: 'Just now',
+          read: false
+        };
+        batch.set(doc(db, 'users', recipientUid, 'notifications', recipientNotifId), recipientNotif);
+
+        await batch.commit();
+      } catch (err) {
+        console.error("Error processing instant wallet transfer: ", err);
+        alert(lang === 'bn' ? 'ব্যালেন্স ট্রান্সফার ব্যর্থ হয়েছে! আবার চেষ্টা করুন।' : 'P2P Transfer failed! Please try again.');
+        throw err;
+      }
+    } else {
+      const newTxId = `tx-${Date.now()}`;
+      const txReferenceId = `TRF${Math.random().toString(36).substr(2, 11).toUpperCase()}`;
+
+      const userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+      const userEmail = currentUser.email || 'user@test.com';
+
+      const newTx: Transaction = {
+        id: newTxId,
+        type: 'Transfer',
+        amount,
+        targetNumber,
+        transferMethod: method,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        txId: txReferenceId,
+        status: 'Pending',
+        userId: currentUser.uid,
+        userEmail,
+        userName
+      };
+
+      const addedNotifId = `notif-${Date.now()}`;
+      const addedNotif: NotificationItem = {
+        id: addedNotifId,
+        title: 'Transfer Request Submitted',
+        titleBn: 'ট্রান্সফার অনুরোধ পাঠানো হয়েছে',
+        desc: `Your transfer of ৳${amount} to ${method} (${targetNumber}) is pending admin verification.`,
+        descBn: `আপনার ${method} নম্বরে (${targetNumber}) ৳${amount} টাকা ট্রান্সফারের অনুরোধ যাচাইয়ের অপেক্ষায় আছে।`,
+        time: 'Just now',
+        read: false,
+      };
+
+      try {
+        const batch = writeBatch(db);
+        
+        batch.set(doc(db, 'users', currentUser.uid, 'transactions', newTxId), newTx);
+        batch.set(doc(db, 'admin_requests', newTxId), newTx);
+        batch.set(doc(db, 'users', currentUser.uid, 'notifications', addedNotifId), addedNotif);
+        
+        const newBalanceVal = Math.max(balance - amount, 0);
+        batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+
+        await batch.commit();
+      } catch (err) {
+        console.error("Error submitting transfer: ", err);
+        throw err;
+      }
     }
   };
 
@@ -796,6 +915,13 @@ export default function App() {
       }
     },
     {
+      id: 'add_fund',
+      title: lang === 'bn' ? 'এড ফান্ড' : 'Add Fund',
+      icon: Wallet,
+      color: 'bg-teal-50 text-teal-600 border border-teal-100/40 shadow-xs shadow-teal-500/2',
+      action: () => setIsAddFundOpen(true)
+    },
+    {
       id: 'packs',
       title: t.internetPackage,
       icon: Wifi,
@@ -829,6 +955,13 @@ export default function App() {
       icon: History,
       color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
       action: () => setActiveTab('history')
+    },
+    {
+      id: 'cashout_calculator',
+      title: lang === 'bn' ? 'ক্যালকুলেটর' : 'Calculator',
+      icon: Calculator,
+      color: 'bg-orange-50 text-orange-600 border border-orange-100/40 shadow-xs shadow-orange-500/2',
+      action: () => setIsCashOutCalcOpen(true)
     },
     {
       id: 'support',
@@ -976,7 +1109,7 @@ export default function App() {
 
               {currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) && (
                 <button
-                  onClick={() => setIsAdminOpen(true)}
+                  onClick={() => setAdminUserViewMode('admin')}
                   className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer mt-2 border border-emerald-500/10"
                 >
                   <Sparkles className="h-4.5 w-4.5" />
@@ -1212,7 +1345,7 @@ export default function App() {
                     onLanguageToggle={handleLanguageToggle}
                     onNotificationClick={() => setIsNotificationsOpen(true)}
                     onLogout={handleLogout}
-                    onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setIsAdminOpen(true) : undefined}
+                    onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setAdminUserViewMode('admin') : undefined}
                     helplineNumber={appConfig.helplineNumber}
                     whatsappUrl={appConfig.whatsappUrl}
                     onAddFundClick={() => setIsAddFundOpen(true)}
@@ -1229,7 +1362,7 @@ export default function App() {
 
   const isUserAdmin = currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim());
 
-  if (currentUser && isUserAdmin) {
+  if (currentUser && isUserAdmin && adminUserViewMode === 'admin') {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800 w-full">
         <div className="w-full max-w-5xl h-screen md:h-[850px] bg-white md:rounded-[3rem] md:shadow-2xl overflow-hidden relative flex flex-col border border-slate-200/40 animate-scale-up">
@@ -1238,6 +1371,7 @@ export default function App() {
             isOpen={true}
             onClose={handleLogout}
             isStandalone={true}
+            onToggleUserView={() => setAdminUserViewMode('user')}
           />
         </div>
       </div>
@@ -1471,7 +1605,7 @@ export default function App() {
               onLanguageToggle={handleLanguageToggle}
               onNotificationClick={handleNotificationClick}
               onLogout={handleLogout}
-              onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setIsAdminOpen(true) : undefined}
+              onAdminClick={currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) ? () => setAdminUserViewMode('admin') : undefined}
               helplineNumber={appConfig.helplineNumber}
               whatsappUrl={appConfig.whatsappUrl}
               onAddFundClick={() => setIsAddFundOpen(true)}
@@ -1543,6 +1677,7 @@ export default function App() {
               currentBalance={balance}
               onSuccess={handleTransferSuccess}
               favorites={favorites}
+              currentUser={currentUser}
             />
           )}
 
@@ -1554,6 +1689,18 @@ export default function App() {
               onClose={() => setIsVoucherOpen(false)}
               currentBalance={balance}
               onSuccess={handleVoucherSuccess}
+            />
+          )}
+
+          {/* CASHOUT CALCULATOR & SIMULATOR DIALOGUE */}
+          {isCashOutCalcOpen && (
+            <CashOutCalculatorModal
+              lang={lang}
+              isOpen={isCashOutCalcOpen}
+              onClose={() => setIsCashOutCalcOpen(false)}
+              currentBalance={balance}
+              onSuccess={() => {}}
+              favorites={favorites}
             />
           )}
 

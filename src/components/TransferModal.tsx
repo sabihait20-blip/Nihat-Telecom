@@ -6,7 +6,7 @@ import {
   Users, ArrowLeft, Search
 } from 'lucide-react';
 import { Language, FavoriteContact } from '../types';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 interface TransferModalProps {
@@ -14,16 +14,26 @@ interface TransferModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentBalance: number;
-  onSuccess: (amount: number, method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay', targetNumber: string) => void;
+  onSuccess: (
+    amount: number, 
+    method: TransferMethod, 
+    targetNumber: string, 
+    note?: string,
+    recipientUid?: string,
+    recipientName?: string,
+    recipientEmail?: string
+  ) => void | Promise<void>;
   favorites?: FavoriteContact[];
+  currentUser?: any;
 }
 
-type TransferMethod = 'bKash' | 'Nagad' | 'Rocket' | 'Upay';
+type TransferMethod = 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)';
 
-export default function TransferModal({ lang, isOpen, onClose, currentBalance, onSuccess, favorites = [] }: TransferModalProps) {
+export default function TransferModal({ lang, isOpen, onClose, currentBalance, onSuccess, favorites = [], currentUser }: TransferModalProps) {
   const [method, setMethod] = useState<TransferMethod>('bKash');
   const [amountInput, setAmountInput] = useState<string>('');
   const [targetNumber, setTargetNumber] = useState<string>('');
+  const [note, setNote] = useState<string>('');
   
   // Checking & validation states
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -62,19 +72,26 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
   // Localized string packs
   const labels = {
     title: lang === 'bn' ? 'ব্যালেন্স ট্রান্সফার করুন' : 'Transfer Balance',
-    subtitle: lang === 'bn' ? 'আপনার ব্যালেন্স বিকাশ, নগদ, রকেট বা উপায়ে ট্রান্সফার করুন' : 'Transfer wallet funds to mobile financial services instantly',
+    subtitle: lang === 'bn' ? 'আপনার ব্যালেন্স বিকাশ, নগদ, রকেট, উপায় বা অন্য ইউজার ওয়ালেটে ট্রান্সফার করুন' : 'Transfer wallet funds to other MFS or registered users instantly',
     selectMethod: lang === 'bn' ? 'ট্রান্সফারের মাধ্যম নির্বাচন করুন' : 'Select Transfer Method',
     amtLabel: lang === 'bn' ? 'টাকার পরিমাণ (৳)' : 'Enter Amount (৳)',
-    targetLabel: lang === 'bn' ? 'প্রাপকের মোবাইল নম্বর' : 'Recipient Account Number',
-    placeholderNumber: lang === 'bn' ? 'যেমন: 017XXXXXXXX' : 'e.g. 017XXXXXXXX',
+    targetLabel: lang === 'bn' ? (method === 'Nihad Wallet (User)' ? 'প্রাপকের মোবাইল বা ইমেইল' : 'প্রাপকের মোবাইল নম্বর') : (method === 'Nihad Wallet (User)' ? 'Recipient Mobile or Email' : 'Recipient Account Number'),
+    placeholderNumber: lang === 'bn' ? (method === 'Nihad Wallet (User)' ? 'যেমন: 017XXXXXXXX বা ইমেইল' : 'যেমন: 017XXXXXXXX') : (method === 'Nihad Wallet (User)' ? 'e.g. 017XXXXXXXX or email' : 'e.g. 017XXXXXXXX'),
     placeholderAmt: lang === 'bn' ? `ন্যূনতম ${settings.minTransfer} টাকা` : `Minimum ৳${settings.minTransfer}`,
     cancel: lang === 'bn' ? 'বাতিল' : 'Cancel',
     submit: lang === 'bn' ? 'টাকা ট্রান্সফার করুন' : 'Transfer Balance',
     successTitle: lang === 'bn' ? 'ট্রান্সফার সফল হয়েছে!' : 'Transfer Submitted!',
-    successDesc: lang === 'bn' ? 'আপনার ট্রান্সফার অনুরোধটি এডমিন ভেরিফিকেশনের জন্য পাঠানো হয়েছে।' : 'Your transfer request is being processed and will complete shortly.',
+    successDesc: lang === 'bn' ? (method === 'Nihad Wallet (User)' ? 'ইউজার টু ইউজার ব্যালেন্স ট্রান্সফার সফলভাবে সম্পন্ন হয়েছে!' : 'আপনার ট্রান্সফার অনুরোধটি এডমিন ভেরিফিকেশনের জন্য পাঠানো হয়েছে।') : (method === 'Nihad Wallet (User)' ? 'Your P2P wallet balance transfer has completed successfully!' : 'Your transfer request is being processed and will complete shortly.'),
     fees: lang === 'bn' ? 'সার্ভিস চার্জ: ৳ ০.০০ (ফ্রি)' : 'Service Charge: ৳0.00 (Free)',
     balWarning: lang === 'bn' ? 'অপর্যাপ্ত ব্যালেন্স!' : 'Insufficient wallet balance!',
     currBal: lang === 'bn' ? `বর্তমান ব্যালেন্স: ৳${currentBalance.toLocaleString()}` : `Current Balance: ৳${currentBalance.toLocaleString()}`,
+  };
+
+  const getMethodDisplayName = (m: TransferMethod) => {
+    if (m === 'Nihad Wallet (User)') {
+      return lang === 'bn' ? 'ওয়ালেট' : 'Wallet';
+    }
+    return m;
   };
 
   const getMethodColor = (m: TransferMethod) => {
@@ -83,10 +100,11 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
       case 'Nagad': return 'border-orange-500 bg-orange-500/10 text-orange-600';
       case 'Rocket': return 'border-purple-600 bg-purple-600/10 text-purple-700';
       case 'Upay': return 'border-blue-500 bg-blue-500/10 text-blue-600';
+      case 'Nihad Wallet (User)': return 'border-violet-600 bg-violet-500/10 text-violet-700';
     }
   };
 
-  const handleTransferSubmit = (e: React.FormEvent) => {
+  const handleTransferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError('');
 
@@ -106,27 +124,78 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
       return;
     }
 
-    if (!targetNumber.trim() || targetNumber.length < 11) {
-      setValidationError(lang === 'bn' ? 'সঠিক ১১ সংখ্যার প্রাপক নম্বর দিন!' : 'Please input a valid 11-digit recipient number.');
+    if (!targetNumber.trim()) {
+      setValidationError(lang === 'bn' ? 'সঠিক প্রাপক নম্বর বা ইমেইল দিন!' : 'Please input a valid recipient identifier.');
       return;
     }
 
     setIsLoading(true);
 
-    // Simulate transfer submit delay
-    setTimeout(() => {
+    let recipientUid = '';
+    let recipientName = '';
+    let recipientEmail = '';
+
+    if (method === 'Nihad Wallet (User)') {
+      try {
+        const usersRef = collection(db, 'registered_users');
+        let recipientUser: any = null;
+
+        // Try phone search first
+        const phoneQuery = query(usersRef, where('phone', '==', targetNumber));
+        const phoneSnap = await getDocs(phoneQuery);
+        
+        if (!phoneSnap.empty) {
+          recipientUser = { id: phoneSnap.docs[0].id, ...phoneSnap.docs[0].data() };
+        } else {
+          // Try email search
+          const resolvedEmail = targetNumber.includes('@') ? targetNumber : `${targetNumber}@nihat-telecom.com`;
+          const emailQuery = query(usersRef, where('email', '==', resolvedEmail));
+          const emailSnap = await getDocs(emailQuery);
+          if (!emailSnap.empty) {
+            recipientUser = { id: emailSnap.docs[0].id, ...emailSnap.docs[0].data() };
+          }
+        }
+
+        if (!recipientUser) {
+          setValidationError(lang === 'bn' ? 'দুঃখিত, এই প্রাপক নম্বরটি নিহাদ টেলিকমে নিবন্ধিত নয়!' : 'Sorry, this recipient is not registered on Nihad Telecom!');
+          setIsLoading(false);
+          return;
+        }
+
+        if (recipientUser.id === currentUser?.uid) {
+          setValidationError(lang === 'bn' ? 'আপনি নিজের অ্যাকাউন্টে টাকা পাঠাতে পারবেন না!' : 'You cannot send money to your own account!');
+          setIsLoading(false);
+          return;
+        }
+
+        recipientUid = recipientUser.id;
+        recipientName = recipientUser.displayName || 'Recipient';
+        recipientEmail = recipientUser.email || '';
+      } catch (err) {
+        console.error("Error verifying recipient: ", err);
+        setValidationError(lang === 'bn' ? 'গ্রাহক যাচাই করতে সমস্যা হয়েছে! আবার চেষ্টা করুন।' : 'Error verifying recipient! Please try again.');
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    try {
+      await onSuccess(amt, method, targetNumber, note, recipientUid, recipientName, recipientEmail);
       setIsLoading(false);
       setShowSuccessOverlay(true);
       
       setTimeout(() => {
-        onSuccess(amt, method, targetNumber);
         setShowSuccessOverlay(false);
-        // Reset states
         setAmountInput('');
         setTargetNumber('');
+        setNote('');
         onClose();
-      }, 2000);
-    }, 1500);
+      }, 2500);
+    } catch (err) {
+      console.error(err);
+      setValidationError(lang === 'bn' ? 'লেনদেন সম্পন্ন করতে সমস্যা হয়েছে!' : 'Transaction failed to process!');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -187,14 +256,17 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
               {labels.selectMethod}
             </label>
-            <div className="grid grid-cols-4 gap-2.5">
-              {(['bKash', 'Nagad', 'Rocket', 'Upay'] as TransferMethod[]).map((m) => {
+            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-2">
+              {(['bKash', 'Nagad', 'Rocket', 'Upay', 'Nihad Wallet (User)'] as TransferMethod[]).map((m) => {
                 const isSelected = method === m;
                 return (
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setMethod(m)}
+                    onClick={() => {
+                      setMethod(m);
+                      setValidationError('');
+                    }}
                     className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all relative overflow-hidden cursor-pointer ${
                       isSelected 
                         ? `${getMethodColor(m)} border-2 shadow-xs scale-102`
@@ -207,7 +279,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
                         <Check className="h-2 w-2 stroke-[3]" />
                       </span>
                     )}
-                    <span className="text-[11px] font-black tracking-tight">{m}</span>
+                    <span className="text-[10px] font-black tracking-tight">{getMethodDisplayName(m)}</span>
                   </button>
                 );
               })}
@@ -224,12 +296,16 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
                 BD
               </div>
               <input
-                type="tel"
-                pattern="[0-9]*"
-                maxLength={11}
+                type={method === 'Nihad Wallet (User)' ? 'text' : 'tel'}
                 required
                 value={targetNumber}
-                onChange={(e) => setTargetNumber(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => {
+                  if (method === 'Nihad Wallet (User)') {
+                    setTargetNumber(e.target.value);
+                  } else {
+                    setTargetNumber(e.target.value.replace(/\D/g, ''));
+                  }
+                }}
                 placeholder={labels.placeholderNumber}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-11 pr-12 text-xs font-bold outline-none focus:border-violet-500 focus:bg-white transition-all text-slate-800 font-mono"
               />
@@ -277,6 +353,23 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
               ))}
             </div>
           </div>
+
+          {/* Note/Reference Input Block (Only for P2P User Transfers) */}
+          {method === 'Nihad Wallet (User)' && (
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                {lang === 'bn' ? 'রেফারেন্স / নোট (ঐচ্ছিক)' : 'Reference / Note (Optional)'}
+              </label>
+              <input
+                type="text"
+                maxLength={50}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={lang === 'bn' ? 'মন্তব্য লিখুন...' : 'Add a small message...'}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-xs font-bold outline-none focus:border-violet-500 focus:bg-white transition-all text-slate-800"
+              />
+            </div>
+          )}
 
           {/* Fee Indicator & Policy note */}
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 space-y-1">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings, Copy, MessageSquare
+  LogOut, User, Settings, Copy, MessageSquare, Globe
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
@@ -309,9 +309,10 @@ interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
   isStandalone?: boolean;
+  onToggleUserView?: () => void;
 }
 
-export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false }: AdminPanelProps) {
+export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
@@ -1321,13 +1322,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           </div>
         </div>
         {isStandalone ? (
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-rose-500/15"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>{lang === 'bn' ? 'লগআউট' : 'Logout'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {onToggleUserView && (
+              <button
+                onClick={onToggleUserView}
+                className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-blue-500/15"
+              >
+                <Globe className="h-4 w-4" />
+                <span>{lang === 'bn' ? 'গ্রাহক ভিউ' : 'User View'}</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-rose-500/15"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>{lang === 'bn' ? 'লগআউট' : 'Logout'}</span>
+            </button>
+          </div>
         ) : (
           <button
             onClick={onClose}
