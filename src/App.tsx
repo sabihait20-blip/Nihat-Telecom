@@ -49,6 +49,7 @@ import SupportModal from './components/SupportModal';
 import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
 import CashOutCalculatorModal from './components/CashOutCalculatorModal';
+import StorePanel from './components/StorePanel';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -943,6 +944,13 @@ export default function App() {
       action: () => setIsTransferOpen(true)
     },
     {
+      id: 'store',
+      title: lang === 'bn' ? 'মেগা স্টোর' : 'Mega Store',
+      icon: ShoppingBag,
+      color: 'bg-pink-50 text-[#e2125d] border border-pink-100/40 shadow-xs shadow-pink-500/2',
+      action: () => setActiveTab('store')
+    },
+    {
       id: 'voucher',
       title: lang === 'bn' ? 'ভাউচার স্টোর' : 'Voucher Store',
       icon: Gift,
@@ -1082,6 +1090,7 @@ export default function App() {
             <nav className="space-y-1">
               {[
                 { id: 'home' as AppTab, label: t.home, icon: Home },
+                { id: 'store' as AppTab, label: lang === 'bn' ? 'স্টোর' : 'Store', icon: ShoppingBag },
                 { id: 'packages' as AppTab, label: t.packages, icon: Package },
                 { id: 'history' as AppTab, label: t.history, icon: History },
                 { id: 'profile' as AppTab, label: t.profile, icon: User },
@@ -1334,6 +1343,15 @@ export default function App() {
                   <HistoryList
                     transactions={transactions}
                     lang={lang}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'store' && (
+                <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm flex flex-col h-[700px]">
+                  <StorePanel
+                    lang={lang}
+                    walletBalance={balance}
                   />
                 </div>
               )}
@@ -1596,6 +1614,13 @@ export default function App() {
             <HistoryList
               transactions={transactions}
               lang={lang}
+            />
+          )}
+
+          {activeTab === 'store' && (
+            <StorePanel
+              lang={lang}
+              walletBalance={balance}
             />
           )}
 

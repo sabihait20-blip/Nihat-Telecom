@@ -25,7 +25,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
       (tx.transferMethod && tx.transferMethod.toLowerCase().includes(query.toLowerCase())) ||
       (tx.voucherItem && tx.voucherItem.toLowerCase().includes(query.toLowerCase())) ||
       (tx.voucherCode && tx.voucherCode.toLowerCase().includes(query.toLowerCase())) ||
-      tx.txId.toLowerCase().includes(query.toLowerCase());
+      (tx.txId || '').toLowerCase().includes(query.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });

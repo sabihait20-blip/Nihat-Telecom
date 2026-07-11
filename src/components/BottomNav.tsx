@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Home, Inbox, User } from 'lucide-react';
+import { Home, Inbox, User, ShoppingBag } from 'lucide-react';
 import { AppTab, Language } from '../types';
 
 interface BottomNavProps {
@@ -17,6 +17,11 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
       id: 'home' as AppTab, 
       label: lang === 'bn' ? 'হোম' : 'Home', 
       icon: Home 
+    },
+    { 
+      id: 'store' as AppTab, 
+      label: lang === 'bn' ? 'স্টোর' : 'Store', 
+      icon: ShoppingBag 
     },
     { 
       id: 'profile' as AppTab, 

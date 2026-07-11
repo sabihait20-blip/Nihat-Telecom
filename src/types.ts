@@ -82,6 +82,38 @@ export interface PromoBanner {
   imageUrl?: string;
 }
 
-export type AppTab = 'home' | 'packages' | 'history' | 'profile';
+export type AppTab = 'home' | 'packages' | 'history' | 'profile' | 'store';
 
 export type Language = 'bn' | 'en';
+
+export interface StoreProduct {
+  id: string;
+  title: string;
+  titleBn: string;
+  price: number;
+  stock: number;
+  description: string;
+  descriptionBn: string;
+  imageUrl?: string;
+  category: string;
+  categoryBn: string;
+}
+
+export interface StoreOrder {
+  id: string;
+  productId: string;
+  productTitle: string;
+  productTitleBn: string;
+  price: number;
+  quantity: number;
+  totalPrice: number;
+  date: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userPhone: string;
+  deliveryAddress?: string;
+  note?: string;
+  rejectionReason?: string;
+}

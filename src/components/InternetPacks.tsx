@@ -24,12 +24,17 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
     const matchOp = selectedOpFilter === 'ALL' || pkg.operator === selectedOpFilter;
     const matchCat = selectedCatFilter === 'all' || pkg.category === selectedCatFilter;
     
-    const textQuery = searchQuery.toLowerCase();
+    const textQuery = searchQuery ? searchQuery.toLowerCase() : '';
+    const pkgTitle = pkg.title || '';
+    const pkgTitleBn = pkg.titleBn || '';
+    const pkgDesc = pkg.description || '';
+    const pkgDescBn = pkg.descriptionBn || '';
+
     const matchSearch =
-      pkg.title.toLowerCase().includes(textQuery) ||
-      pkg.titleBn.toLowerCase().includes(textQuery) ||
-      pkg.description.toLowerCase().includes(textQuery) ||
-      pkg.descriptionBn.toLowerCase().includes(textQuery);
+      pkgTitle.toLowerCase().includes(textQuery) ||
+      pkgTitleBn.toLowerCase().includes(textQuery) ||
+      pkgDesc.toLowerCase().includes(textQuery) ||
+      pkgDescBn.toLowerCase().includes(textQuery);
 
     return matchOp && matchCat && matchSearch;
   });

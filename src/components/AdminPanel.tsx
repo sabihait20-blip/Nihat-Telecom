@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings, Copy, MessageSquare, Globe
+  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
   query, orderBy, writeBatch, updateDoc, getDoc 
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Language, Operator, RechargePackage, PromoBanner, Transaction, BillProvider } from '../types';
+import { Language, Operator, RechargePackage, PromoBanner, Transaction, BillProvider, StoreProduct, StoreOrder } from '../types';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -313,10 +313,28 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
+
+  // Store Management state variables
+  const [adminProducts, setAdminProducts] = useState<StoreProduct[]>([]);
+  const [adminOrders, setAdminOrders] = useState<StoreOrder[]>([]);
+  const [productForm, setProductForm] = useState({
+    title: '',
+    titleBn: '',
+    price: 0,
+    stock: 0,
+    description: '',
+    descriptionBn: '',
+    imageUrl: '',
+    category: 'Lifestyle',
+  });
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [orderRejectReason, setOrderRejectReason] = useState('');
+  const [rejectingOrderId, setRejectingOrderId] = useState<string | null>(null);
 
   const handleCopyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -581,6 +599,40 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       setSupportTickets(list);
     }, (error) => {
       console.error("Error loading support tickets: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 5c. Listen for store products list
+  useEffect(() => {
+    const q = collection(db, 'products');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: StoreProduct[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id } as StoreProduct);
+      });
+      setAdminProducts(list);
+    }, (error) => {
+      console.error("Error loading products in admin panel: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 5d. Listen for store orders list
+  useEffect(() => {
+    const q = collection(db, 'store_orders');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: StoreOrder[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id } as StoreOrder);
+      });
+      // Sort in-memory descending by date
+      list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setAdminOrders(list);
+    }, (error) => {
+      console.error("Error loading orders in admin panel: ", error);
     });
 
     return () => unsubscribe();
@@ -990,11 +1042,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const handleEditBiller = (biller: BillProvider) => {
     setEditingBillerId(biller.id);
     setBillerForm({
-      name: biller.name,
-      nameBn: biller.nameBn,
-      category: biller.category,
-      categoryBn: biller.categoryBn,
-      logoColor: biller.logoColor,
+      name: biller.name || '',
+      nameBn: biller.nameBn || '',
+      category: biller.category || 'Electricity',
+      categoryBn: biller.categoryBn || 'বিদ্যুৎ',
+      logoColor: biller.logoColor || 'bg-blue-600',
       imageUrl: biller.imageUrl || ''
     });
     setShowBillerForm(true);
@@ -1017,6 +1069,172 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       category: cat,
       categoryBn: catsBn[cat] || 'অন্যান্য'
     });
+  };
+
+  // ---------------- MEGA STORE PRODUCT MANAGEMENT ----------------
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProduct(true);
+    try {
+      const prodId = editingProductId || `prod-${Date.now()}`;
+      const docRef = doc(db, 'products', prodId);
+      
+      const newProduct: StoreProduct = {
+        id: prodId,
+        title: productForm.title,
+        titleBn: productForm.titleBn,
+        price: Number(productForm.price) || 0,
+        stock: Number(productForm.stock) || 0,
+        description: productForm.description,
+        descriptionBn: productForm.descriptionBn,
+        imageUrl: productForm.imageUrl,
+        category: productForm.category,
+        categoryBn: productForm.category,
+      };
+
+      await setDoc(docRef, newProduct);
+
+      setEditingProductId(null);
+      setProductForm({
+        title: '',
+        titleBn: '',
+        price: 0,
+        stock: 0,
+        description: '',
+        descriptionBn: '',
+        imageUrl: '',
+        category: 'Lifestyle',
+      });
+    } catch (err) {
+      console.error("Error saving product: ", err);
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
+  const handleEditProduct = (prod: StoreProduct) => {
+    setEditingProductId(prod.id);
+    setProductForm({
+      title: prod.title || '',
+      titleBn: prod.titleBn || '',
+      price: prod.price || 0,
+      stock: prod.stock || 0,
+      description: prod.description || '',
+      descriptionBn: prod.descriptionBn || '',
+      imageUrl: prod.imageUrl || '',
+      category: prod.category || 'Lifestyle',
+    });
+  };
+
+  const handleDeleteProduct = async (prodId: string) => {
+    if (confirm(lang === 'bn' ? 'আপনি কি নিশ্চিতভাবে এই প্রোডাক্টটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this product?')) {
+      try {
+        await deleteDoc(doc(db, 'products', prodId));
+      } catch (err) {
+        console.error("Error deleting product:", err);
+      }
+    }
+  };
+
+  // ---------------- STORE ORDERS MANAGEMENT ----------------
+  const handleApproveOrder = async (order: StoreOrder) => {
+    if (isProcessing) return;
+    setIsProcessing(order.id);
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Update order status to Approved (Delivered)
+      batch.update(doc(db, 'store_orders', order.id), { status: 'Approved' });
+
+      // 2. Add customer notifications
+      const addedNotifId = `notif-appr-${Date.now()}`;
+      const addedNotif = {
+        id: addedNotifId,
+        title: lang === 'bn' ? 'অর্ডার ডেলিভারড' : 'Order Delivered',
+        titleBn: 'অর্ডারটি সম্পন্ন হয়েছে',
+        desc: `Your order for ${order.productTitle} (x${order.quantity}) has been approved and delivered!`,
+        descBn: `আপনার ${order.productTitleBn} (x${order.quantity}) অর্ডারের অনুরোধটি সফলভাবে অনুমোদিত এবং ডেলিভার করা হয়েছে!`,
+        time: 'Just now',
+        read: false,
+      };
+      batch.set(doc(db, 'users', order.userId, 'notifications', addedNotifId), addedNotif);
+
+      // 3. Update status to Approved inside the user's transactions array
+      const timestampPart = order.id.replace('order-', '');
+      const txDocId = `tx-store-${timestampPart}`;
+      
+      batch.update(doc(db, 'users', order.userId, 'transactions', txDocId), { status: 'Approved' });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Error approving order:", err);
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleRejectOrder = async (order: StoreOrder, reason: string) => {
+    if (isProcessing) return;
+    if (!reason.trim()) {
+      alert(lang === 'bn' ? 'অনুগ্রহ করে রিজেক্ট করার কারণ লিখুন।' : 'Please enter rejection reason.');
+      return;
+    }
+    setIsProcessing(order.id);
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Update order status to Rejected with reason
+      batch.update(doc(db, 'store_orders', order.id), { 
+        status: 'Rejected',
+        rejectionReason: reason
+      });
+
+      // 2. Refund user's balance
+      const userBalanceDocRef = doc(db, 'users', order.userId, 'wallet', 'balance_doc');
+      const userBalanceSnap = await getDoc(userBalanceDocRef);
+      if (userBalanceSnap.exists()) {
+        const currentBal = userBalanceSnap.data().balance || 0;
+        const refundedBal = currentBal + order.totalPrice;
+        batch.set(userBalanceDocRef, { balance: refundedBal });
+      }
+
+      // 3. Return product stock
+      const prodDocRef = doc(db, 'products', order.productId);
+      const prodSnap = await getDoc(prodDocRef);
+      if (prodSnap.exists()) {
+        const currentStock = prodSnap.data().stock || 0;
+        batch.update(prodDocRef, { stock: currentStock + order.quantity });
+      }
+
+      // 4. Update transaction status
+      const timestampPart = order.id.replace('order-', '');
+      const txDocId = `tx-store-${timestampPart}`;
+      batch.update(doc(db, 'users', order.userId, 'transactions', txDocId), { 
+        status: 'Rejected',
+        rejectionReason: reason
+      });
+
+      // 5. Add customer notification
+      const addedNotifId = `notif-rej-${Date.now()}`;
+      const addedNotif = {
+        id: addedNotifId,
+        title: lang === 'bn' ? 'অর্ডার বাতিল' : 'Order Rejected',
+        titleBn: 'অর্ডার বাতিল এবং রিফান্ড',
+        desc: `Your order for ${order.productTitle} has been rejected. Reason: ${reason}. Refunded ৳${order.totalPrice} to your wallet.`,
+        descBn: `আপনার ${order.productTitleBn} অর্ডারের অনুরোধটি বাতিল করা হয়েছে। কারণ: ${reason}। আপনার ওয়ালেটে ৳${order.totalPrice} টাকা ফেরত দেওয়া হয়েছে।`,
+        time: 'Just now',
+        read: false,
+      };
+      batch.set(doc(db, 'users', order.userId, 'notifications', addedNotifId), addedNotif);
+
+      await batch.commit();
+      setRejectingOrderId(null);
+      setOrderRejectReason('');
+    } catch (err) {
+      console.error("Error rejecting order:", err);
+    } finally {
+      setIsProcessing(null);
+    }
   };
 
   const handleAdjustUserBalance = async () => {
@@ -1426,6 +1644,28 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           >
             <MessageSquare className="h-3.5 w-3.5" />
             <span>{lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets'}</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('products')}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeSubTab === 'products' 
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span>{lang === 'bn' ? 'স্টোর প্রোডাক্টস' : 'Manage Products'} ({adminProducts.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('orders')}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeSubTab === 'orders' 
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+            }`}
+          >
+            <ShoppingBag className="h-3.5 w-3.5" />
+            <span>{lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders'} ({adminOrders.filter(o => o.status === 'Pending').length})</span>
           </button>
         </div>
 
@@ -3697,6 +3937,376 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   );
                 })()}
               </div>
+            </div>
+          )}
+
+          {/* 5c. STORE PRODUCTS MANAGEMENT */}
+          {activeSubTab === 'products' && (
+            <div className="space-y-6">
+              {/* Add/Edit Product Form */}
+              <div className="bg-slate-900 border border-white/5 rounded-3xl p-6 text-slate-100">
+                <h3 className="text-sm font-black tracking-tight mb-4 flex items-center gap-2">
+                  <Plus className="h-4.5 w-4.5 text-blue-500" />
+                  <span>{editingProductId ? (lang === 'bn' ? 'প্রোডাক্ট এডিট করুন' : 'Edit Store Product') : (lang === 'bn' ? 'নতুন প্রোডাক্ট যোগ করুন' : 'Add New Store Product')}</span>
+                </h3>
+
+                <form onSubmit={handleSaveProduct} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'নাম (ইংরেজি)' : 'Title (English)'}</label>
+                      <input
+                        type="text"
+                        required
+                        value={productForm.title}
+                        onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'নাম (বাংলা)' : 'Title (Bangla)'}</label>
+                      <input
+                        type="text"
+                        required
+                        value={productForm.titleBn}
+                        onChange={(e) => setProductForm({ ...productForm, titleBn: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'मूल्य (৳)' : 'Price (৳)'}</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={productForm.price}
+                        onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) || 0 })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'স্টক পরিমাণ' : 'Stock Qty'}</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={productForm.stock}
+                        onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) || 0 })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'ক্যাটাগরি' : 'Category'}</label>
+                      <select
+                        value={productForm.category}
+                        onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500 appearance-none cursor-pointer text-slate-300"
+                      >
+                        <option value="Lifestyle" className="bg-slate-900">Lifestyle</option>
+                        <option value="Digital" className="bg-slate-900">Digital</option>
+                        <option value="Electronics" className="bg-slate-900">Electronics</option>
+                        <option value="Services" className="bg-slate-900">Services</option>
+                        <option value="Other" className="bg-slate-900">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'ইমেজ ইউআরএল' : 'Image URL'}</label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/product.jpg"
+                      value={productForm.imageUrl}
+                      onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'বিবরণ (ইংরেজি)' : 'Description (English)'}</label>
+                      <textarea
+                        rows={2}
+                        required
+                        value={productForm.description}
+                        onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'বিবরণ (বাংলা)' : 'Description (Bangla)'}</label>
+                      <textarea
+                        rows={2}
+                        required
+                        value={productForm.descriptionBn}
+                        onChange={(e) => setProductForm({ ...productForm, descriptionBn: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    {editingProductId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProductId(null);
+                          setProductForm({
+                            title: '',
+                            titleBn: '',
+                            price: 0,
+                            stock: 0,
+                            description: '',
+                            descriptionBn: '',
+                            imageUrl: '',
+                            category: 'Lifestyle',
+                          });
+                        }}
+                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl text-xs transition-colors cursor-pointer"
+                      >
+                        {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={isSavingProduct}
+                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-2xl text-xs transition-colors flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingProduct && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                      <span>{editingProductId ? (lang === 'bn' ? 'হালনাগাদ করুন' : 'Update Product') : (lang === 'bn' ? 'সেভ করুন' : 'Save Product')}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Products List Table */}
+              <div className="bg-slate-900 border border-white/5 rounded-3xl p-6">
+                <h3 className="text-sm font-black tracking-tight mb-4">{lang === 'bn' ? 'বিদ্যমান প্রোডাক্টসমূহ' : 'Available Products List'} ({adminProducts.length})</h3>
+
+                {adminProducts.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-6 text-center font-semibold">{lang === 'bn' ? 'কোন প্রোডাক্ট পাওয়া যায়নি!' : 'No products found. Add some above!'}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-medium border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 text-slate-400 font-bold">
+                          <th className="py-3 px-2">{lang === 'bn' ? 'ছবি' : 'Image'}</th>
+                          <th className="py-3 px-2">{lang === 'bn' ? 'নাম' : 'Title'}</th>
+                          <th className="py-3 px-2">{lang === 'bn' ? 'ক্যাটাগরি' : 'Category'}</th>
+                          <th className="py-3 px-2">{lang === 'bn' ? 'मूल্য' : 'Price'}</th>
+                          <th className="py-3 px-2">{lang === 'bn' ? 'স্টক' : 'Stock'}</th>
+                          <th className="py-3 px-2 text-right">{lang === 'bn' ? 'অ্যাকশন' : 'Actions'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {adminProducts.map((prod) => (
+                          <tr key={prod.id} className="hover:bg-white/5 transition-colors">
+                            <td className="py-3 px-2">
+                              <div className="h-10 w-10 rounded-lg bg-white/10 overflow-hidden flex items-center justify-center">
+                                {prod.imageUrl ? (
+                                  <img src={prod.imageUrl} alt={prod.title} referrerPolicy="no-referrer" className="object-cover h-full w-full" />
+                                ) : (
+                                  <ShoppingBag className="h-5 w-5 text-slate-500" />
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-2">
+                              <p className="font-extrabold text-slate-100">{prod.title}</p>
+                              <p className="text-[10px] text-slate-400">{prod.titleBn}</p>
+                            </td>
+                            <td className="py-3 px-2">
+                              <span className="bg-white/5 border border-white/5 px-2.5 py-0.5 rounded-full text-[10px] text-slate-300 uppercase font-black tracking-wider">
+                                {prod.category}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2 font-mono font-bold text-blue-400">৳{prod.price}</td>
+                            <td className="py-3 px-2 font-bold">
+                              <span className={prod.stock > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                {prod.stock}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2 text-right space-x-1 whitespace-nowrap">
+                              <button
+                                onClick={() => handleEditProduct(prod)}
+                                className="p-1.5 bg-white/5 hover:bg-blue-600/20 text-slate-400 hover:text-blue-400 rounded-lg transition-colors cursor-pointer"
+                                title="Edit"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(prod.id)}
+                                className="p-1.5 bg-white/5 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 5d. STORE ORDERS MANAGEMENT */}
+          {activeSubTab === 'orders' && (
+            <div className="space-y-4">
+              <div className="bg-slate-900 border border-white/5 rounded-3xl p-6">
+                <h3 className="text-sm font-black tracking-tight mb-4 flex items-center justify-between">
+                  <span>{lang === 'bn' ? 'স্টোর অর্ডার রিকোয়েস্টসমূহ' : 'Customer Store Purchase Orders'}</span>
+                  <span className="text-xs bg-blue-600/20 border border-blue-500/20 text-blue-400 px-3 py-1 rounded-full font-bold">
+                    {adminOrders.filter(o => o.status === 'Pending').length} Pending
+                  </span>
+                </h3>
+
+                {adminOrders.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500 font-semibold text-xs">
+                    {lang === 'bn' ? 'এখনো কোনো অর্ডার পাওয়া যায়নি!' : 'No store orders found in database yet.'}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {adminOrders.map((order) => {
+                      const isPending = order.status === 'Pending';
+                      return (
+                        <div key={order.id} className="bg-slate-950 border border-white/5 rounded-3xl p-5 flex flex-col md:flex-row gap-5 items-start justify-between hover:border-slate-700/80 transition-all">
+                          {/* Order specifications details */}
+                          <div className="space-y-2 flex-1 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                                order.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                order.status === 'Rejected' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                                'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                              }`}>
+                                {order.status}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono font-bold">ID: {order.id}</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                              {/* Customer Information Column */}
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase font-bold text-slate-400">{lang === 'bn' ? 'ক্রেতার বিবরণ' : 'Customer Info'}</p>
+                                <p className="font-extrabold text-slate-200">{order.userName}</p>
+                                <p className="text-[11px] text-slate-400">{order.userEmail}</p>
+                                <p className="text-[11px] text-blue-400 font-bold flex items-center gap-1 cursor-pointer" onClick={() => handleCopyToClipboard(order.userPhone, order.id + '-phone')}>
+                                  <span>{order.userPhone}</span>
+                                  <Copy className="h-3 w-3" />
+                                </p>
+                              </div>
+
+                              {/* Product Particulars Column */}
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase font-bold text-slate-400">{lang === 'bn' ? 'পণ্যের বিবরণ' : 'Product Particulars'}</p>
+                                <p className="font-extrabold text-slate-200">{order.productTitle} (x{order.quantity})</p>
+                                <p className="text-[11px] text-[#e2125d] font-bold">Total: ৳{order.totalPrice.toLocaleString()}</p>
+                                <p className="text-[10px] text-slate-500">{new Date(order.date).toLocaleString()}</p>
+                              </div>
+                            </div>
+
+                            {/* Delivery shipping specifications */}
+                            <div className="pt-2 border-t border-white/5 space-y-1 text-[11px]">
+                              <p className="text-slate-300">
+                                <strong className="text-slate-400">{lang === 'bn' ? 'ডেলিভারি ঠিকানা:' : 'Shipping Address:'}</strong> {order.deliveryAddress}
+                              </p>
+                              {order.note && (
+                                <p className="text-slate-400 italic">
+                                  <strong>Memo:</strong> {order.note}
+                                </p>
+                              )}
+                              {order.rejectionReason && (
+                                <p className="text-rose-400 font-semibold bg-rose-950/20 border border-rose-900/30 p-2.5 rounded-xl mt-1">
+                                  <strong>Rejection Reason:</strong> {order.rejectionReason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Approval reject action CTAs */}
+                          {isPending && (
+                            <div className="flex md:flex-col gap-2 shrink-0 w-full md:w-auto">
+                              <button
+                                onClick={() => handleApproveOrder(order)}
+                                className="flex-1 md:w-36 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                              >
+                                <Check className="h-4 w-4" />
+                                <span>{lang === 'bn' ? 'অনুমোদন করুন' : 'Approve & Ship'}</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRejectingOrderId(order.id);
+                                  setOrderRejectReason('');
+                                }}
+                                className="flex-1 md:w-36 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black shadow-md shadow-rose-500/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                              >
+                                <X className="h-4 w-4" />
+                                <span>{lang === 'bn' ? 'প্রত্যাখ্যান করুন' : 'Reject Order'}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Order Rejection Custom Dialog Prompt */}
+              {rejectingOrderId && (
+                <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+                  <div 
+                    onClick={() => setRejectingOrderId(null)}
+                    className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+                  />
+                  <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-xl p-6 border border-slate-100 flex flex-col space-y-4 relative z-50 animate-scale-up text-slate-800">
+                    <div className="flex items-center gap-2.5 text-rose-600 pb-1 border-b border-slate-100">
+                      <AlertTriangle className="h-5 w-5 shrink-0" />
+                      <h3 className="text-slate-950 font-black text-sm tracking-tight">
+                        {lang === 'bn' ? 'অর্ডার প্রত্যাখ্যান করুন' : 'Reject Customer Order'}
+                      </h3>
+                    </div>
+
+                    <p className="text-xs text-slate-500 font-medium">
+                      {lang === 'bn' ? 'অর্ডারটি প্রত্যাখ্যান করার সুনির্দিষ্ট কারণ লিখুন। এটি কাস্টমার ইনবক্সে দেখতে পাবে এবং টাকা স্বয়ংক্রিয় রিফান্ড হবে।' : 'Specify why you are rejecting this purchase. The customer will see this and funds will automatically be refunded.'}
+                    </p>
+
+                    <input
+                      type="text"
+                      required
+                      placeholder={lang === 'bn' ? 'যেমন: স্টক আউট, ভুল ঠিকানা ইত্যাদি' : 'e.g., Stock unavailable, Incorrect address...'}
+                      value={orderRejectReason}
+                      onChange={(e) => setOrderRejectReason(e.target.value)}
+                      className="w-full bg-slate-100 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-semibold text-slate-800 outline-none focus:border-rose-500"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setRejectingOrderId(null)}
+                        className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-98 cursor-pointer text-center"
+                      >
+                        {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const orderObj = adminOrders.find(o => o.id === rejectingOrderId);
+                          if (orderObj) {
+                            handleRejectOrder(orderObj, orderRejectReason);
+                          }
+                        }}
+                        className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-500/10 transition-all active:scale-98 cursor-pointer text-center"
+                      >
+                        {lang === 'bn' ? 'বাতিল করুন' : 'Reject & Refund'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

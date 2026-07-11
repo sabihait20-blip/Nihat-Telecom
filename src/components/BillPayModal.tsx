@@ -145,8 +145,10 @@ export default function BillPayModal({
 
   // Filter bills in directory
   const filteredBillers = billers.filter((biller) => {
-    const q = searchQuery.toLowerCase();
-    return biller.name.toLowerCase().includes(q) || biller.nameBn.toLowerCase().includes(q);
+    const q = searchQuery ? searchQuery.toLowerCase() : '';
+    const bName = biller.name || '';
+    const bNameBn = biller.nameBn || '';
+    return bName.toLowerCase().includes(q) || bNameBn.toLowerCase().includes(q);
   });
 
   return (
