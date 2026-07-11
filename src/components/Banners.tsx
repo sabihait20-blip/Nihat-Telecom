@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { Language, Operator, PromoBanner } from '../types';
@@ -48,6 +48,14 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
   const t = TRANSLATIONS[lang];
 
   const activeBanners = banners.length > 0 ? banners : PROMOS;
+
+  useEffect(() => {
+    if (activeBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % activeBanners.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeBanners.length]);
 
   const handleNext = () => {
     setActiveIndex((prev) => (prev + 1) % activeBanners.length);
