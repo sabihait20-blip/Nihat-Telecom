@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, Unlock, Fingerprint, Delete, ShieldAlert, Sparkles, Check, HelpCircle } from 'lucide-react';
+import { Lock, Unlock, Delete, ShieldAlert, Sparkles } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 
@@ -15,22 +15,6 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
   const [shake, setShake] = useState<boolean>(false);
-  
-  // Biometric state
-  const [showBiometricScan, setShowBiometricScan] = useState<boolean>(false);
-  const [biometricStatus, setBiometricStatus] = useState<'idle' | 'scanning' | 'success' | 'failed'>('idle');
-  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('biometric_enabled') !== 'false';
-  });
-
-  // Automatically trigger biometric scan on mount if enabled
-  useEffect(() => {
-    if (biometricEnabled) {
-      setTimeout(() => {
-        handleBiometricTrigger();
-      }, 800);
-    }
-  }, [biometricEnabled]);
 
   const handleKeyPress = (num: string) => {
     if (pin.length < 4) {
@@ -50,13 +34,7 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
     setPin((prev) => prev.slice(0, -1));
   };
 
-  const handleClear = () => {
-    setErrorMsg('');
-    setPin('');
-  };
-
   const verifyPin = (enteredPin: string) => {
-    // Standard Demo Pin
     const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
     
     if (enteredPin === savedPin) {
@@ -72,31 +50,6 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
         setShake(false);
       }, 600);
     }
-  };
-
-  const handleBiometricTrigger = () => {
-    setShowBiometricScan(true);
-    setBiometricStatus('scanning');
-    
-    // Simulate high-density biometric scanning animation
-    setTimeout(() => {
-      // 90% Success rate simulation for ultra realistic feel
-      const success = Math.random() < 0.95;
-      if (success) {
-        setBiometricStatus('success');
-        setTimeout(() => {
-          setIsUnlocked(true);
-          setShowBiometricScan(false);
-          onUnlocked();
-        }, 800);
-      } else {
-        setBiometricStatus('failed');
-        setTimeout(() => {
-          setShowBiometricScan(false);
-          setErrorMsg(t.biometricError || 'Biometric verification failed.');
-        }, 1200);
-      }
-    }, 1800);
   };
 
   return (
@@ -193,14 +146,8 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
             </button>
           ))}
 
-          {/* Biometric trigger on bottom-left */}
-          <button
-            onClick={handleBiometricTrigger}
-            className="h-15 w-15 rounded-full bg-blue-600/10 hover:bg-blue-600/20 active:bg-blue-600/30 border border-blue-500/20 active:scale-95 transition-all flex items-center justify-center text-blue-400 cursor-pointer text-sm"
-            title={t.biometricTitle}
-          >
-            <Fingerprint className="h-6 w-6" />
-          </button>
+          {/* Spacer to replace fingerprint trigger symmetrically */}
+          <div className="h-15 w-15 rounded-full flex items-center justify-center text-slate-600" />
 
           {/* Number 0 */}
           <button
@@ -219,94 +166,7 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
             <Delete className="h-5 w-5" />
           </button>
         </div>
-
-        {/* Demo Mode helper */}
-        <div className="mt-6 flex justify-center">
-          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-            <Lock className="h-3 w-3 text-amber-400" />
-            <span>{t.demoPinWarning}</span>
-          </div>
-        </div>
       </div>
-
-      {/* Simulated High-Density Biometric Popup Drawer */}
-      <AnimatePresence>
-        {showBiometricScan && (
-          <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="w-full max-w-md bg-slate-900 border-t border-white/10 rounded-t-[32px] p-6 text-white pb-12 relative shadow-2xl"
-            >
-              {/* Top Drag Indicator bar */}
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
-
-              <div className="flex flex-col items-center text-center">
-                <h3 className="text-lg font-bold font-display mb-1">{t.faceTouchId || 'Biometric Scanner'}</h3>
-                <p className="text-xs text-slate-400 max-w-xs mb-8">{t.biometricDesc}</p>
-
-                {/* Biometric Interactive scanner visual ring */}
-                <div className="relative mb-8 h-28 w-28 flex items-center justify-center">
-                  {/* Outer spinning ring when scanning */}
-                  {biometricStatus === 'scanning' && (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
-                      className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-blue-400 border-b-transparent border-l-transparent"
-                    />
-                  )}
-                  
-                  {/* Visual pulse wave circles */}
-                  {biometricStatus === 'scanning' && (
-                    <motion.div
-                      animate={{ scale: [0.8, 1.4, 0.8], opacity: [0.5, 0.1, 0.5] }}
-                      transition={{ repeat: Infinity, duration: 2 }}
-                      className="absolute inset-2 rounded-full border-2 border-blue-400/30"
-                    />
-                  )}
-
-                  <div className={`h-22 w-22 rounded-full flex items-center justify-center transition-all ${
-                    biometricStatus === 'success'
-                      ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400'
-                      : biometricStatus === 'failed'
-                      ? 'bg-rose-500/20 border-2 border-rose-500 text-rose-450'
-                      : 'bg-white/5 border border-white/10 text-blue-400'
-                  }`}>
-                    {biometricStatus === 'success' ? (
-                      <Check className="h-10 w-10 stroke-[2.5]" />
-                    ) : (
-                      <Fingerprint className={`h-12 w-12 ${biometricStatus === 'scanning' ? 'animate-pulse' : ''}`} />
-                    )}
-                  </div>
-                </div>
-
-                {/* Local status label */}
-                <span className={`text-xs font-bold uppercase tracking-wider ${
-                  biometricStatus === 'success'
-                    ? 'text-emerald-400'
-                    : biometricStatus === 'failed'
-                    ? 'text-rose-400'
-                    : 'text-blue-400 animate-pulse'
-                }`}>
-                  {biometricStatus === 'scanning' && (lang === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying Identity...')}
-                  {biometricStatus === 'success' && (lang === 'bn' ? 'যাচাইকরণ সফল!' : 'Verified Successfully!')}
-                  {biometricStatus === 'failed' && (lang === 'bn' ? 'ব্যর্থ হয়েছে' : 'Verification Failed')}
-                </span>
-
-                {/* Cancel option */}
-                <button
-                  onClick={() => setShowBiometricScan(false)}
-                  className="mt-8 text-xs font-bold text-slate-400 hover:text-white px-5 py-2 hover:bg-white/5 rounded-full transition-colors cursor-pointer"
-                >
-                  {lang === 'bn' ? 'পিন ব্যবহার করুন' : 'Cancel & Use PIN'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

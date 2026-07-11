@@ -40,21 +40,11 @@ export default function ProfilePanel({
   const userEmail = currentUser?.email || 'user@test.com';
 
   // Security States
-  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('biometric_enabled') !== 'false';
-  });
-  
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [currentPinInput, setCurrentPinInput] = useState<string>('');
   const [newPinInput, setNewPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<string>('');
   const [pinSuccess, setPinSuccess] = useState<string>('');
-
-  const handleToggleBiometric = () => {
-    const newVal = !biometricEnabled;
-    setBiometricEnabled(newVal);
-    localStorage.setItem('biometric_enabled', newVal.toString());
-  };
 
   const handleChangePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,37 +208,7 @@ export default function ProfilePanel({
             <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
           </button>
 
-          {/* Biometric Toggle Switch */}
-          <div
-            id="profile-biometric-toggle"
-            className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
-                <Fingerprint className="h-4.5 w-4.5 text-purple-600" />
-              </div>
-              <div>
-                <h4 className="text-slate-800 font-bold text-xs">
-                  {lang === 'bn' ? 'বায়োমেট্রিক লগইন' : 'Biometric Sensor Login'}
-                </h4>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                  {lang === 'bn' ? 'ফেস আইডি / ফিঙ্গারপ্রিন্ট সেন্সর টগল করুন' : 'Enable Face / Touch ID quick-unlock'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleToggleBiometric}
-              className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer focus:outline-none ${
-                biometricEnabled ? 'bg-blue-600' : 'bg-slate-200'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
-                  biometricEnabled ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
+
 
           {/* Change PIN Action */}
           <button

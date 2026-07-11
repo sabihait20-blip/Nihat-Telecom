@@ -72,7 +72,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>('bn');
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
-  const [isAppLocked, setIsAppLocked] = useState<boolean>(true);
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => !!localStorage.getItem('secure_wallet_pin'));
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [balance, setBalance] = useState<number>(0);
 

@@ -486,13 +486,9 @@ export default function RechargeModal({
                 
                 {pinError && (
                   <p className="text-center text-rose-500 text-[10px] font-bold">
-                    {lang === 'bn' ? 'ভুল পিন দিয়েছেন! সঠিক পিন: ১২৩৪' : 'Incorrect demo PIN! Try: 1234'}
+                    {lang === 'bn' ? 'ভুল পিন দিয়েছেন! পুনরায় চেষ্টা করুন।' : 'Incorrect PIN! Please try again.'}
                   </p>
                 )}
-
-                <p className="text-center text-[10px] text-amber-600 font-bold bg-amber-500/10 px-3 py-1 rounded-full w-fit mx-auto">
-                  {t.demoPinWarning}
-                </p>
               </div>
 
               <div className="flex gap-2.5 pt-3 border-t border-slate-100">

@@ -172,7 +172,7 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
 
     const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
     if (pinInput !== savedPin) {
-      setErrorMsg(lang === 'bn' ? `ভুল পিন নম্বর! (টেস্ট পিন: ${savedPin})` : `Invalid PIN! (Demo PIN: ${savedPin})`);
+      setErrorMsg(lang === 'bn' ? 'ভুল পিন নম্বর! পুনরায় চেষ্টা করুন।' : 'Invalid PIN! Please try again.');
       return;
     }
 
@@ -457,7 +457,6 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
             <div className="space-y-1.5 pt-1">
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider flex justify-between">
                 <span>{lang === 'bn' ? '৪ ডিজিটের সিকিউরিটি পিন' : 'Enter 4-Digit Wallet PIN'}</span>
-                <span className="text-indigo-600 lowercase font-mono">demo: 1234</span>
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
