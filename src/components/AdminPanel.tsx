@@ -3,7 +3,7 @@ import Tesseract from 'tesseract.js';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag
+  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2
 } from 'lucide-react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
@@ -323,13 +323,47 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const initialSupportLoadRef = useRef(true);
   const initialOrderLoadRef = useRef(true);
 
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(() => {
+    return localStorage.getItem('admin_voice_enabled') !== 'false';
+  });
+
   const speak = (text: string) => {
+    if (!isVoiceEnabled) return;
     if ("speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "bn-BD";
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
+      try {
+        // Cancel any pending speech to prevent queue build-up / silence
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Dynamically locate Bengali voice if available on the browser/device
+        const voices = window.speechSynthesis.getVoices();
+        const bnVoice = voices.find(v => v.lang.startsWith('bn'));
+        if (bnVoice) {
+          utterance.voice = bnVoice;
+        }
+
+        utterance.lang = "bn-BD";
+        utterance.rate = 0.95;
+        utterance.volume = 1.0;
+        
+        // Speak!
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error("Speech Synthesis Error:", err);
+      }
     }
+  };
+
+  const formatBanglaAmount = (amount?: number) => {
+    if (amount === undefined || amount === null) return '';
+    const englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    let text = String(amount);
+    for (let i = 0; i < 10; i++) {
+      text = text.replace(new RegExp(englishDigits[i], 'g'), banglaDigits[i]);
+    }
+    return `, পরিমাণ ${text} টাকা`;
   };
   // Store Management state variables
   const [adminProducts, setAdminProducts] = useState<StoreProduct[]>([]);
@@ -536,11 +570,39 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   useEffect(() => {
     const q = query(collection(db, 'admin_requests'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!initialReqLoadRef.current) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data() as Transaction;
+            if (data.status === 'Pending') {
+              let msg = 'নতুন রিকোয়েস্ট এসেছে';
+              if (data.type === 'CashIn') {
+                msg = 'নতুন অ্যাড ফান্ড রিকোয়েস্ট এসেছে';
+              } else if (data.type === 'Recharge') {
+                msg = 'নতুন ফ্লেক্সিলোড রিকোয়েস্ট এসেছে';
+              } else if (data.type === 'Bill') {
+                msg = 'নতুন বিল পে রিকোয়েস্ট এসেছে';
+              } else if (data.type === 'Voucher') {
+                msg = 'নতুন গেমিং ভাউচার রিকোয়েস্ট এসেছে';
+              } else if (data.type === 'Transfer') {
+                msg = 'নতুন ব্যালেন্স ট্রান্সফার রিকোয়েস্ট এসেছে';
+              }
+              const amtStr = formatBanglaAmount(data.amount);
+              speak(`${msg}${amtStr}`);
+            }
+          }
+        });
+      }
+
       const list: Transaction[] = [];
       snapshot.forEach((snap) => {
         list.push({ ...snap.data(), id: snap.id } as Transaction);
       });
       setPendingRequests(list);
+
+      if (initialReqLoadRef.current) {
+        initialReqLoadRef.current = false;
+      }
     }, (error) => {
       console.error("Error loading admin requests: ", error);
     });
@@ -689,7 +751,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           if (change.type === 'added') {
              const data = change.doc.data() as StoreOrder;
              if (data.status === 'Pending') {
-                 speak('দোকানের নতুন অর্ডারের রিকোয়েস্ট এসেছে');
+                 const amtStr = formatBanglaAmount(data.totalPrice);
+                 speak(`দোকানের নতুন অর্ডারের রিকোয়েস্ট এসেছে${amtStr}`);
              }
           }
         });
@@ -2118,6 +2181,71 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   <span className="text-[10px] text-blue-400 font-bold hover:text-blue-300 transition-colors">
                     {lang === 'bn' ? 'রিয়েল-টাইমে আপডেট হচ্ছে' : 'Listening Live via snapshots'}
                   </span>
+                </div>
+
+                {/* Voice Assistant Controls */}
+                <div className="bg-slate-900/60 border border-white/5 p-3.5 rounded-2xl flex flex-col sm:flex-row gap-3 items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isVoiceEnabled ? 'bg-blue-500/10 text-blue-400 border border-blue-500/15' : 'bg-slate-800 text-slate-500'}`}>
+                      <Volume2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-black text-slate-100 flex items-center gap-1.5">
+                        {lang === 'bn' ? 'ভয়েস নোটিফিকেশন' : 'Voice Notification Assistant'}
+                        <span className={`inline-block w-2 h-2 rounded-full ${isVoiceEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                      </h5>
+                      <p className="text-[10px] text-slate-400 leading-normal">
+                        {lang === 'bn' 
+                          ? 'নতুন অ্যাড ফান্ড, ফ্লেক্সিলোড বা বিল পে রিকোয়েস্টের বাংলা ঘোষণা।' 
+                          : 'Announces new orders, flexiloads, or bill pays in Bangla.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextState = !isVoiceEnabled;
+                        setIsVoiceEnabled(nextState);
+                        localStorage.setItem('admin_voice_enabled', String(nextState));
+                        if (nextState) {
+                          // Trigger a silent speak to unblock browser sound rules
+                          setTimeout(() => {
+                            speak(lang === 'bn' ? 'ভয়েস সহকারী সক্রিয় করা হয়েছে' : 'Voice assistant activated');
+                          }, 100);
+                        }
+                      }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isVoiceEnabled 
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/45' 
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {isVoiceEnabled 
+                        ? (lang === 'bn' ? 'ভয়েস অন' : 'Voice On') 
+                        : (lang === 'bn' ? 'ভয়েস অফ' : 'Voice Off')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Force speak even if isVoiceEnabled is false for testing
+                        if ("speechSynthesis" in window) {
+                          window.speechSynthesis.cancel();
+                          const utterance = new SpeechSynthesisUtterance(lang === 'bn' ? 'বাংলা নোটিফিকেশন সিস্টেম চমৎকারভাবে কাজ করছে' : 'Bangla voice assistant is working properly');
+                          const voices = window.speechSynthesis.getVoices();
+                          const bnVoice = voices.find(v => v.lang.startsWith('bn'));
+                          if (bnVoice) utterance.voice = bnVoice;
+                          utterance.lang = "bn-BD";
+                          utterance.rate = 0.95;
+                          window.speechSynthesis.speak(utterance);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-lg shadow-blue-950/45"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      {lang === 'bn' ? 'টেস্ট ভয়েস' : 'Test Voice'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Advanced Filter Toolbar */}
