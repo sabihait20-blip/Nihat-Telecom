@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Tesseract from 'tesseract.js';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
@@ -313,7 +314,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'scratch'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
@@ -447,6 +448,18 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [adminReplyText, setAdminReplyText] = useState('');
   
+  // Scratch Cards Management State
+  const [scratchCards, setScratchCards] = useState<any[]>([]);
+  const [scratchForm, setScratchForm] = useState({
+    operator: 'Grameenphone',
+    title: '1 GB + 20 Min',
+    price: 20,
+    pin: '',
+    validity: '২ দিন'
+  });
+  const [editingScratchId, setEditingScratchId] = useState<string | null>(null);
+  const [isScanningPin, setIsScanningPin] = useState(false);
+  
   // Dynamic collections loaders
   const [offers, setOffers] = useState<RechargePackage[]>([]);
   const [banners, setBanners] = useState<PromoBanner[]>([]);
@@ -549,6 +562,23 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       setBanners(list);
     }, (error) => {
       console.error("Error loading banners inside admin panel: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 3.1 Listen for scratch cards
+  useEffect(() => {
+    const q = collection(db, 'scratch_cards');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ id: snap.id, ...snap.data() });
+      });
+      list.sort((a, b) => b.createdAt - a.createdAt);
+      setScratchCards(list);
+    }, (error) => {
+      console.error("Error loading scratch cards inside admin panel: ", error);
     });
 
     return () => unsubscribe();
@@ -699,12 +729,25 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       // If CashIn (Add Fund), increment customer wallet balance
       if (tx.type === 'CashIn') {
         const balanceDocRef = doc(db, 'users', tx.userId, 'wallet', 'balance_doc');
-        const balanceSnap = await getDoc(balanceDocRef);
+        const userProfileRef = doc(db, 'registered_users', tx.userId);
+        
+        const [balanceSnap, profileSnap] = await Promise.all([
+          getDoc(balanceDocRef),
+          getDoc(userProfileRef)
+        ]);
+        
         let curBalance = 0;
+        let curGiven = 0;
         if (balanceSnap.exists()) {
           curBalance = balanceSnap.data().balance || 0;
         }
-        batch.set(balanceDocRef, { balance: curBalance + tx.amount });
+        if (profileSnap.exists()) {
+          curGiven = parseFloat(profileSnap.data().totalGiven + '') || 0;
+        }
+        
+        const newBalance = curBalance + tx.amount;
+        batch.set(balanceDocRef, { balance: newBalance });
+        batch.set(userProfileRef, { balance: newBalance, totalGiven: curGiven + tx.amount }, { merge: true });
 
         // Add a friendly success notification to the user
         const notifId = `notif-${Date.now()}`;
@@ -1250,8 +1293,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       let newBalance = selectedUserBalance;
       let typeText = '';
       let typeTextBn = '';
+      let addedAmount = 0;
+      
       if (userBalanceAdjustType === 'increment') {
         newBalance += amount;
+        addedAmount = amount;
         typeText = 'Balance Added by Admin';
         typeTextBn = 'অ্যাডমিন কর্তৃক ব্যালেন্স যোগ করা হয়েছে';
       } else if (userBalanceAdjustType === 'decrement') {
@@ -1263,6 +1309,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         typeText = 'Balance Deducted by Admin';
         typeTextBn = 'অ্যাডমিন কর্তৃক ব্যালেন্স কেটে নেওয়া হয়েছে';
       } else {
+        if (amount > selectedUserBalance) {
+          addedAmount = amount - selectedUserBalance;
+        }
         newBalance = amount;
         typeText = 'Balance Set by Admin';
         typeTextBn = 'অ্যাডমিন কর্তৃক ব্যালেন্স সেট করা হয়েছে';
@@ -1273,6 +1322,12 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       // 1. Update wallet balance
       const balanceRef = doc(db, 'users', selectedUser.uid, 'wallet', 'balance_doc');
       batch.set(balanceRef, { balance: newBalance });
+      
+      // Update the user's profile with new balance and totalGiven tracker
+      const currentGiven = parseFloat(selectedUser.totalGiven + '') || 0;
+      const newTotalGiven = currentGiven + addedAmount;
+      const userProfileRef = doc(db, 'registered_users', selectedUser.uid);
+      batch.set(userProfileRef, { balance: newBalance, totalGiven: newTotalGiven }, { merge: true });
 
       // 2. Add custom transaction log to history list
       const txId = 'ADJ-' + Math.floor(100000 + Math.random() * 900000);
@@ -1348,6 +1403,137 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       alert('Error: ' + err.message);
     } finally {
       setIsSendingNotif(false);
+    }
+  };
+
+  const toBnDigits = (text: string) => {
+    return text.replace(/[0-9]/g, d => "০১২৩৪৫৬৭৮৯"[parseInt(d)]);
+  };
+
+  const parseTitle = (title: string) => {
+    const match = title.match(/^(\d+)\s*(.*)$/);
+    if (match) {
+      return {
+        number: match[1],
+        rest: match[2]
+      };
+    }
+    return { number: '', rest: title };
+  };
+
+  const renderOperatorLogo = (op: string) => {
+    const lo = op.toLowerCase();
+    let src = '';
+    if (lo.includes('grameen') || lo.includes('gp')) src = 'input_file_1.png';
+    else if (lo.includes('banglalink') || lo.includes('bl')) src = 'input_file_0.png';
+    else if (lo.includes('robi')) src = 'input_file_2.png';
+    else if (lo.includes('airtel')) src = 'input_file_3.png';
+    else if (lo.includes('teletalk')) src = 'input_file_4.png';
+
+    if (src) {
+      return (
+        <img 
+          src={src} 
+          alt={op} 
+          className="w-10 h-10 object-contain" 
+          referrerPolicy="no-referrer"
+        />
+      );
+    }
+
+    return (
+      <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 text-xs font-black">
+        {op.slice(0, 2).toUpperCase()}
+      </div>
+    );
+  };
+
+  const localizeOperatorName = (op: string) => {
+    const lo = op.toLowerCase();
+    if (lo.includes('grameen') || lo.includes('gp')) return lang === 'bn' ? 'গ্রামীণফোন' : 'Grameenphone';
+    if (lo.includes('robi')) return lang === 'bn' ? 'রবি' : 'Robi';
+    if (lo.includes('banglalink') || lo.includes('bl')) return lang === 'bn' ? 'বাংলালিংক' : 'Banglalink';
+    if (lo.includes('airtel')) return lang === 'bn' ? 'এয়ারটেল' : 'Airtel';
+    if (lo.includes('teletalk')) return lang === 'bn' ? 'টেলিটক' : 'Teletalk';
+    return op;
+  };
+
+  const handleScanPin = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningPin(true);
+    try {
+      const result = await Tesseract.recognize(file, 'eng');
+      const text = result.data.text;
+      const digits = text.replace(/\D/g, '');
+      if (digits.length > 0) {
+        setScratchForm(prev => ({ ...prev, pin: digits }));
+        alert(lang === 'bn' ? 'স্ক্যান সফল হয়েছে!' : 'PIN extracted successfully!');
+      } else {
+        alert(lang === 'bn' ? 'পিন নম্বর খুঁজে পাওয়া যায়নি!' : 'Could not find PIN in image.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('OCR Error: ' + err.message);
+    }
+    setIsScanningPin(false);
+  };
+
+  const handleSaveScratchCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scratchForm.pin) {
+      alert(lang === 'bn' ? 'পিন নম্বর দিন' : 'Enter PIN number');
+      return;
+    }
+    setLoading(true);
+    try {
+      if (editingScratchId) {
+        const cardRef = doc(db, 'scratch_cards', editingScratchId);
+        await updateDoc(cardRef, scratchForm);
+        setEditingScratchId(null);
+      } else {
+        const id = 'sc-' + Date.now();
+        const cardRef = doc(db, 'scratch_cards', id);
+        await setDoc(cardRef, {
+          ...scratchForm,
+          status: 'available',
+          createdAt: Date.now()
+        });
+      }
+      setScratchForm({
+        operator: 'Grameenphone',
+        title: '1 GB + 20 Min',
+        price: 20,
+        pin: '',
+        validity: '২ দিন'
+      });
+      alert(lang === 'bn' ? 'স্ক্র্যাচ কার্ড সফলভাবে সংরক্ষিত হয়েছে' : 'Scratch card successfully saved!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Error: ' + err.message);
+    }
+    setLoading(false);
+  };
+
+  const handleEditScratchCard = (card: any) => {
+    setScratchForm({
+      operator: card.operator,
+      title: card.title,
+      price: card.price,
+      pin: card.pin,
+      validity: card.validity || '২ দিন'
+    });
+    setEditingScratchId(card.id);
+  };
+
+  const handleDeleteScratchCard = async (id: string) => {
+    if (window.confirm(lang === 'bn' ? 'মুছে ফেলতে চান?' : 'Delete this scratch card?')) {
+      try {
+        await deleteDoc(doc(db, 'scratch_cards', id));
+      } catch (err: any) {
+        alert('Error: ' + err.message);
+      }
     }
   };
 
@@ -1667,6 +1853,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             <ShoppingBag className="h-3.5 w-3.5" />
             <span>{lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders'} ({adminOrders.filter(o => o.status === 'Pending').length})</span>
           </button>
+          <button
+            onClick={() => setActiveSubTab('scratch')}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeSubTab === 'scratch' 
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+            }`}
+          >
+            <CreditCard className="h-3.5 w-3.5" />
+            <span>{lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Cards'}</span>
+          </button>
         </div>
 
         {/* Scrollable Workspace panel viewport */}
@@ -1688,6 +1885,25 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             const totalSuccessfulDebits = pendingRequests
               .filter(r => r.status === 'Success' && (r.type === 'Recharge' || r.type === 'Bill'))
               .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);
+
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+
+            const todayRequests = pendingRequests.filter(r => {
+              if (!r.date) return false;
+              const dateObj = new Date(r.date);
+              return dateObj >= startOfToday;
+            });
+
+            const todayCashIns = todayRequests
+              .filter(r => r.status === 'Success' && r.type === 'CashIn')
+              .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);
+
+            const todayDebits = todayRequests
+              .filter(r => r.status === 'Success' && (r.type === 'Recharge' || r.type === 'Bill'))
+              .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);
+            
+            const allTimeAdded = registeredUsers.reduce((acc, u) => acc + (parseFloat(u.totalGiven + '') || 0), 0);
 
             return (
               <>
@@ -1763,49 +1979,49 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
                     <div>
                       <span className="text-[8px] font-black tracking-wider text-emerald-400 uppercase opacity-90 block">
-                        {lang === 'bn' ? 'মোট ডিপোজিট ভলিউম' : 'Net Deposit Volume'}
+                        {lang === 'bn' ? 'আজকের যোগকৃত ফান্ড' : 'Today Added'}
                       </span>
                       <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
-                        ৳{totalSuccessfulCashIns.toLocaleString()}
+                        ৳{todayCashIns.toLocaleString()}
                       </span>
                     </div>
                     <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
-                      IN
+                      TODAY
                     </span>
                   </div>
 
                   <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
                     <div>
                       <span className="text-[8px] font-black tracking-wider text-rose-400 uppercase opacity-90 block">
-                        {lang === 'bn' ? 'মোট পরিশোধিত ব্যালেন্স' : 'Disbursed Out'}
+                        {lang === 'bn' ? 'আজকের বিক্রয়/খরচ' : 'Today Sales'}
                       </span>
                       <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
-                        ৳{totalSuccessfulDebits.toLocaleString()}
+                        ৳{todayDebits.toLocaleString()}
                       </span>
                     </div>
                     <span className="text-[8px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
-                      OUT
+                      TODAY
                     </span>
                   </div>
 
                   <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
                     <div>
                       <span className="text-[8px] font-black tracking-wider text-blue-400 uppercase opacity-90 block">
-                        {lang === 'bn' ? 'মোট ট্রানজেকশন ভলিউম' : 'Approved Volume'}
+                        {lang === 'bn' ? 'মোট দেওয়া ফান্ড' : 'Total Added'}
                       </span>
                       <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
-                        ৳{totalApprovedVolume.toLocaleString()}
+                        ৳{allTimeAdded.toLocaleString()}
                       </span>
                     </div>
                     <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
-                      TXS
+                      ALL
                     </span>
                   </div>
 
                   <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
                     <div>
                       <span className="text-[8px] font-black tracking-wider text-violet-400 uppercase opacity-90 block">
-                        {lang === 'bn' ? 'গ্রাহকদের মোট ফান্ড' : 'Customer Credit'}
+                        {lang === 'bn' ? 'সর্বমোট ইউজার ব্যালেন্স' : 'Total User Balance'}
                       </span>
                       <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
                         ৳{totalUserBalance.toLocaleString()}
@@ -3257,13 +3473,23 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                     : 'bg-slate-950/20 hover:bg-slate-950/40 border-white/5 text-slate-300 hover:text-white'
                                 }`}
                               >
-                                <div className="space-y-1 pr-2 truncate">
-                                  <h4 className="text-xs font-black truncate">
-                                    {userObj.displayName}
-                                  </h4>
-                                  <p className={`text-[10px] font-mono truncate ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                                    {userObj.phone ? `📱 ${userObj.phone}` : `✉️ ${userObj.email}`}
-                                  </p>
+                                <div className="space-y-1 pr-2 truncate flex-1">
+                                  <div className="flex items-center justify-between mr-2">
+                                    <h4 className="text-xs font-black truncate">
+                                      {userObj.displayName}
+                                    </h4>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-green-500/10 text-green-400'}`}>
+                                      ৳{(parseFloat(userObj.balance + '') || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-1 mr-2">
+                                    <p className={`text-[10px] font-mono truncate ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                                      {userObj.phone ? `📱 ${userObj.phone}` : `✉️ ${userObj.email}`}
+                                    </p>
+                                    <span className={`text-[9px] font-black tracking-wide ${isSelected ? 'text-blue-200' : 'text-emerald-500'}`}>
+                                      IN: ৳{(parseFloat(userObj.totalGiven + '') || 0).toLocaleString()}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="text-right shrink-0">
                                   <span className={`text-[9px] font-bold block ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
@@ -4307,6 +4533,194 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 6. SCRATCH CARDS MANAGEMENT */}
+          {activeSubTab === 'scratch' && (
+            <div className="space-y-6">
+              <div className="bg-slate-900 border border-white/5 rounded-3xl p-6">
+                <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4">
+                  <h3 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-orange-500" />
+                    <span>{lang === 'bn' ? 'স্ক্র্যাচ কার্ড ম্যানেজমেন্ট' : 'Manage Scratch Cards'}</span>
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-950/40 border border-white/5 p-5 rounded-2xl">
+                    <h4 className="text-xs font-black text-slate-300 mb-4">{lang === 'bn' ? 'নতুন কার্ড যোগ করুন' : 'Add New Scratch Card'}</h4>
+                    <form onSubmit={handleSaveScratchCard} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Operator</label>
+                          <select
+                            value={scratchForm.operator}
+                            onChange={(e) => setScratchForm({...scratchForm, operator: e.target.value})}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                          >
+                            <option value="Grameenphone">Grameenphone</option>
+                            <option value="Banglalink">Banglalink</option>
+                            <option value="Robi">Robi</option>
+                            <option value="Airtel">Airtel</option>
+                            <option value="Teletalk">Teletalk</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Price</label>
+                          <input
+                            type="number"
+                            required
+                            value={scratchForm.price}
+                            onChange={(e) => setScratchForm({...scratchForm, price: Number(e.target.value)})}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Title / Package Details</label>
+                        <input
+                          type="text"
+                          required
+                          value={scratchForm.title}
+                          onChange={(e) => setScratchForm({...scratchForm, title: e.target.value})}
+                          placeholder="e.g. 1 GB + 20 Min or 50 Tk Recharge"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-between">
+                          <span>Secret PIN</span>
+                          <label className="flex items-center gap-1 text-orange-400 hover:text-orange-300 cursor-pointer">
+                            <Plus className="h-3 w-3" />
+                            <span>Scan with Camera</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              capture="environment"
+                              className="hidden" 
+                              onChange={handleScanPin}
+                            />
+                          </label>
+                        </label>
+                        {isScanningPin && (
+                          <div className="text-[10px] text-orange-500 animate-pulse font-bold">Scanning image with OCR...</div>
+                        )}
+                        <input
+                          type="text"
+                          required
+                          value={scratchForm.pin}
+                          onChange={(e) => setScratchForm({...scratchForm, pin: e.target.value})}
+                          placeholder="Enter PIN number"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Validity</label>
+                        <input
+                          type="text"
+                          value={scratchForm.validity}
+                          onChange={(e) => setScratchForm({...scratchForm, validity: e.target.value})}
+                          placeholder="e.g., ২ দিন"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={isProcessing === 'scratch'}
+                          className="flex-1 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-orange-600/20 disabled:opacity-50"
+                        >
+                          {editingScratchId ? (lang === 'bn' ? 'আপডেট করুন' : 'Update Card') : (lang === 'bn' ? 'সেভ করুন' : 'Save Scratch Card')}
+                        </button>
+                        {editingScratchId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingScratchId(null);
+                              setScratchForm({ operator: 'Grameenphone', title: '1 GB + 20 Min', price: 20, pin: '', validity: '২ দিন' });
+                            }}
+                            className="bg-slate-800 hover:bg-slate-700 text-white px-4 rounded-xl text-xs font-black transition-all"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+
+                  <div className="bg-slate-950/40 border border-white/5 p-5 rounded-2xl flex flex-col h-[500px]">
+                    <h4 className="text-xs font-black text-slate-300 mb-4">{lang === 'bn' ? 'কার্ড তালিকা' : 'Inventory List'}</h4>
+                    <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                      {scratchCards.map((card) => {
+                        const parsed = parseTitle(card.title);
+
+                        return (
+                          <div key={card.id} className="aspect-[3.5/1] w-full bg-gradient-to-br from-[#006a4e] to-[#f42a41] rounded-xl shadow-md border-2 border-white p-3 flex flex-col justify-between text-white select-none relative overflow-hidden">
+                            {/* Top Section */}
+                            <div className="flex justify-between items-center relative z-10">
+                              <div className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-white/10 uppercase">
+                                {localizeOperatorName(card.operator)}
+                              </div>
+                              <div className="text-sm font-black drop-shadow-md flex items-center gap-1.5">
+                                <span className="opacity-80 text-xs">৳</span>
+                                <span>{card.price}</span>
+                                <span className="text-[10px] font-bold opacity-70 ml-1">
+                                  ({parsed.number || card.title} {parsed.rest})
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Middle: PIN Area */}
+                            <div className="bg-white py-1.5 rounded-lg text-center relative border border-white/30 shadow-inner group-hover:bg-white transition-colors">
+                              <p className="text-[11px] font-mono font-black text-slate-800 tracking-wider">
+                                {card.pin.split('').map((char, i) => (
+                                  <span key={i} className={i % 4 === 0 && i !== 0 ? 'ml-2' : ''}>{char}</span>
+                                ))}
+                              </p>
+                              <div className="absolute top-1 right-2">
+                                <div className={`w-2 h-2 rounded-full ${card.status === 'sold' ? 'bg-rose-500' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse'}`} />
+                              </div>
+                            </div>
+
+                            {/* Bottom Section */}
+                            <div className="flex justify-between items-center text-[9px] font-bold opacity-90 relative z-10">
+                              <div className="flex items-center gap-2">
+                                <span className="bg-white/10 px-1.5 rounded uppercase">{card.status}</span>
+                                <span>*১২১*পিন#</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[8px] opacity-60">{localizeOperatorName(card.operator)}</span>
+                                <button
+                                  onClick={() => handleEditScratchCard(card)}
+                                  className="p-1.5 bg-white/20 hover:bg-orange-500 text-white rounded-lg transition-all shadow-sm"
+                                  title="Edit Card"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteScratchCard(card.id)}
+                                  className="p-1.5 bg-white/20 hover:bg-rose-600 text-white rounded-lg transition-all shadow-sm"
+                                  title="Delete Card"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Glossy overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

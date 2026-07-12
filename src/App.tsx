@@ -4,7 +4,7 @@ import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
   Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare,
-  Calculator
+  Calculator, CreditCard
 } from 'lucide-react';
 
 // Data types & assets
@@ -26,7 +26,8 @@ import {
   deleteDoc,
   query,
   orderBy,
-  writeBatch
+  writeBatch,
+  updateDoc
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -45,6 +46,7 @@ import AddFundModal from './components/AddFundModal';
 import TransferModal from './components/TransferModal';
 import SecureLockModal from './components/SecureLockModal';
 import VoucherModal from './components/VoucherModal';
+import ScratchCardModal from './components/ScratchCardModal';
 import SupportModal from './components/SupportModal';
 import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
@@ -142,6 +144,7 @@ export default function App() {
 
   // Modal triggers
   const [isRechargeOpen, setIsRechargeOpen] = useState(false);
+  const [isScratchCardOpen, setIsScratchCardOpen] = useState(false);
   const [prefilledOp, setPrefilledOp] = useState<Operator | null>(null);
   const [prefilledAmt, setPrefilledAmt] = useState<number | null>(null);
 
@@ -323,10 +326,13 @@ export default function App() {
         const data = docSnap.data();
         if (typeof data.balance === 'number') {
           setBalance(data.balance);
+          // Sync balance to registered_users for admin panel
+          updateDoc(doc(db, 'registered_users', currentUser.uid), { balance: data.balance }).catch(() => {});
         }
       } else {
         // Initialize balance in Firestore
         setDoc(balanceDocRef, { balance: 0 });
+        setDoc(doc(db, 'registered_users', currentUser.uid), { balance: 0 }, { merge: true }).catch(() => {});
       }
     });
     return () => unsubscribe();
@@ -893,6 +899,11 @@ export default function App() {
     }
   };
 
+  const handleScratchCardSuccess = (amount: number) => {
+    // Balance and transaction are already handled in ScratchCardModal via writeBatch
+    // Firestore listener will auto-update the balance state.
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -914,6 +925,13 @@ export default function App() {
         setPrefilledAmt(null);
         setIsRechargeOpen(true);
       }
+    },
+    {
+      id: 'scratch_card',
+      title: lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Card',
+      icon: CreditCard,
+      color: 'bg-orange-50 text-orange-600 border border-orange-100/40 shadow-xs shadow-orange-500/2',
+      action: () => setIsScratchCardOpen(true)
     },
     {
       id: 'add_fund',
@@ -949,27 +967,6 @@ export default function App() {
       icon: ShoppingBag,
       color: 'bg-pink-50 text-[#e2125d] border border-pink-100/40 shadow-xs shadow-pink-500/2',
       action: () => setActiveTab('store')
-    },
-    {
-      id: 'voucher',
-      title: lang === 'bn' ? 'ভাউচার স্টোর' : 'Voucher Store',
-      icon: Gift,
-      color: 'bg-rose-50 text-rose-600 border border-rose-100/40 shadow-xs shadow-rose-500/2',
-      action: () => setIsVoucherOpen(true)
-    },
-    {
-      id: 'history',
-      title: t.transactionHistory,
-      icon: History,
-      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
-      action: () => setActiveTab('history')
-    },
-    {
-      id: 'cashout_calculator',
-      title: lang === 'bn' ? 'ক্যালকুলেটর' : 'Calculator',
-      icon: Calculator,
-      color: 'bg-orange-50 text-orange-600 border border-orange-100/40 shadow-xs shadow-orange-500/2',
-      action: () => setIsCashOutCalcOpen(true)
     },
     {
       id: 'support',
@@ -1033,43 +1030,46 @@ export default function App() {
         )}
 
         {/* 1. STICKY LEFT SIDEBAR */}
-        <aside className="w-72 bg-slate-900 text-white flex flex-col justify-between shrink-0 border-r border-slate-800 h-screen sticky top-0 p-5 z-20">
-          <div className="space-y-6">
+        <aside className="w-[280px] bg-slate-950 text-white flex flex-col justify-between shrink-0 border-r border-slate-800/60 h-screen sticky top-0 p-5 z-20 shadow-2xl relative overflow-hidden">
+          {/* Decorative background glows */}
+          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-900/20 to-transparent pointer-events-none" />
+          
+          <div className="space-y-8 relative z-10">
             {/* App Logo */}
-            <div className="flex items-center gap-3 px-2 py-1">
-              <div className="w-10 h-10 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md border border-white/10">
+            <div className="flex items-center gap-3.5 px-2">
+              <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 border border-white/10">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-md font-black tracking-tight text-white">{t.appName}</h1>
-                <span className="text-[9px] text-emerald-400 font-bold tracking-widest uppercase font-mono block">PRO EDITION</span>
+                <h1 className="text-lg font-black tracking-tight text-white">{t.appName}</h1>
+                <span className="text-[9px] text-blue-400 font-bold tracking-widest uppercase font-mono block">WORKSPACE</span>
               </div>
             </div>
 
             {/* User Wallet Card */}
             {currentUser && (
-              <div className="bg-gradient-to-br from-slate-850 to-slate-900 border border-slate-755 p-4 rounded-2xl shadow-lg space-y-3 relative overflow-hidden">
-                <div className="absolute top-0 right-0 h-16 w-16 bg-white/5 rounded-full translate-x-4 -translate-y-4 blur-md" />
+              <div className="bg-gradient-to-b from-slate-800/80 to-slate-900/90 backdrop-blur-md border border-slate-700/50 p-5 rounded-3xl shadow-xl space-y-4 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
                 <div className="flex items-center gap-3 relative z-10">
-                  <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center text-sm font-bold border border-white/20">
+                  <div className="w-11 h-11 bg-slate-800 rounded-2xl flex items-center justify-center text-sm font-bold border border-slate-600 shadow-inner">
                     {userInitials}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-200 truncate">{userName}</p>
-                    <span className="text-[10px] text-yellow-500 font-bold bg-white/5 px-2 py-0.5 rounded-full border border-white/5 inline-block mt-0.5">
+                    <p className="text-[13px] font-bold text-slate-200 truncate">{userName}</p>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20 inline-block mt-1 uppercase tracking-wider">
                       {t.userStatus}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800/60 relative z-10">
-                  <span className="text-[10px] text-slate-400 font-bold tracking-wide block uppercase mb-1">
+                <div className="pt-3 border-t border-slate-700/50 relative z-10">
+                  <span className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase mb-1.5 block">
                     {t.currBalance}
                   </span>
                   
                   <div className="flex items-center justify-between">
-                    <div className="bg-slate-900/45 border border-slate-800/40 rounded-xl px-3 py-1.5 flex items-center gap-2">
-                      <span className="text-md font-mono font-extrabold text-white">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-mono font-extrabold text-white tracking-tight">
                         {formatCurrency(balance)}
                       </span>
                     </div>
@@ -1077,9 +1077,9 @@ export default function App() {
                     <button
                       onClick={() => setIsAddFundOpen(true)}
                       title={lang === 'bn' ? 'টাকা যোগ করুন' : 'Add Fund'}
-                      className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-md active:scale-95 cursor-pointer"
+                      className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-lg shadow-blue-600/30 active:scale-95 cursor-pointer"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-4 w-4 stroke-[3]" />
                     </button>
                   </div>
                 </div>
@@ -1087,7 +1087,7 @@ export default function App() {
             )}
 
             {/* Sidebar Navigation Items */}
-            <nav className="space-y-1">
+            <nav className="space-y-1.5">
               {[
                 { id: 'home' as AppTab, label: t.home, icon: Home },
                 { id: 'store' as AppTab, label: lang === 'bn' ? 'স্টোর' : 'Store', icon: ShoppingBag },
@@ -1101,16 +1101,16 @@ export default function App() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[13px] font-bold transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/15'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        ? 'bg-blue-600/10 text-blue-400 shadow-inner border border-blue-500/20'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
                     }`}
                   >
-                    <Icon className="h-4.5 w-4.5" />
+                    <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
                     <span>{tab.label}</span>
                     {isActive && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />
+                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
                     )}
                   </button>
                 );
@@ -1167,18 +1167,21 @@ export default function App() {
         </aside>
 
         {/* 2. MAIN SCROLLABLE CONTENT AREA */}
-        <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
+        <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f8f9fc] relative">
+          {/* Subtle background ambient blur */}
+          <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-blue-400/5 rounded-full blur-[100px] pointer-events-none" />
+          
           {/* Top Bar Navigation */}
-          <header className="bg-white border-b border-slate-200/50 px-8 py-4.5 flex items-center justify-between">
+          <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 px-10 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-200/20">
             <div>
-              <h2 className="text-slate-900 font-extrabold text-base tracking-tight font-display">
+              <h2 className="text-slate-900 font-black text-[1.35rem] tracking-tight font-display drop-shadow-sm">
                 {activeTab === 'home' && (lang === 'bn' ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard Overview')}
                 {activeTab === 'packages' && t.packages}
                 {activeTab === 'history' && t.history}
                 {activeTab === 'profile' && t.profile}
               </h2>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {activeTab === 'home' && (lang === 'bn' ? 'আপনার নিহাদ টেলিকম পোর্টালে স্বাগতম' : 'Welcome to your premium Nihad Telecom portal')}
+              <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+                {activeTab === 'home' && (lang === 'bn' ? 'আপনার নিহাদ টেলিকম পোর্টালে স্বাগতম' : 'Welcome to your premium Nihad Telecom workspace')}
                 {activeTab === 'packages' && (lang === 'bn' ? 'সেরা অফার ও বান্ডেল চেক করুন' : 'Check out top-tier cellular recharge packages')}
                 {activeTab === 'history' && (lang === 'bn' ? 'সকল মোবাইল রিচার্জ ও বিল বিবরণী' : 'View secure logs and ledgers for references')}
                 {activeTab === 'profile' && (lang === 'bn' ? 'প্রোফাইল সেটিংস ও সাপোর্ট' : 'Manage your billing settings and account parameters')}
@@ -1186,17 +1189,17 @@ export default function App() {
             </div>
 
             {/* Toolbar Items */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {/* Notification icon */}
               <button
                 onClick={() => setIsNotificationsOpen(true)}
-                className="relative p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-all cursor-pointer shadow-xs"
+                className="relative p-2.5 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 transition-all cursor-pointer shadow-sm hover:shadow active:scale-95"
               >
-                <Bell className="h-4.5 w-4.5" />
+                <Bell className="h-5 w-5 stroke-[2]" />
                 {unreadNotifications && (
-                  <span className="absolute top-1 right-1 flex h-2 w-2">
+                  <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
                   </span>
                 )}
               </button>
@@ -1204,23 +1207,23 @@ export default function App() {
           </header>
 
           {/* Dynamic Scrollable Working Space */}
-          <div className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-6xl mx-auto space-y-6">
+          <div className="flex-1 overflow-y-auto p-10 relative z-0">
+            <div className="max-w-[1400px] mx-auto space-y-8">
 
               {activeTab === 'home' && (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   {/* Dynamic Warning Marquee notice ticker */}
                   {appConfig.showNotice && (
-                    <div id="notice-ticker" className="bg-amber-500/10 border border-amber-500/20 rounded-2xl py-2 px-4 flex items-center gap-3 overflow-hidden shadow-xs">
-                      <div className="p-1 px-1.5 bg-amber-500/10 border border-amber-500/10 text-amber-600 rounded-lg shrink-0 flex items-center justify-center gap-1.5 font-bold text-[10px] tracking-wide uppercase">
+                    <div id="notice-ticker" className="bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl py-2.5 px-4 flex items-center gap-3 overflow-hidden shadow-sm">
+                      <div className="p-1 px-2 bg-amber-500/15 border border-amber-500/20 text-amber-700 rounded-lg shrink-0 flex items-center justify-center gap-2 font-bold text-[10.5px] tracking-widest uppercase">
                         <span className="relative flex h-1.5 w-1.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
                         </span>
                         <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
                       </div>
                       <div className="flex-1 overflow-hidden relative">
-                        <div className="animate-marquee whitespace-nowrap text-slate-700 text-[11px] font-bold font-sans">
+                        <div className="animate-marquee whitespace-nowrap text-amber-900/80 text-[12px] font-bold font-sans">
                           {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
                         </div>
                       </div>
@@ -1228,7 +1231,7 @@ export default function App() {
                   )}
 
                   {/* Banner promotions on top */}
-                  <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">
+                  <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-5 shadow-sm hover:shadow-md transition-shadow">
                     <Banners
                       lang={lang}
                       banners={dbBanners}
@@ -1237,21 +1240,24 @@ export default function App() {
                   </div>
 
                   {/* Desktop Interactive Service Deck */}
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-5">
                     {gridServices.map((srv) => {
                       const Icon = srv.icon;
                       return (
                         <button
                           key={srv.id}
                           onClick={srv.action}
-                          className="bg-white border border-slate-200/50 hover:border-blue-200 hover:shadow-md hover:scale-102 active:scale-98 rounded-3xl p-6 transition-all flex flex-col items-center justify-center text-center group cursor-pointer"
+                          className="bg-white border border-slate-200/60 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 rounded-[2rem] p-7 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[150px] relative overflow-hidden"
                         >
-                          <div className={`h-14 w-14 rounded-2xl flex items-center justify-center group-hover:shadow-md transition-all mb-3 ${srv.color}`}>
-                            <Icon className="h-6 w-6 stroke-[2.25]" />
+                          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-40 transition-opacity duration-500 ${srv.color}`} />
+                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 shadow-sm ${srv.color}`}>
+                            <Icon className="h-5 w-5 stroke-[2.25]" />
                           </div>
-                          <h3 className="text-xs font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors">
-                            {srv.title}
-                          </h3>
+                          <div>
+                            <h3 className="text-[14px] font-black text-slate-800 group-hover:text-blue-600 transition-colors tracking-tight">
+                              {srv.title}
+                            </h3>
+                          </div>
                         </button>
                       );
                     })}
@@ -1260,7 +1266,7 @@ export default function App() {
                   {/* Split Layout of Additional widgets */}
                   <div className="grid grid-cols-12 gap-6">
                     {/* Left Pane: Favorites list */}
-                    <div className="col-span-12 xl:col-span-7 bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                    <div className="col-span-12 xl:col-span-7 bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
                       <FavoritesGrid
                         favorites={favorites}
                         onSelectContact={handleSelectFavorite}
@@ -1271,7 +1277,7 @@ export default function App() {
                     </div>
 
                     {/* Right Pane: Compact ledger list */}
-                    <div className="col-span-12 xl:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
+                    <div className="col-span-12 xl:col-span-5 bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-slate-900 font-extrabold text-xs tracking-tight font-display">
@@ -1329,7 +1335,7 @@ export default function App() {
               )}
 
               {activeTab === 'packages' && (
-                <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
                   <InternetPacks
                     lang={lang}
                     packages={dbOffers}
@@ -1339,7 +1345,7 @@ export default function App() {
               )}
 
               {activeTab === 'history' && (
-                <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
                   <HistoryList
                     transactions={transactions}
                     lang={lang}
@@ -1348,7 +1354,7 @@ export default function App() {
               )}
 
               {activeTab === 'store' && (
-                <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm flex flex-col h-[700px]">
+                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow flex flex-col h-[700px]">
                   <StorePanel
                     lang={lang}
                     walletBalance={balance}
@@ -1357,7 +1363,7 @@ export default function App() {
               )}
 
               {activeTab === 'profile' && (
-                <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
                   <ProfilePanel
                     lang={lang}
                     onLanguageToggle={handleLanguageToggle}
@@ -1716,6 +1722,16 @@ export default function App() {
               onSuccess={handleVoucherSuccess}
             />
           )}
+
+          {/* SCRATCH CARD STORE */}
+          <ScratchCardModal
+            lang={lang}
+            isOpen={isScratchCardOpen}
+            onClose={() => setIsScratchCardOpen(false)}
+            balance={balance}
+            uid={currentUser?.uid || null}
+            onSuccess={handleScratchCardSuccess}
+          />
 
           {/* CASHOUT CALCULATOR & SIMULATOR DIALOGUE */}
           {isCashOutCalcOpen && (
