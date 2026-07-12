@@ -346,7 +346,7 @@ export default function App() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const txList: Transaction[] = [];
       querySnapshot.forEach((docSnap) => {
-        txList.push(docSnap.data() as Transaction);
+        txList.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
       });
       setTransactions(txList);
     });
@@ -1293,9 +1293,9 @@ export default function App() {
                         </div>
 
                         <div className="space-y-2">
-                          {transactions.slice(0, 3).map((tx) => (
+                          {transactions.slice(0, 3).map((tx, index) => (
                             <div
-                              key={tx.id}
+                              key={tx.id || index}
                               className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors text-xs font-semibold"
                             >
                               <div className="flex items-center gap-3">
@@ -1573,9 +1573,9 @@ export default function App() {
                 </div>
 
                 <div className="bg-white border border-slate-100 rounded-[28px] p-4.5 shadow-sm space-y-1">
-                  {transactions.slice(0, 2).map((tx) => (
+                  {transactions.slice(0, 2).map((tx, index) => (
                     <div
-                      key={tx.id}
+                      key={tx.id || index}
                       className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold"
                     >
                       <div className="flex items-center gap-3">

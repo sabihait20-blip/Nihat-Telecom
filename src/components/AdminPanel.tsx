@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Tesseract from 'tesseract.js';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
@@ -319,6 +319,18 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
 
+  const initialReqLoadRef = useRef(true);
+  const initialSupportLoadRef = useRef(true);
+  const initialOrderLoadRef = useRef(true);
+
+  const speak = (text: string) => {
+    if ("speechSynthesis" in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "bn-BD";
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
   // Store Management state variables
   const [adminProducts, setAdminProducts] = useState<StoreProduct[]>([]);
   const [adminOrders, setAdminOrders] = useState<StoreOrder[]>([]);
@@ -621,6 +633,19 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   useEffect(() => {
     const q = collection(db, 'support_tickets');
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!initialSupportLoadRef.current) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+             speak('নতুন সাপোর্ট টিকিট এসেছে');
+          } else if (change.type === 'modified') {
+             const data = change.doc.data();
+             if (data.lastMessageSender === 'user' && data.status === 'Open') {
+                speak('সাপোর্ট টিকিটে নতুন মেসেজ এসেছে');
+             }
+          }
+        });
+      }
+
       const list: any[] = [];
       snapshot.forEach((snap) => {
         list.push({ ...snap.data(), id: snap.id });
@@ -628,6 +653,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       // Sort in-memory to prevent requiring composite index creation in emulator or firebase console
       list.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
       setSupportTickets(list);
+
+      if (initialSupportLoadRef.current) {
+         initialSupportLoadRef.current = false;
+      }
     }, (error) => {
       console.error("Error loading support tickets: ", error);
     });
@@ -655,6 +684,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   useEffect(() => {
     const q = collection(db, 'store_orders');
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!initialOrderLoadRef.current) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+             const data = change.doc.data() as StoreOrder;
+             if (data.status === 'Pending') {
+                 speak('দোকানের নতুন অর্ডারের রিকোয়েস্ট এসেছে');
+             }
+          }
+        });
+      }
+
       const list: StoreOrder[] = [];
       snapshot.forEach((snap) => {
         list.push({ ...snap.data(), id: snap.id } as StoreOrder);
@@ -662,6 +702,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       // Sort in-memory descending by date
       list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setAdminOrders(list);
+
+      if (initialOrderLoadRef.current) {
+         initialOrderLoadRef.current = false;
+      }
     }, (error) => {
       console.error("Error loading orders in admin panel: ", error);
     });
@@ -3709,13 +3753,13 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             {lang === 'bn' ? 'এই গ্রাহকের কোনো ট্রানজেকশন রেকর্ড নেই।' : 'No transaction logs present for this account.'}
                           </div>
                         ) : (
-                          selectedUserHistory.map((hTx) => {
+                          selectedUserHistory.map((hTx, index) => {
                             const isApproved = hTx.status === 'Approved';
                             const isRejected = hTx.status === 'Rejected';
                             const isCashIn = hTx.type === 'CashIn';
                             return (
                               <div
-                                key={hTx.id} 
+                                key={hTx.id || index} 
                                 className="bg-slate-950/30 border border-white/5 p-3 rounded-2xl flex justify-between items-center gap-2.5 text-slate-300"
                               >
                                 <div className="space-y-1 truncate">
