@@ -9,7 +9,7 @@ interface HistoryListProps {
 }
 
 export default function HistoryList({ transactions, lang }: HistoryListProps) {
-  const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher'>('All');
+  const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher' | 'ScratchCard'>('All');
   const [query, setQuery] = useState('');
   
   const t = TRANSLATIONS[lang];
@@ -42,6 +42,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         return 'bg-violet-50 text-violet-600 border-violet-100/50';
       case 'Voucher':
         return 'bg-rose-50 text-rose-600 border-rose-100/50';
+      case 'ScratchCard':
+        return 'bg-orange-50 text-orange-600 border-orange-100/50';
       default:
         return 'bg-slate-50 text-slate-500 border-slate-100';
     }
@@ -73,6 +75,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         return <ArrowUpRight className="h-4.5 w-4.5" />;
       case 'Voucher':
         return <Gift className="h-4.5 w-4.5" />;
+      case 'ScratchCard':
+        return <FileText className="h-4.5 w-4.5" />;
       default:
         return <FileText className="h-4.5 w-4.5" />;
     }
@@ -106,7 +110,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
 
       {/* Category horizontal tabs */}
       <div className="flex gap-2.5 border-b border-slate-100 pb-1 overflow-x-auto scrollbar-none">
-        {(['All', 'Recharge', 'Bill', 'CashIn', 'Transfer', 'Voucher'] as const).map((type) => {
+        {(['All', 'Recharge', 'Bill', 'CashIn', 'Transfer', 'Voucher', 'ScratchCard'] as const).map((type) => {
           const isActive = filter === type;
           let label: string = type;
           if (lang === 'bn') {
@@ -116,9 +120,11 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
             else if (type === 'CashIn') label = t.filterCashin;
             else if (type === 'Transfer') label = 'ব্যালেন্স ট্রান্সফার';
             else if (type === 'Voucher') label = 'গেমিং ও ওটিটি';
+            else if (type === 'ScratchCard') label = 'স্ক্র্যাচ কার্ড';
           } else {
             if (type === 'Transfer') label = 'Balance Transfer';
             else if (type === 'Voucher') label = 'Gaming & OTT';
+            else if (type === 'ScratchCard') label = 'Scratch Card';
           }
           return (
             <button
@@ -164,6 +170,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                             : `${tx.transferMethod} ${lang === 'bn' ? 'ট্রান্সফার' : 'Transfer'}`)
                         : tx.type === 'Voucher'
                         ? `${tx.voucherItem} ${lang === 'bn' ? 'ভাউচার' : 'Voucher'}`
+                        : tx.type === 'ScratchCard'
+                        ? `${tx.operator} ${lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Card'}`
                         : (tx.transferMethod === 'Received from User'
                             ? `${lang === 'bn' ? 'সেন্ড মানি গ্রহণ' : 'Money Received (P2P)'}`
                             : `${lang === 'bn' ? 'এড ফান্ড (ওয়ালেট রিচার্জ)' : 'Add Fund (Wallet Deposit)'}`)}
@@ -183,6 +191,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                             : (lang === 'bn' ? `প্রাপক নম্বর: ${tx.targetNumber}` : `Recipient Number: ${tx.targetNumber}`))
                         : tx.type === 'Voucher'
                         ? (lang === 'bn' ? `একাউন্ট/আইডি: ${tx.targetNumber} (${tx.voucherCode})` : `Account/ID: ${tx.targetNumber} (${tx.voucherCode})`)
+                        : tx.type === 'ScratchCard'
+                        ? (lang === 'bn' ? `প্যাকেজ: ${tx.details} | পিন: ${tx.voucherCode}` : `Package: ${tx.details} | PIN: ${tx.voucherCode}`)
                         : `${tx.targetNumber} (${tx.operator})`}
                     </span>
                   )}

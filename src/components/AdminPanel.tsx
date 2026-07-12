@@ -455,7 +455,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     title: '1 GB + 20 Min',
     price: 20,
     pin: '',
-    validity: '২ দিন'
+    validity: '২ দিন',
+    dialCode: '*১২১*পিন#'
   });
   const [editingScratchId, setEditingScratchId] = useState<string | null>(null);
   const [isScanningPin, setIsScanningPin] = useState(false);
@@ -1418,7 +1419,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         rest: match[2]
       };
     }
-    return { number: '', rest: title };
+    return { number: title, rest: '' };
   };
 
   const renderOperatorLogo = (op: string) => {
@@ -1506,7 +1507,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         title: '1 GB + 20 Min',
         price: 20,
         pin: '',
-        validity: '২ দিন'
+        validity: '২ দিন',
+        dialCode: '*১২১*পিন#'
       });
       alert(lang === 'bn' ? 'স্ক্র্যাচ কার্ড সফলভাবে সংরক্ষিত হয়েছে' : 'Scratch card successfully saved!');
     } catch (err: any) {
@@ -1522,7 +1524,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       title: card.title,
       price: card.price,
       pin: card.pin,
-      validity: card.validity || '২ দিন'
+      validity: card.validity || '২ দিন',
+      dialCode: card.dialCode || '*১২১*পিন#'
     });
     setEditingScratchId(card.id);
   };
@@ -4629,6 +4632,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         />
                       </div>
 
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Dial Code</label>
+                        <input
+                          type="text"
+                          value={scratchForm.dialCode}
+                          onChange={(e) => setScratchForm({...scratchForm, dialCode: e.target.value})}
+                          placeholder="e.g., *121*PIN#"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
+                        />
+                      </div>
+
                       <div className="flex gap-2">
                         <button
                           type="submit"
@@ -4642,7 +4656,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             type="button"
                             onClick={() => {
                               setEditingScratchId(null);
-                              setScratchForm({ operator: 'Grameenphone', title: '1 GB + 20 Min', price: 20, pin: '', validity: '২ দিন' });
+                              setScratchForm({ operator: 'Grameenphone', title: '1 GB + 20 Min', price: 20, pin: '', validity: '২ দিন', dialCode: '*১২১*পিন#' });
                             }}
                             className="bg-slate-800 hover:bg-slate-700 text-white px-4 rounded-xl text-xs font-black transition-all"
                           >
@@ -4690,8 +4704,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             {/* Bottom Section */}
                             <div className="flex justify-between items-center text-[9px] font-bold opacity-90 relative z-10">
                               <div className="flex items-center gap-2">
-                                <span className="bg-white/10 px-1.5 rounded uppercase">{card.status}</span>
-                                <span>*১২১*পিন#</span>
+                                <span className={`bg-white/10 px-1.5 rounded uppercase ${card.status === 'sold' ? 'text-rose-200' : 'text-emerald-200'}`}>{card.status === 'sold' ? 'USED' : 'AVAILABLE'}</span>
+                                <span>{card.dialCode || '*১২১*পিন#'}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-[8px] opacity-60">{localizeOperatorName(card.operator)}</span>

@@ -12,6 +12,7 @@ interface ScratchCard {
   price: number;
   pin: string;
   validity?: string;
+  dialCode?: string;
   status: 'available' | 'sold';
   createdAt: number;
 }
@@ -96,12 +97,14 @@ export default function ScratchCardModal({ isOpen, onClose, lang, balance, uid, 
       const txRef = doc(db, 'users', uid, 'transactions', txId);
       const txObj: Transaction = {
         id: txId,
-        type: 'Voucher',
+        type: 'ScratchCard',
+        operator: selectedCard.operator as any,
         amount: selectedCard.price,
         date: new Date().toISOString(),
         status: 'Success',
         targetNumber: selectedCard.operator + ' Scratch Card',
-        operator: 'GP', // Default operator to satisfy type
+        details: selectedCard.title,
+        voucherCode: selectedCard.pin,
         txId: txId
       };
       batch.set(txRef, txObj);
@@ -142,7 +145,7 @@ export default function ScratchCardModal({ isOpen, onClose, lang, balance, uid, 
         rest: match[2]
       };
     }
-    return { number: '', rest: title };
+    return { number: title, rest: '' };
   };
 
   const renderOperatorLogo = (op: string) => {
@@ -348,7 +351,7 @@ export default function ScratchCardModal({ isOpen, onClose, lang, balance, uid, 
                                         {lang === 'bn' ? `মেয়াদ: ${card.validity || '২ দিন'}` : `Validity: ${card.validity || '2 Days'}`}
                                       </div>
                                       <div className="flex items-center gap-1">
-                                        {lang === 'bn' ? 'ডায়াল: *১২১*পিন#' : 'Dial: *121*PIN#'}
+                                        {lang === 'bn' ? `ডায়াল: ${card.dialCode || '*১২১*পিন#'}` : `Dial: ${card.dialCode || '*121*PIN#'}`}
                                       </div>
                                     </div>
 

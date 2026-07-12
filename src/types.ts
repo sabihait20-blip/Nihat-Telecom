@@ -31,7 +31,7 @@ export interface RechargePackage {
 
 export interface Transaction {
   id: string;
-  type: 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher';
+  type: 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher' | 'ScratchCard';
   operator?: Operator;
   targetNumber?: string;
   senderNumber?: string;
@@ -48,6 +48,7 @@ export interface Transaction {
   transferMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)' | 'Received from User';
   voucherItem?: string;
   voucherCode?: string;
+  details?: string;
   voucherCategory?: 'Gaming' | 'OTT';
   note?: string;
 }
