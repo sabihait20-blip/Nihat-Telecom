@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Home, Inbox, User, ShoppingBag } from 'lucide-react';
+import { Home, Inbox, User, ShoppingBag, Gift } from 'lucide-react';
 import { AppTab, Language } from '../types';
 
 interface BottomNavProps {
@@ -25,7 +25,7 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
     },
     { 
       id: 'profile' as AppTab, 
-      label: lang === 'bn' ? 'আমার অ্যাকাউন্ট' : 'My Account', 
+      label: lang === 'bn' ? 'অ্যাকাউন্ট' : 'Account', 
       icon: User 
     },
     { 
@@ -47,8 +47,9 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
           const Icon = tab.icon;
           
           // Check active state
-          // If active tab is 'packages', we also highlight 'profile' (since Packages represent sub-recharges in My bKash)
-          const isActive = tab.id === activeTab || (activeTab === 'packages' && tab.id === 'profile');
+          // If active tab is 'packages' or 'referral', we also highlight 'profile' (since these represent sub-views of Profile)
+          const isActive = tab.id === activeTab || 
+                           ((activeTab === 'packages' || activeTab === 'referral') && tab.id === 'profile');
 
           return (
             <motion.button

@@ -83,7 +83,7 @@ export interface PromoBanner {
   imageUrl?: string;
 }
 
-export type AppTab = 'home' | 'packages' | 'history' | 'profile' | 'store';
+export type AppTab = 'home' | 'packages' | 'history' | 'profile' | 'store' | 'referral';
 
 export type Language = 'bn' | 'en';
 
@@ -117,4 +117,25 @@ export interface StoreOrder {
   deliveryAddress?: string;
   note?: string;
   rejectionReason?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  displayName: string;
+  email: string;
+  phone: string;
+  referralCode: string;
+  referredBy?: string;
+  createdAt: string;
+  kycStatus?: 'not_verified' | 'pending' | 'verified' | 'rejected';
+  kycData?: {
+    nidNumber: string;
+    fullName: string;
+    dob: string;
+    nidFrontUrl: string;
+    nidBackUrl: string;
+    submittedAt: string;
+    verifiedAt?: string;
+    rejectionReason?: string;
+  };
 }

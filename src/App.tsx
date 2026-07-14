@@ -52,6 +52,8 @@ import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
 import CashOutCalculatorModal from './components/CashOutCalculatorModal';
 import StorePanel from './components/StorePanel';
+import ReferralPanel from './components/ReferralPanel';
+import KYCModal from './components/KYCModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -73,6 +75,7 @@ interface NotificationItem {
 export default function App() {
   const [lang, setLang] = useState<Language>('bn');
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [isAppLocked, setIsAppLocked] = useState<boolean>(() => !!localStorage.getItem('secure_wallet_pin'));
   const [activeTab, setActiveTab] = useState<AppTab>('home');
@@ -154,6 +157,7 @@ export default function App() {
   const [isVoucherOpen, setIsVoucherOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isCashOutCalcOpen, setIsCashOutCalcOpen] = useState(false);
+  const [isKYCOpen, setIsKYCOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -168,10 +172,44 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      setAuthChecking(false);
+      if (!user) {
+        setUserData(null);
+        setAuthChecking(false);
+      }
     });
     return () => unsubscribe();
   }, []);
+
+  // User Data Listener
+  useEffect(() => {
+    if (!currentUser) return;
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserData(data);
+
+        // Synchronize KYC details and photoURL to registered_users immediately
+        const updatePayload: any = {};
+        if (data.kycStatus !== undefined) updatePayload.kycStatus = data.kycStatus;
+        if (data.kycData !== undefined) updatePayload.kycData = data.kycData;
+        if (data.photoURL !== undefined) updatePayload.photoURL = data.photoURL;
+        if (data.phone !== undefined) updatePayload.phone = data.phone;
+        if (data.displayName !== undefined) updatePayload.displayName = data.displayName;
+
+        if (Object.keys(updatePayload).length > 0) {
+          updateDoc(doc(db, 'registered_users', currentUser.uid), updatePayload).catch((err) => {
+            console.warn("Failed to sync profile to registered_users: ", err);
+          });
+        }
+      }
+      setAuthChecking(false);
+    }, (err) => {
+      console.error("Error fetching user data:", err);
+      setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
 
   // Firestore dynamic offers database snap observer
   useEffect(() => {
@@ -1373,6 +1411,16 @@ export default function App() {
                     helplineNumber={appConfig.helplineNumber}
                     whatsappUrl={appConfig.whatsappUrl}
                     onAddFundClick={() => setIsAddFundOpen(true)}
+                    onReferralClick={() => setActiveTab('referral')}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'referral' && (
+                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
+                  <ReferralPanel
+                    lang={lang}
+                    onBack={() => setActiveTab('profile')}
                   />
                 </div>
               )}
@@ -1388,8 +1436,8 @@ export default function App() {
 
   if (currentUser && isUserAdmin && adminUserViewMode === 'admin') {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800 w-full">
-        <div className="w-full max-w-5xl h-screen md:h-[850px] bg-white md:rounded-[3rem] md:shadow-2xl overflow-hidden relative flex flex-col border border-slate-200/40 animate-scale-up">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-0 select-none font-sans antialiased text-slate-100 w-full">
+        <div className="w-full h-screen bg-slate-950 overflow-hidden relative flex flex-col border-none animate-scale-up">
           <AdminPanel
             lang={lang}
             isOpen={true}
@@ -1403,7 +1451,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800">
+    <div className={`min-h-screen ${(!currentUser || viewMode === 'mobile-mock') ? 'bg-slate-950' : 'bg-slate-50'} flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800`}>
       
       {/* Dynamic view toggler float pill on computer wide screens */}
       {isLargeScreen && (
@@ -1433,7 +1481,7 @@ export default function App() {
         renderDesktopDashboard()
       ) : (
         /* Smartphone Frame Outer Body container */
-        <div className="w-full max-w-md bg-slate-50 min-h-screen md:min-h-[812px] md:rounded-[3rem] md:shadow-2xl relative overflow-hidden flex flex-col pb-24 border border-slate-200/45">
+        <div className={`w-full max-w-md ${!currentUser ? 'bg-slate-900 border-slate-800 shadow-slate-950/50' : 'bg-slate-50 border-slate-200/45 shadow-2xl'} min-h-screen md:min-h-[812px] md:rounded-[3rem] relative overflow-hidden flex flex-col pb-24 border`}>
         
         {/* Firebase user login / registration system */}
         <AnimatePresence>
@@ -1467,11 +1515,6 @@ export default function App() {
           </div>
         )}
         
-        {/* Smartphone Camera Notch indicator on desktop */}
-        <div className="hidden md:absolute md:top-2 md:left-1/2 md:-translate-x-1/2 md:h-5 md:w-32 md:bg-black/85 md:rounded-full md:z-50 md:flex md:items-center md:justify-center">
-          <div className="h-1.5 w-1.5 rounded-full bg-slate-800 ml-4" />
-        </div>
-
         {/* Core Orchestration tabs */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'home' && (
@@ -1630,6 +1673,13 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'referral' && (
+            <ReferralPanel
+              lang={lang}
+              onBack={() => setActiveTab('profile')}
+            />
+          )}
+
           {activeTab === 'profile' && (
             <ProfilePanel
               lang={lang}
@@ -1640,6 +1690,9 @@ export default function App() {
               helplineNumber={appConfig.helplineNumber}
               whatsappUrl={appConfig.whatsappUrl}
               onAddFundClick={() => setIsAddFundOpen(true)}
+              userData={userData}
+              onKYCClick={() => setIsKYCOpen(true)}
+              onReferralClick={() => setActiveTab('referral')}
             />
           )}
         </div>
@@ -1760,6 +1813,15 @@ export default function App() {
               lang={lang}
               isOpen={isAdminOpen}
               onClose={() => setIsAdminOpen(false)}
+            />
+          )}
+
+          {/* KYC VERIFICATION MODAL */}
+          {isKYCOpen && (
+            <KYCModal
+              lang={lang}
+              onClose={() => setIsKYCOpen(false)}
+              onSuccess={() => setIsKYCOpen(false)}
             />
           )}
 

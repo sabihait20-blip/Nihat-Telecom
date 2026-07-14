@@ -1,8 +1,151 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Default deny catch-all net to ensure Zero-Trust by default
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Global reusable security helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Strictly verifies email verification status to prevent identity spoofing
+    function isAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email_verified == true && 
+             (request.auth.token.email == 'musicnrs2020@gmail.com' ||
+              request.auth.token.email == 'nurnobyr36@gmail.com' ||
+              request.auth.token.email == 'sabihait20@gmail.com' ||
+              request.auth.token.email == 'dhukabuzz420@gmail.com');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Settings Collection (Global Config, Helpline and Payment info)
+    match /settings/app_config {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 2. Public / Catalog Collections (Read-only for normal users, fully managed by Admins)
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /billers/{billerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 3. Scratch Cards (Protects sensitive voucher PINs from leaks)
+    match /scratch_cards/{cardId} {
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.status == 'available' || resource.data.boughtBy == request.auth.uid));
+      allow create, delete: if isAdmin();
+      
+      // Regular users can ONLY buy (scratch) a card if they update its status from 'available' to 'sold'
+      // and set 'boughtBy' to their own authenticated UID without modifying any other product fields.
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        existing().status == 'available' && 
+        incoming().status == 'sold' && 
+        incoming().boughtBy == request.auth.uid && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'boughtBy', 'boughtAt'])
+      );
+    }
+
+    // 4. Primary User profiles and Nested Personal Accounts
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) || isAdmin();
+      
+      // Regular users can only update their profile to submit KYC for verification or update profile photo/display name
+      allow update: if isAdmin() || (
+        isOwner(userId) && (
+          !incoming().diff(existing()).affectedKeys().hasAny(['uid', 'email', 'referralCode', 'referredBy', 'createdAt', 'balance']) &&
+          (!incoming().diff(existing()).affectedKeys().hasAny(['kycStatus', 'kycData']) || (
+            incoming().kycStatus == 'pending' &&
+            (!('kycStatus' in existing()) || existing().kycStatus == 'not_verified' || existing().kycStatus == 'rejected')
+          ))
+        )
+      );
+      allow delete: if isAdmin();
+
+      // Wallet subcollection containing critical cash balances
+      match /wallet/balance_doc {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      // Transactions subcollection (Implemented as Immutable Ledger)
+      match /transactions/{txId} {
+        allow read, create: if isOwner(userId) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+
+      // Favorites subcollection
+      match /favorites/{favId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      // Notifications subcollection
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // 5. Global Registered User profiles list (viewed by administrator in panel)
+    match /registered_users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 6. Admin approval requests (Deposit, withdraw, bill pay, etc.)
+    match /admin_requests/{requestId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // 7. Store / Shop orders
+    match /store_orders/{orderId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // 8. Support Tickets (Interactive Customer helpline threads)
+    match /support_tickets/{ticketId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        existing().userId == request.auth.uid && 
+        incoming().userId == request.auth.uid
+      );
+      allow delete: if isAdmin();
     }
   }
 }

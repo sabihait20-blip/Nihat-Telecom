@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import {
   User, Shield, Phone, BellRing, Info, LogOut, ChevronRight,
-  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet
+  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift
 } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { updateProfile } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface ProfilePanelProps {
   lang: Language;
@@ -16,6 +18,9 @@ interface ProfilePanelProps {
   helplineNumber?: string;
   whatsappUrl?: string;
   onAddFundClick?: () => void;
+  userData?: any;
+  onKYCClick?: () => void;
+  onReferralClick?: () => void;
 }
 
 export default function ProfilePanel({
@@ -27,10 +32,14 @@ export default function ProfilePanel({
   helplineNumber = '01970250988',
   whatsappUrl = 'https://wa.me/8801970250988',
   onAddFundClick,
+  userData,
+  onKYCClick,
+  onReferralClick,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
   const currentUser = auth.currentUser;
+  const kycStatus = userData?.kycStatus || 'not_verified';
   const userInitials = currentUser?.displayName
     ? currentUser.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : currentUser?.email
@@ -45,6 +54,62 @@ export default function ProfilePanel({
   const [newPinInput, setNewPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<string>('');
   const [pinSuccess, setPinSuccess] = useState<string>('');
+
+  // Profile Upload State
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+
+  const handleProfilePicChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    setUploadingProfile(true);
+    try {
+      // Read to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(file);
+      const base64String = await base64Promise;
+
+      // Upload to ImgBB
+      const base64Data = base64String.split(',')[1] || base64String;
+      const body = new FormData();
+      body.append('image', base64Data);
+
+      const response = await fetch('https://api.imgbb.com/1/upload?key=5a96450548a710e6f8cf39c709ed732a', {
+        method: 'POST',
+        body: body,
+      });
+
+      if (!response.ok) {
+        throw new Error('Image upload failed');
+      }
+
+      const result = await response.json();
+      const imageUrl = result.data.url;
+
+      // Update Auth profile
+      await updateProfile(currentUser, { photoURL: imageUrl });
+
+      // Update Firestore users collection
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        photoURL: imageUrl
+      });
+
+      // Update registered_users collection (if exists)
+      await updateDoc(doc(db, 'registered_users', currentUser.uid), {
+        photoURL: imageUrl
+      }).catch(err => console.log("Non-fatal registered_users sync error:", err));
+
+    } catch (err) {
+      console.error("Profile picture upload error:", err);
+      alert(lang === 'bn' ? 'ছবি আপলোড করতে ব্যর্থ হয়েছে।' : 'Failed to upload profile picture.');
+    } finally {
+      setUploadingProfile(false);
+    }
+  };
 
   const handleChangePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,9 +146,36 @@ export default function ProfilePanel({
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/20 rounded-full blur-3xl -mr-10 -mt-10" />
         
         <div className="flex items-center gap-4 relative z-10">
-          <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-lg font-display text-white text-xl font-bold">
-            {userInitials}
+          <div 
+            onClick={() => document.getElementById('profilePicInput')?.click()}
+            className="relative w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-lg font-display text-white text-xl font-bold overflow-hidden cursor-pointer group hover:bg-white/30 transition-all shrink-0"
+          >
+            {uploadingProfile ? (
+              <RefreshCw className="h-5 w-5 animate-spin text-white" />
+            ) : (userData?.photoURL || currentUser?.photoURL) ? (
+              <img 
+                src={userData?.photoURL || currentUser?.photoURL} 
+                alt="Profile" 
+                className="w-full h-full object-cover rounded-2xl" 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span>{userInitials}</span>
+            )}
+            
+            {/* Hover Camera Icon overlay */}
+            <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+              <Camera className="h-4 w-4 text-white" />
+            </div>
           </div>
+          <input 
+            id="profilePicInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleProfilePicChange}
+            disabled={uploadingProfile}
+          />
           <div>
             <h3 className="text-white font-extrabold text-sm tracking-tight font-display">
               {userName}
@@ -104,6 +196,101 @@ export default function ProfilePanel({
             ID: {currentUser?.uid ? `FLX-${currentUser.uid.slice(0, 6).toUpperCase()}` : 'FLX-88290'}
           </span>
         </div>
+      </div>
+
+      {/* KYC Status Banner */}
+      <div className="bg-white border border-slate-100 rounded-[28px] p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${
+              kycStatus === 'verified' ? 'bg-emerald-50 text-emerald-600' :
+              kycStatus === 'pending' ? 'bg-amber-50 text-amber-600' :
+              kycStatus === 'rejected' ? 'bg-rose-50 text-rose-600' :
+              'bg-slate-50 text-slate-400'
+            }`}>
+              {kycStatus === 'verified' ? <ShieldCheck className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-slate-800 leading-tight">
+                {lang === 'bn' ? 'ডিজিটাল কেওয়াইসি' : 'Digital KYC Status'}
+              </h4>
+              <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${
+                kycStatus === 'verified' ? 'text-emerald-500' :
+                kycStatus === 'pending' ? 'text-amber-500' :
+                kycStatus === 'rejected' ? 'text-rose-500' :
+                'text-slate-400'
+              }`}>
+                {kycStatus === 'verified' ? (lang === 'bn' ? 'ভেরিফাইড' : 'Verified') :
+                 kycStatus === 'pending' ? (lang === 'bn' ? 'অপেক্ষমান' : 'Pending Verification') :
+                 kycStatus === 'rejected' ? (lang === 'bn' ? 'বাতিল করা হয়েছে' : 'Rejected') :
+                 (lang === 'bn' ? 'ভেরিফাইড নয়' : 'Not Verified')}
+              </p>
+            </div>
+          </div>
+          
+          {(kycStatus === 'not_verified' || kycStatus === 'rejected') && (
+            <button
+              onClick={onKYCClick}
+              className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer shadow-md"
+            >
+              {lang === 'bn' ? 'ভেরিফাই করুন' : 'Verify Now'}
+            </button>
+          )}
+
+          {kycStatus === 'pending' && (
+            <div className="px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black border border-amber-100 flex items-center gap-1.5">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              <span>{lang === 'bn' ? 'যাচাই করা হচ্ছে' : 'Under Review'}</span>
+            </div>
+          )}
+
+          {kycStatus === 'verified' && (
+            <div className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black border border-emerald-100 flex items-center gap-1.5">
+              <Check className="h-3 w-3" />
+              <span>{lang === 'bn' ? 'সুরক্ষিত' : 'Secured'}</span>
+            </div>
+          )}
+        </div>
+        
+        {kycStatus === 'rejected' && userData?.kycData?.rejectionReason && (
+          <div className="mt-3 p-2 bg-rose-50 rounded-xl border border-rose-100">
+            <p className="text-[9px] font-bold text-rose-600">
+              {lang === 'bn' ? 'বাতিলের কারণ:' : 'Reason:'} {userData.kycData.rejectionReason}
+            </p>
+          </div>
+        )}
+
+        {userData?.kycData?.nidFrontUrl && userData?.kycData?.nidBackUrl && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+              {lang === 'bn' ? 'সাবমিট করা এনআইডি কার্ডসমূহ' : 'Submitted NID Cards'}
+            </h5>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                <img 
+                  src={userData.kycData.nidFrontUrl} 
+                  alt="NID Front" 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+                <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+                  {lang === 'bn' ? 'সামনের অংশ' : 'Front'}
+                </span>
+              </div>
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                <img 
+                  src={userData.kycData.nidBackUrl} 
+                  alt="NID Back" 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+                <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+                  {lang === 'bn' ? 'পিছনের অংশ' : 'Back'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Settings Grid list */}
@@ -207,6 +394,30 @@ export default function ProfilePanel({
             </div>
             <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
           </button>
+
+          {/* Referral Program Action */}
+          {onReferralClick && (
+            <button
+              onClick={onReferralClick}
+              id="profile-referral-btn"
+              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <Gift className="h-4.5 w-4.5 text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="text-slate-800 font-bold text-xs">
+                    {lang === 'bn' ? 'রেফার করুন ও আয় করুন' : 'Refer & Earn'}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                    {lang === 'bn' ? 'বন্ধুদের ইনভাইট করে আনলিমিটেড বোনাস পান!' : 'Invite friends and receive unlimited bonus rewards!'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
 
 
 

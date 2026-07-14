@@ -3,8 +3,9 @@ import Tesseract from 'tesseract.js';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2
+  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
   query, orderBy, writeBatch, updateDoc, getDoc 
@@ -314,7 +315,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'scratch'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'scratch' | 'kyc'>('requests');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
@@ -326,6 +327,31 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(() => {
     return localStorage.getItem('admin_voice_enabled') !== 'false';
   });
+
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullScreen(true);
+      }).catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullScreen(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullScreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullScreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
+  }, []);
 
   const speak = (text: string) => {
     if (!isVoiceEnabled) return;
@@ -400,6 +426,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     whatsappUrl: 'https://wa.me/8801970250988',
     minAddFund: 100,
     maxAddFund: 25000,
+    referralBonus: 10,
     globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
     globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
     showNotice: true,
@@ -418,6 +445,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           whatsappUrl: data.whatsappUrl || 'https://wa.me/8801970250988',
           minAddFund: typeof data.minAddFund === 'number' ? data.minAddFund : 100,
           maxAddFund: typeof data.maxAddFund === 'number' ? data.maxAddFund : 25000,
+          referralBonus: typeof data.referralBonus === 'number' ? data.referralBonus : 10,
           globalNoticeEn: data.globalNoticeEn || '',
           globalNoticeBn: data.globalNoticeBn || '',
           showNotice: typeof data.showNotice === 'boolean' ? data.showNotice : true,
@@ -506,6 +534,43 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   });
   const [editingScratchId, setEditingScratchId] = useState<string | null>(null);
   const [isScanningPin, setIsScanningPin] = useState(false);
+  
+  // KYC management helpers
+  const [rejectingKycUserId, setRejectingKycUserId] = useState<string | null>(null);
+  const [kycRejectReason, setKycRejectReason] = useState('');
+
+  const handleApproveKyc = async (userId: string) => {
+    if (!window.confirm(lang === 'bn' ? 'আপনি কি এই গ্রাহকের কেওয়াইসি এপ্রুভ করতে চান?' : 'Do you want to approve this user\'s KYC?')) return;
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        kycStatus: 'verified',
+        'kycData.verifiedAt': new Date().toISOString()
+      });
+      alert(lang === 'bn' ? 'কেওয়াইসি সফলভাবে এপ্রুভ করা হয়েছে!' : 'KYC successfully approved!');
+    } catch (err) {
+      console.error("Error approving KYC:", err);
+      alert('Error: ' + err);
+    }
+  };
+
+  const handleRejectKyc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingKycUserId || !kycRejectReason) return;
+    try {
+      const userRef = doc(db, 'users', rejectingKycUserId);
+      await updateDoc(userRef, {
+        kycStatus: 'rejected',
+        'kycData.rejectionReason': kycRejectReason
+      });
+      setRejectingKycUserId(null);
+      setKycRejectReason('');
+      alert(lang === 'bn' ? 'কেওয়াইসি বাতিল করা হয়েছে।' : 'KYC rejected.');
+    } catch (err) {
+      console.error("Error rejecting KYC:", err);
+      alert('Error: ' + err);
+    }
+  };
   
   // Dynamic collections loaders
   const [offers, setOffers] = useState<RechargePackage[]>([]);
@@ -1812,172 +1877,204 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     }
   };
 
+  const adminTabsList = [
+    { id: 'requests' as const, label: labels.requests, icon: Layers, badge: pendingRequests.filter(r => r.status === 'Pending').length, badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' },
+    { id: 'offers' as const, label: labels.offers, icon: Gift, badge: offers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'banners' as const, label: labels.banners, icon: Sparkles, badge: banners.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'billers' as const, label: labels.billers, icon: CreditCard, badge: billers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'users' as const, label: labels.users, icon: User, badge: registeredUsers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'products' as const, label: lang === 'bn' ? 'স্টোর প্রোডাক্টস' : 'Manage Products', icon: Globe, badge: adminProducts.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'orders' as const, label: lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders', icon: ShoppingBag, badge: adminOrders.filter(o => o.status === 'Pending').length, badgeColor: 'bg-rose-500/15 text-rose-400 border border-rose-500/25' },
+    { id: 'scratch' as const, label: lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Cards', icon: Smartphone, badge: scratchCards.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'kyc' as const, label: lang === 'bn' ? 'কেওয়াইসি ভেরিফিকেশন' : 'KYC Verification', icon: ShieldCheck, badge: registeredUsers.filter(u => u.kycStatus === 'pending').length, badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
+    { id: 'support' as const, label: lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets', icon: MessageSquare, badge: supportTickets.filter(t => t.status === 'Open').length, badgeColor: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' },
+    { id: 'settings' as const, label: lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, badge: 0, badgeColor: '' },
+  ];
+
   const adminPanelBody = (
     <>
-      <div className={isStandalone ? "w-full h-full bg-slate-950 flex flex-col relative overflow-hidden text-slate-100" : "relative bg-slate-900/85 backdrop-blur-2xl w-full max-w-2xl h-[90%] rounded-[36px] shadow-2xl border border-white/10 flex flex-col relative z-10 overflow-hidden text-slate-100 animate-scale-up"}>
+      <div className={isFullScreen || isStandalone ? "w-full h-full bg-slate-950 flex flex-col lg:flex-row relative overflow-hidden text-slate-100 font-sans" : "relative bg-slate-900/85 backdrop-blur-2xl w-full h-full lg:h-[90%] lg:max-w-6xl rounded-none lg:rounded-[36px] shadow-2xl border-none lg:border lg:border-white/10 flex flex-col lg:flex-row relative z-10 overflow-hidden text-slate-100 animate-scale-up font-sans"}>
       
       {/* Dynamic Ambient Blur Spheres */}
       <div className="absolute top-[-50px] right-[-50px] w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none select-none" />
       <div className="absolute bottom-[-50px] left-[-50px] w-80 h-80 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none select-none" />
 
-      {/* Header bar */}
-      <div className="bg-slate-950/60 backdrop-blur-md border-b border-white/10 px-6 py-5 flex items-center justify-between relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/15">
+      {/* 1. DESKTOP PERMANENT SIDEBAR */}
+      <div className="hidden lg:flex flex-col w-72 bg-slate-950/70 border-r border-white/10 h-full shrink-0 relative z-20 overflow-hidden">
+        {/* Left header with elite status panel */}
+        <div className="p-6 border-b border-white/10 flex items-center gap-3.5 bg-slate-950/40">
+          <div className="p-3 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-xl shadow-blue-500/20 border border-blue-400/30 ring-4 ring-blue-500/10 shrink-0">
             <ShieldCheck className="h-5 w-5" />
           </div>
-          <div>
-            <h2 className="text-white font-extrabold text-sm tracking-tight flex items-center gap-1.5 leading-none">
+          <div className="min-w-0">
+            <h2 className="text-white font-extrabold text-sm tracking-tight truncate uppercase leading-none">
               {labels.title}
             </h2>
-            <p className="text-[10px] text-slate-400 font-bold font-mono tracking-wider mt-1.5">
-              {isStandalone ? "SECURE HARDENED ADMINISTRATIVE SYSTEM" : "SECURE SANDBOX ADMINISTRATIVE MODE"}
+            <p className="text-[9px] text-blue-400 font-black font-mono tracking-widest mt-1.5 uppercase truncate">
+              {isStandalone ? "HARDENED ADM SYSTEM" : "SANDBOX SECURE ADM"}
             </p>
           </div>
         </div>
-        {isStandalone ? (
-          <div className="flex items-center gap-2">
-            {onToggleUserView && (
+
+        {/* Scrollable vertical navigation of tabs */}
+        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-1.5 scroller-hidden">
+          {adminTabsList.map((tab) => {
+            const TabIcon = tab.icon;
+            const isTabActive = activeSubTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveSubTab(tab.id);
+                  if (tab.id === 'users') {
+                    setSelectedUser(null);
+                  }
+                }}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[11.5px] font-bold tracking-wide transition-all duration-200 cursor-pointer text-left border relative group ${
+                  isTabActive 
+                    ? 'bg-blue-600/90 text-white shadow-lg shadow-blue-600/20 border-blue-500/20' 
+                    : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
+                }`}
+              >
+                {/* Visual active tab left accent bar */}
+                {isTabActive && (
+                  <div className="absolute left-1.5 top-3 bottom-3 w-1 bg-white rounded-full" />
+                )}
+                
+                <div className="flex items-center gap-3 min-w-0">
+                  <TabIcon className={`h-4 w-4 shrink-0 transition-colors ${isTabActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                  <span className="truncate">{tab.label}</span>
+                </div>
+
+                {tab.badge > 0 && (
+                  <span className={`text-[9px] font-extrabold tracking-tight px-2 py-0.5 rounded-lg border font-mono ${
+                    isTabActive ? 'bg-white/20 text-white border-white/20' : tab.badgeColor
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sidebar bottom control deck */}
+        <div className="p-4 border-t border-white/10 bg-slate-950/60 space-y-3 shrink-0">
+          {/* Fullscreen & View Switches */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={toggleFullScreen}
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 text-slate-300 hover:text-white transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+              title={isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullScreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+              <span>{isFullScreen ? (lang === 'bn' ? 'মিনিমাইজ' : 'Min') : (lang === 'bn' ? 'ফুলস্ক্রিন' : 'Full')}</span>
+            </button>
+            {isStandalone && onToggleUserView && (
               <button
                 onClick={onToggleUserView}
-                className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-blue-500/15"
+                className="p-2.5 rounded-xl bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 text-blue-400 hover:text-blue-300 transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Globe className="h-4 w-4" />
-                <span>{lang === 'bn' ? 'গ্রাহক ভিউ' : 'User View'}</span>
+                <Globe className="h-3.5 w-3.5" />
+                <span>{lang === 'bn' ? 'ইউজার ভিউ' : 'User'}</span>
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-rose-500/15"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>{lang === 'bn' ? 'লগআউট' : 'Logout'}</span>
-            </button>
           </div>
-        ) : (
+
+          {/* Logout Close Button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer active:scale-95"
+            className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/10 hover:border-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
           >
-            <X className="h-4.5 w-4.5" />
+            <LogOut className="h-3.5 w-3.5" />
+            <span>{isStandalone ? (lang === 'bn' ? 'লগআউট' : 'Logout') : (lang === 'bn' ? 'বন্ধ করুন' : 'Close Dashboard')}</span>
           </button>
-        )}
+        </div>
       </div>
 
-      {/* Dynamic Inner Tab Controller header pill list */}
-      <div className="bg-slate-950/40 border-b border-white/5 px-6 py-3 flex gap-2 overflow-x-auto scroller-hidden relative z-10">
-          <button
-            onClick={() => setActiveSubTab('requests')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'requests' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            {labels.requests} ({pendingRequests.filter(r => r.status === 'Pending').length})
-          </button>
-          <button
-            onClick={() => setActiveSubTab('offers')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'offers' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            {labels.offers} ({offers.length})
-          </button>
-          <button
-            onClick={() => setActiveSubTab('banners')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'banners' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            {labels.banners} ({banners.length})
-          </button>
-          <button
-            onClick={() => setActiveSubTab('billers')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'billers' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            {labels.billers} ({billers.length})
-          </button>
-          <button
-            onClick={() => {
-              setActiveSubTab('users');
-              setSelectedUser(null);
-            }}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'users' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            {labels.users} ({registeredUsers.length})
-          </button>
-          <button
-            onClick={() => setActiveSubTab('settings')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeSubTab === 'settings' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            <Settings className="h-3.5 w-3.5" />
-            <span>{lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings'}</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('support')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeSubTab === 'support' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span>{lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets'}</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('products')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeSubTab === 'products' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            <Globe className="h-3.5 w-3.5" />
-            <span>{lang === 'bn' ? 'স্টোর প্রোডাক্টস' : 'Manage Products'} ({adminProducts.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('orders')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeSubTab === 'orders' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            <ShoppingBag className="h-3.5 w-3.5" />
-            <span>{lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders'} ({adminOrders.filter(o => o.status === 'Pending').length})</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('scratch')}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeSubTab === 'scratch' 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-transparent' 
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-            }`}
-          >
-            <CreditCard className="h-3.5 w-3.5" />
-            <span>{lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Cards'}</span>
-          </button>
+      {/* 2. MAIN LAYOUT WORKSPACE */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative z-10">
+        
+        {/* MOBILE PORTRAIT HEADER (Hidden on desktop) */}
+        <div className="lg:hidden bg-slate-950/60 backdrop-blur-md border-b border-white/10 px-5 py-4 flex items-center justify-between relative z-20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-md shrink-0">
+              <ShieldCheck className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-white font-extrabold text-xs tracking-tight truncate">
+                {labels.title}
+              </h2>
+              <p className="text-[8px] text-slate-400 font-bold font-mono tracking-wider mt-0.5 uppercase truncate">
+                {isStandalone ? "ADMIN SYSTEM" : "SANDBOX MODE"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {isStandalone ? (
+              <div className="flex items-center gap-1.5">
+                {onToggleUserView && (
+                  <button
+                    onClick={onToggleUserView}
+                    className="p-2 bg-blue-500/10 text-blue-400 rounded-xl text-[9px] font-black border border-blue-500/15 cursor-pointer"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-2 bg-rose-500/10 text-rose-400 rounded-xl text-[9px] font-black border border-rose-500/15 cursor-pointer"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* MOBILE HORIZONTAL TABS SELECTOR (Hidden on desktop) */}
+        <div className="lg:hidden bg-slate-950/40 border-b border-white/5 px-5 py-2.5 flex gap-2 overflow-x-auto scroller-hidden relative z-20">
+          {adminTabsList.map((tab) => {
+            const TabIcon = tab.icon;
+            const isTabActive = activeSubTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveSubTab(tab.id);
+                  if (tab.id === 'users') {
+                    setSelectedUser(null);
+                  }
+                }}
+                className={`px-3.5 py-2 rounded-full text-[10.5px] font-extrabold transition-all duration-200 cursor-pointer whitespace-nowrap flex items-center gap-1.5 border shrink-0 ${
+                  isTabActive 
+                    ? 'bg-blue-600 text-white shadow-md border-transparent' 
+                    : 'bg-white/5 text-slate-300 border-white/5 hover:bg-white/10'
+                }`}
+              >
+                <TabIcon className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+                {tab.badge > 0 && (
+                  <span className={`text-[8px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                    isTabActive ? 'bg-white/25 text-white' : 'bg-white/10 text-slate-300'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Scrollable Workspace panel viewport */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 relative z-10 bg-slate-900/30">
+        <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-6 relative z-10 bg-slate-900/30">
           
           {/* Dynamic math counters for net system audit */}
           {(() => {
@@ -3687,38 +3784,48 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   <div className="lg:col-span-7 bg-slate-950/40 border border-white/10 rounded-3xl p-5 space-y-5">
                     {/* Header profile details info card */}
                     <div className="flex justify-between items-start border-b border-white/5 pb-4 text-slate-100">
-                      <div>
-                        <span className="text-[9px] font-black tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/15 rounded px-1.5 py-0.5 uppercase font-mono">
-                          {lang === 'bn' ? 'নির্বাচিত ইউজার প্রোফাইল' : 'Selected Customer Profile'}
-                        </span>
-                        <h3 className="text-sm font-extrabold text-white mt-2">
-                          {selectedUser.displayName}
-                        </h3>
-                        <p className="text-[11px] font-mono text-slate-400 mt-1">
-                          UID: <span className="text-slate-300">{selectedUser.uid}</span>
-                        </p>
-                        <p className="text-[11px] font-mono text-slate-400 font-medium">
-                          {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
-                        </p>
+                      <div className="flex gap-4 items-start flex-1 min-w-0">
+                        {/* Profile Image */}
+                        <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center font-display text-white text-xl font-bold overflow-hidden shrink-0 shadow-inner">
+                          {selectedUser.photoURL ? (
+                            <img src={selectedUser.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span>{selectedUser.displayName?.[0]?.toUpperCase() || 'U'}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[9px] font-black tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/15 rounded px-1.5 py-0.5 uppercase font-mono">
+                            {lang === 'bn' ? 'নির্বাচিত ইউজার প্রোফাইল' : 'Selected Customer Profile'}
+                          </span>
+                          <h3 className="text-sm font-extrabold text-white mt-2 truncate">
+                            {selectedUser.displayName}
+                          </h3>
+                          <p className="text-[11px] font-mono text-slate-400 mt-1 truncate">
+                            UID: <span className="text-slate-300">{selectedUser.uid}</span>
+                          </p>
+                          <p className="text-[11px] font-mono text-slate-400 font-medium truncate">
+                            {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
+                          </p>
 
-                        {/* Edit / Delete control buttons */}
-                        <div className="flex gap-2.5 mt-3">
-                          <button
-                            type="button"
-                            onClick={() => handleEditUser(selectedUser)}
-                            className="p-1 px-2.5 bg-white/5 hover:bg-blue-600/20 text-slate-300 hover:text-blue-400 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                            <span>{lang === 'bn' ? 'প্রোফাইল এডিট' : 'Edit Profile'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUser(selectedUser.uid, selectedUser.displayName)}
-                            className="p-1 px-2.5 bg-white/5 hover:bg-rose-600/20 text-slate-300 hover:text-rose-400 border border-white/5 hover:border-rose-500/20 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>{lang === 'bn' ? 'ইউজার ডিলেট' : 'Delete User'}</span>
-                          </button>
+                          {/* Edit / Delete control buttons */}
+                          <div className="flex gap-2.5 mt-3">
+                            <button
+                              type="button"
+                              onClick={() => handleEditUser(selectedUser)}
+                              className="p-1 px-2.5 bg-white/5 hover:bg-blue-600/20 text-slate-300 hover:text-blue-400 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                              <span>{lang === 'bn' ? 'প্রোফাইল এডিট' : 'Edit Profile'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(selectedUser.uid, selectedUser.displayName)}
+                              className="p-1 px-2.5 bg-white/5 hover:bg-rose-600/20 text-slate-300 hover:text-rose-400 border border-white/5 hover:border-rose-500/20 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>{lang === 'bn' ? 'ইউজার ডিলেট' : 'Delete User'}</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -3864,6 +3971,74 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         </div>
                       </div>
                     </div>
+
+                    {/* Permanent NID Card Records (KYC) */}
+                    {selectedUser.kycData && (
+                      <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-5 space-y-4">
+                        <span className="text-[10px] font-black text-blue-400 block uppercase tracking-wider font-mono">
+                          🪪 {lang === 'bn' ? 'স্থায়ী এনআইডি কার্ড রেকর্ড' : 'Permanent NID Card Records'}
+                        </span>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3.5 bg-slate-950/60 rounded-2xl text-slate-200">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'এনআইডি নাম' : 'NID Name'}</span>
+                            <p className="text-white text-xs font-bold truncate">{selectedUser.kycData?.fullName || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'এনআইডি নম্বর' : 'NID Number'}</span>
+                            <p className="text-white text-xs font-bold font-mono">{selectedUser.kycData?.nidNumber || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'জন্ম তারিখ' : 'Date of Birth'}</span>
+                            <p className="text-white text-xs font-bold font-mono">{selectedUser.kycData?.dob || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'কেওয়াইসি স্ট্যাটাস' : 'KYC Status'}</span>
+                            <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                              selectedUser.kycStatus === 'verified' ? 'bg-emerald-500/10 text-emerald-400' :
+                              selectedUser.kycStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 animate-pulse' :
+                              selectedUser.kycStatus === 'rejected' ? 'bg-rose-500/10 text-rose-400' :
+                              'bg-slate-500/10 text-slate-400'
+                            }`}>
+                              {selectedUser.kycStatus || 'Not Submitted'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">{lang === 'bn' ? 'সামনের অংশ' : 'Front Side'}</span>
+                            <div className="aspect-video bg-slate-950 border border-white/5 rounded-2xl overflow-hidden relative group shadow-md">
+                              {selectedUser.kycData?.nidFrontUrl ? (
+                                <a href={selectedUser.kycData.nidFrontUrl} target="_blank" rel="noreferrer" className="block w-full h-full relative">
+                                  <img src={selectedUser.kycData.nidFrontUrl} alt="NID Front" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350" referrerPolicy="no-referrer" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[10px] font-bold text-white">
+                                    {lang === 'bn' ? 'ক্লিক করে বড় করুন' : 'Click to Zoom'}
+                                  </div>
+                                </a>
+                              ) : (
+                                <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500 font-bold">No Image</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">{lang === 'bn' ? 'পিছনের অংশ' : 'Back Side'}</span>
+                            <div className="aspect-video bg-slate-950 border border-white/5 rounded-2xl overflow-hidden relative group shadow-md">
+                              {selectedUser.kycData?.nidBackUrl ? (
+                                <a href={selectedUser.kycData.nidBackUrl} target="_blank" rel="noreferrer" className="block w-full h-full relative">
+                                  <img src={selectedUser.kycData.nidBackUrl} alt="NID Back" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350" referrerPolicy="no-referrer" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[10px] font-bold text-white">
+                                    {lang === 'bn' ? 'ক্লিক করে বড় করুন' : 'Click to Zoom'}
+                                  </div>
+                                </a>
+                              ) : (
+                                <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500 font-bold">No Image</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* USER TRANSACTION RECORD HISTORY LIST */}
                     <div className="space-y-3">
@@ -4116,6 +4291,30 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         placeholder="বাংলায় নোটিশ বার্তা লিখুন..."
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-medium outline-none focus:border-blue-500 font-semibold"
                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section E: Referral Rewards System */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">
+                    5. Referral Rewards Configuration
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                        Referral Bonus Amount (৳)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={settingsForm.referralBonus}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, referralBonus: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                      />
+                      <p className="text-[9px] text-slate-500 font-bold ml-1">
+                        {lang === 'bn' ? '* নতুন ইউজার রেফারেল কোড ব্যবহার করলে রেফারার এই পরিমাণ বোনাস পাবে।' : '* Referrer will receive this amount when a new user signs up using their code.'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -4711,7 +4910,109 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             </div>
           )}
 
-          {/* 6. SCRATCH CARDS MANAGEMENT */}
+          {/* 6. KYC VERIFICATION MANAGEMENT */}
+          {activeSubTab === 'kyc' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 bg-white/5 p-4 rounded-3xl border border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-600/20 text-blue-400 rounded-2xl">
+                    <ShieldCheck className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-sm tracking-tight">
+                      {lang === 'bn' ? 'কেওয়াইসি ভেরিফিকেশন রিকুয়েস্ট' : 'KYC Verification Requests'}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      {registeredUsers.filter(u => u.kycStatus === 'pending').length} {lang === 'bn' ? 'টি রিকুয়েস্ট পেন্ডিং' : 'Requests Pending'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {registeredUsers.filter(u => u.kycStatus === 'pending').map((user) => (
+                  <div key={user.uid} className="bg-slate-950 border border-white/5 rounded-3xl p-5 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-sm">
+                          {user.displayName?.[0] || 'U'}
+                        </div>
+                        <div>
+                          <h4 className="text-white font-bold text-xs">{user.displayName}</h4>
+                          <p className="text-[10px] text-slate-500 font-mono">{user.phone || user.email}</p>
+                        </div>
+                      </div>
+                      <div className="px-2 py-1 bg-amber-500/10 text-amber-500 rounded-lg text-[9px] font-black uppercase tracking-wider border border-amber-500/20">
+                        {lang === 'bn' ? 'পেন্ডিং' : 'Pending'}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-white/5 rounded-2xl">
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'এনআইডি নাম' : 'NID Name'}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.fullName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'এনআইডি নম্বর' : 'NID Number'}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.nidNumber}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'জন্ম তারিখ' : 'Date of Birth'}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.dob}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'জমাদান' : 'Submitted'}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.submittedAt ? new Date(user.kycData.submittedAt).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <span className="text-[9px] font-black text-slate-500 uppercase ml-1">{lang === 'bn' ? 'সামনের অংশ' : 'Front Side'}</span>
+                        <div className="aspect-video bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+                          <img src={user.kycData?.nidFrontUrl} alt="Front" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-[9px] font-black text-slate-500 uppercase ml-1">{lang === 'bn' ? 'পিছনের অংশ' : 'Back Side'}</span>
+                        <div className="aspect-video bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+                          <img src={user.kycData?.nidBackUrl} alt="Back" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <button
+                        onClick={() => setRejectingKycUserId(user.uid)}
+                        className="py-3 bg-rose-600/10 text-rose-500 rounded-2xl text-[10px] font-black border border-rose-500/20 hover:bg-rose-600/20 transition-all cursor-pointer"
+                      >
+                        {lang === 'bn' ? 'বাতিল করুন' : 'Reject KYC'}
+                      </button>
+                      <button
+                        onClick={() => handleApproveKyc(user.uid)}
+                        className="py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-black shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all cursor-pointer"
+                      >
+                        {lang === 'bn' ? 'এপ্রুভ করুন' : 'Approve KYC'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {registeredUsers.filter(u => u.kycStatus === 'pending').length === 0 && (
+                  <div className="col-span-full py-12 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-[32px] border border-white/5">
+                    <div className="p-4 bg-white/5 rounded-full">
+                      <ShieldCheck className="h-8 w-8 text-slate-600" />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold">
+                      {lang === 'bn' ? 'কোন পেন্ডিং কেওয়াইসি রিকুয়েস্ট নেই' : 'No pending KYC requests found'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 7. SCRATCH CARDS MANAGEMENT */}
           {activeSubTab === 'scratch' && (
             <div className="space-y-6">
               <div className="bg-slate-900 border border-white/5 rounded-3xl p-6">
@@ -4912,6 +5213,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
         </div>
       </div>
+    </div>
 
       {/* CUSTOM CONFIRMATION DELETE DIALOG POPUP */}
       {deleteConfirm && (
@@ -4956,6 +5258,66 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* KYC REJECTION MODAL */}
+      {rejectingKycUserId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setRejectingKycUserId(null)}
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 border border-slate-100 space-y-4 z-10"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-slate-900 font-black text-sm tracking-tight flex items-center gap-2">
+                <AlertTriangle className="h-4.5 w-4.5 text-rose-500" />
+                <span>{lang === 'bn' ? 'কেওয়াইসি বাতিলের কারণ' : 'KYC Rejection Reason'}</span>
+              </h3>
+              <button onClick={() => setRejectingKycUserId(null)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectKyc} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  {lang === 'bn' ? 'কেন বাতিল করা হচ্ছে?' : 'Why is it being rejected?'}
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={kycRejectReason}
+                  onChange={e => setKycRejectReason(e.target.value)}
+                  placeholder={lang === 'bn' ? 'যেমন: ঝাপসা ছবি, ভুল তথ্য...' : 'e.g. Blurry photo, Incorrect details...'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-3.5 text-xs font-bold text-slate-900 outline-none focus:border-rose-500 transition-all resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRejectingKycUserId(null)}
+                  className="py-3 bg-slate-100 text-slate-600 rounded-2xl text-xs font-bold"
+                >
+                  {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="py-3 bg-rose-600 text-white rounded-2xl text-xs font-black shadow-lg shadow-rose-600/20"
+                >
+                  {lang === 'bn' ? 'বাতিল নিশ্চিত করুন' : 'Confirm Reject'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
 
@@ -5043,11 +5405,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center ${isFullScreen ? 'p-0' : 'p-0 lg:p-4'}`}>
       {/* Backdrop */}
       <div 
         onClick={onClose}
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm cursor-pointer"
+        className={`absolute inset-0 bg-slate-950/80 backdrop-blur-sm cursor-pointer ${isFullScreen ? 'hidden' : 'hidden lg:block'}`}
       />
       {adminPanelBody}
     </div>
