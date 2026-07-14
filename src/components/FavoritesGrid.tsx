@@ -136,9 +136,9 @@ export default function FavoritesGrid({
 
       {/* Horizontal horizontal saved contacts */}
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none scroll-smooth">
-        {favorites.map((fav) => (
+        {favorites.map((fav, index) => (
           <div
-            key={fav.id}
+            key={`${fav.id || fav.number}-${index}`}
             className="flex flex-col items-center flex-shrink-0 relative group"
             style={{ width: '76px' }}
           >

@@ -14,10 +14,12 @@ const defaultFirebaseConfig = {
   firestoreDatabaseId: ""
 };
 
-const activeConfig = appletConfig;
+const activeConfig = defaultFirebaseConfig;
 
 const app = !getApps().length ? initializeApp(activeConfig) : getApp();
-export const db = getFirestore(app, activeConfig.firestoreDatabaseId); 
+export const db = activeConfig.firestoreDatabaseId 
+  ? getFirestore(app, activeConfig.firestoreDatabaseId) 
+  : getFirestore(app); 
 export const auth = getAuth(app);
 export const currentFirebaseConfig = activeConfig;
 

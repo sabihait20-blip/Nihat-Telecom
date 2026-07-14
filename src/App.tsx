@@ -1333,7 +1333,7 @@ export default function App() {
                         <div className="space-y-2">
                           {transactions.slice(0, 3).map((tx, index) => (
                             <div
-                              key={tx.id || index}
+                              key={`${tx.id || index}-${index}`}
                               className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors text-xs font-semibold"
                             >
                               <div className="flex items-center gap-3">
@@ -1618,7 +1618,7 @@ export default function App() {
                 <div className="bg-white border border-slate-100 rounded-[28px] p-4.5 shadow-sm space-y-1">
                   {transactions.slice(0, 2).map((tx, index) => (
                     <div
-                      key={tx.id || index}
+                      key={`${tx.id || index}-${index}`}
                       className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold"
                     >
                       <div className="flex items-center gap-3">
@@ -1883,9 +1883,9 @@ export default function App() {
                 )}
 
                 <div className="space-y-2">
-                  {notifications.map((notif) => (
+                  {notifications.map((notif, index) => (
                     <div
-                      key={notif.id}
+                      key={`${notif.id || index}-${index}`}
                       className={`p-3 rounded-2xl border transition-all text-xs space-y-1 ${
                         notif.read ? 'bg-white border-slate-100' : 'bg-blue-50/50 border-blue-200/30'
                       }`}

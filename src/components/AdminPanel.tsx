@@ -542,11 +542,19 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const handleApproveKyc = async (userId: string) => {
     if (!window.confirm(lang === 'bn' ? 'আপনি কি এই গ্রাহকের কেওয়াইসি এপ্রুভ করতে চান?' : 'Do you want to approve this user\'s KYC?')) return;
     try {
+      const batch = writeBatch(db);
       const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
+      const regUserRef = doc(db, 'registered_users', userId);
+      
+      const updateData = {
         kycStatus: 'verified',
         'kycData.verifiedAt': new Date().toISOString()
-      });
+      };
+      
+      batch.update(userRef, updateData);
+      batch.update(regUserRef, updateData);
+      
+      await batch.commit();
       alert(lang === 'bn' ? 'কেওয়াইসি সফলভাবে এপ্রুভ করা হয়েছে!' : 'KYC successfully approved!');
     } catch (err) {
       console.error("Error approving KYC:", err);
@@ -558,11 +566,19 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     e.preventDefault();
     if (!rejectingKycUserId || !kycRejectReason) return;
     try {
+      const batch = writeBatch(db);
       const userRef = doc(db, 'users', rejectingKycUserId);
-      await updateDoc(userRef, {
+      const regUserRef = doc(db, 'registered_users', rejectingKycUserId);
+      
+      const updateData = {
         kycStatus: 'rejected',
         'kycData.rejectionReason': kycRejectReason
-      });
+      };
+      
+      batch.update(userRef, updateData);
+      batch.update(regUserRef, updateData);
+      
+      await batch.commit();
       setRejectingKycUserId(null);
       setKycRejectReason('');
       alert(lang === 'bn' ? 'কেওয়াইসি বাতিল করা হয়েছে।' : 'KYC rejected.');
@@ -1020,12 +1036,15 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       // If Recharge, Bill, Transfer, or Voucher, refund docked user balance
       if (tx.type === 'Recharge' || tx.type === 'Bill' || tx.type === 'Transfer' || tx.type === 'Voucher') {
         const balanceDocRef = doc(db, 'users', tx.userId, 'wallet', 'balance_doc');
+        const userProfileRef = doc(db, 'registered_users', tx.userId);
         const balanceSnap = await getDoc(balanceDocRef);
         let curBalance = 0;
         if (balanceSnap.exists()) {
           curBalance = balanceSnap.data().balance || 0;
         }
-        batch.set(balanceDocRef, { balance: curBalance + tx.amount });
+        const newBalance = curBalance + tx.amount;
+        batch.set(balanceDocRef, { balance: newBalance });
+        batch.set(userProfileRef, { balance: newBalance }, { merge: true });
       }
 
       // Send rejection notification
@@ -1127,17 +1146,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     setEditingOfferId(pkg.id);
     setSmartText('');
     setOfferForm({
-      title: pkg.title,
-      titleBn: pkg.titleBn,
-      operator: pkg.operator,
-      price: pkg.price,
-      validity: pkg.validity,
-      validityBn: pkg.validityBn,
-      category: pkg.category,
-      volume: pkg.volume,
-      volumeBn: pkg.volumeBn,
-      description: pkg.description,
-      descriptionBn: pkg.descriptionBn,
+      title: pkg.title || '',
+      titleBn: pkg.titleBn || '',
+      operator: pkg.operator || 'GP',
+      price: pkg.price || 0,
+      validity: pkg.validity || '',
+      validityBn: pkg.validityBn || '',
+      category: pkg.category || 'internet',
+      volume: pkg.volume || '',
+      volumeBn: pkg.volumeBn || '',
+      description: pkg.description || '',
+      descriptionBn: pkg.descriptionBn || '',
       isPopular: pkg.isPopular || false,
       imageUrl: pkg.imageUrl || ''
     });
@@ -1183,13 +1202,13 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const handleEditBanner = (ban: PromoBanner) => {
     setEditingBannerId(ban.id);
     setBannerForm({
-      title: ban.title,
-      titleEn: ban.titleEn,
-      desc: ban.desc,
-      descEn: ban.descEn,
-      operator: ban.operator,
-      prefillAmount: ban.prefillAmount,
-      gradient: ban.gradient,
+      title: ban.title || '',
+      titleEn: ban.titleEn || '',
+      desc: ban.desc || '',
+      descEn: ban.descEn || '',
+      operator: ban.operator || 'GP',
+      prefillAmount: ban.prefillAmount || 0,
+      gradient: ban.gradient || '',
       imageUrl: ban.imageUrl || ''
     });
     setShowBannerForm(true);
@@ -1295,6 +1314,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       const prodId = editingProductId || `prod-${Date.now()}`;
       const docRef = doc(db, 'products', prodId);
       
+      const catsBn: Record<string, string> = {
+        Lifestyle: 'লাইফস্টাইল',
+        Digital: 'ডিজিটাল সার্ভিস',
+        Electronics: 'ইলেকট্রনিক্স',
+        Services: 'সেবাসমূহ',
+        Other: 'অন্যান্য'
+      };
+
       const newProduct: StoreProduct = {
         id: prodId,
         title: productForm.title,
@@ -1305,7 +1332,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         descriptionBn: productForm.descriptionBn,
         imageUrl: productForm.imageUrl,
         category: productForm.category,
-        categoryBn: productForm.category,
+        categoryBn: catsBn[productForm.category] || 'অন্যান্য',
       };
 
       await setDoc(docRef, newProduct);
@@ -1407,11 +1434,13 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
       // 2. Refund user's balance
       const userBalanceDocRef = doc(db, 'users', order.userId, 'wallet', 'balance_doc');
+      const userProfileRef = doc(db, 'registered_users', order.userId);
       const userBalanceSnap = await getDoc(userBalanceDocRef);
       if (userBalanceSnap.exists()) {
         const currentBal = userBalanceSnap.data().balance || 0;
         const refundedBal = currentBal + order.totalPrice;
         batch.set(userBalanceDocRef, { balance: refundedBal });
+        batch.set(userProfileRef, { balance: refundedBal }, { merge: true });
       }
 
       // 3. Return product stock
@@ -1692,10 +1721,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   const handleEditScratchCard = (card: any) => {
     setScratchForm({
-      operator: card.operator,
-      title: card.title,
-      price: card.price,
-      pin: card.pin,
+      operator: card.operator || 'Grameenphone',
+      title: card.title || '',
+      price: card.price || 0,
+      pin: card.pin || '',
       validity: card.validity || '২ দিন',
       dialCode: card.dialCode || '*১২১*পিন#'
     });
@@ -1719,18 +1748,26 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       const uid = editingUserId || `user-${Date.now()}`;
       const userRef = doc(db, 'registered_users', uid);
       const balanceRef = doc(db, 'users', uid, 'wallet', 'balance_doc');
+      const userProfileRef = doc(db, 'users', uid);
       
       const batch = writeBatch(db);
       
-      // Save/update registered_users profile doc
-      batch.set(userRef, {
+      const profileData = {
         uid,
         displayName: userForm.displayName,
         phone: userForm.phone,
         email: userForm.email || (userForm.phone ? `${userForm.phone}@nihat-telecom.com` : `${uid}@nihat-telecom.com`),
+      };
+
+      // Save/update registered_users profile doc
+      batch.set(userRef, {
+        ...profileData,
         lastActive: new Date().toISOString()
       }, { merge: true });
       
+      // Save/update users profile doc directly (sync user client data)
+      batch.set(userProfileRef, profileData, { merge: true });
+
       // Save/update user balance doc
       batch.set(balanceRef, {
         balance: Number(userForm.balance) || 0
@@ -2416,11 +2453,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredRequests.map((req) => {
+                    {filteredRequests.map((req, index) => {
                       const isTxPending = req.status === 'Pending';
                       return (
                         <div 
-                          key={req.id} 
+                          key={`${req.id || index}-${index}`} 
                           className={`bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-lg transition-all relative overflow-hidden flex flex-col justify-between ${
                             !isTxPending ? 'opacity-50 bg-slate-950/40 border-slate-800/60' : ''
                           }`}
@@ -3016,8 +3053,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {filteredOffers.map((pkg) => (
-                      <div key={pkg.id} className="bg-white border border-slate-200/60 p-4 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+                    {filteredOffers.map((pkg, index) => (
+                      <div key={`${pkg.id || index}-${index}`} className="bg-white border border-slate-200/60 p-4 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
                         <span className="absolute right-0 top-0 text-[8.5px] uppercase font-black bg-slate-150 text-slate-600 px-2 py-0.5 rounded-bl-lg">
                           {pkg.operator}
                         </span>
@@ -3239,8 +3276,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
               {/* Banners slider control checklist */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {banners.map((ban) => (
-                  <div key={ban.id} className="bg-slate-900/40 backdrop-blur-md border border-white/15 p-4 rounded-3xl flex flex-col justify-between gap-3.5 group hover:bg-slate-900/60 hover:border-white/20 transition-all duration-300">
+                {banners.map((ban, index) => (
+                  <div key={`${ban.id || index}-${index}`} className="bg-slate-900/40 backdrop-blur-md border border-white/15 p-4 rounded-3xl flex flex-col justify-between gap-3.5 group hover:bg-slate-900/60 hover:border-white/20 transition-all duration-300">
                     <div className="flex items-start gap-3.5">
                       {ban.imageUrl ? (
                         <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md relative group-hover:scale-105 transition-transform mt-0.5">
@@ -3510,8 +3547,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {filteredBillers.map((biller) => (
-                      <div key={biller.id} className="bg-white border border-slate-150 p-4 rounded-3xl flex flex-col justify-between gap-3.5 shadow-xs group hover:shadow-md transition-shadow">
+                    {filteredBillers.map((biller, index) => (
+                      <div key={`${biller.id || index}-${index}`} className="bg-white border border-slate-150 p-4 rounded-3xl flex flex-col justify-between gap-3.5 shadow-xs group hover:shadow-md transition-shadow">
                         <div className="flex items-center gap-3.5">
                           {biller.imageUrl ? (
                             <div className="h-11 w-11 rounded-2xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
@@ -4062,7 +4099,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             const isCashIn = hTx.type === 'CashIn';
                             return (
                               <div
-                                key={hTx.id || index} 
+                                key={`${hTx.id || index}-${index}`} 
                                 className="bg-slate-950/30 border border-white/5 p-3 rounded-2xl flex justify-between items-center gap-2.5 text-slate-300"
                               >
                                 <div className="space-y-1 truncate">
@@ -4701,8 +4738,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {adminProducts.map((prod) => (
-                          <tr key={prod.id} className="hover:bg-white/5 transition-colors">
+                        {adminProducts.map((prod, index) => (
+                          <tr key={`${prod.id || index}-${index}`} className="hover:bg-white/5 transition-colors">
                             <td className="py-3 px-2">
                               <div className="h-10 w-10 rounded-lg bg-white/10 overflow-hidden flex items-center justify-center">
                                 {prod.imageUrl ? (
@@ -4770,10 +4807,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {adminOrders.map((order) => {
+                    {adminOrders.map((order, index) => {
                       const isPending = order.status === 'Pending';
                       return (
-                        <div key={order.id} className="bg-slate-950 border border-white/5 rounded-3xl p-5 flex flex-col md:flex-row gap-5 items-start justify-between hover:border-slate-700/80 transition-all">
+                        <div key={`${order.id || index}-${index}`} className="bg-slate-950 border border-white/5 rounded-3xl p-5 flex flex-col md:flex-row gap-5 items-start justify-between hover:border-slate-700/80 transition-all">
                           {/* Order specifications details */}
                           <div className="space-y-2 flex-1 text-xs">
                             <div className="flex items-center gap-2">
@@ -4930,8 +4967,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {registeredUsers.filter(u => u.kycStatus === 'pending').map((user) => (
-                  <div key={user.uid} className="bg-slate-950 border border-white/5 rounded-3xl p-5 space-y-4">
+                {registeredUsers.filter(u => u.kycStatus === 'pending').map((user, index) => (
+                  <div key={`${user.uid || index}-${index}`} className="bg-slate-950 border border-white/5 rounded-3xl p-5 space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-sm">
@@ -5143,11 +5180,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   <div className="bg-slate-950/40 border border-white/5 p-5 rounded-2xl flex flex-col h-[500px]">
                     <h4 className="text-xs font-black text-slate-300 mb-4">{lang === 'bn' ? 'কার্ড তালিকা' : 'Inventory List'}</h4>
                     <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                      {scratchCards.map((card) => {
+                      {scratchCards.map((card, index) => {
                         const parsed = parseTitle(card.title);
 
                         return (
-                          <div key={card.id} className="aspect-[3.5/1] w-full bg-gradient-to-br from-[#006a4e] to-[#f42a41] rounded-xl shadow-md border-2 border-white p-3 flex flex-col justify-between text-white select-none relative overflow-hidden">
+                          <div key={`${card.id || index}-${index}`} className="aspect-[3.5/1] w-full bg-gradient-to-br from-[#006a4e] to-[#f42a41] rounded-xl shadow-md border-2 border-white p-3 flex flex-col justify-between text-white select-none relative overflow-hidden">
                             {/* Top Section */}
                             <div className="flex justify-between items-center relative z-10">
                               <div className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-white/10 uppercase">

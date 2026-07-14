@@ -148,7 +148,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
         {filteredTx.length > 0 ? (
           filteredTx.map((tx, index) => (
             <div
-              key={tx.id || index}
+              key={`${tx.id || index}-${index}`}
               className="bg-white border border-slate-100/80 rounded-[28px] p-5 flex items-center justify-between shadow-sm hover:border-blue-100/60 hover:shadow-md transition-all"
             >
               <div className="flex items-center gap-3">
