@@ -4,7 +4,7 @@ import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
   Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare,
-  Calculator, CreditCard
+  Calculator, CreditCard, AlertTriangle
 } from 'lucide-react';
 
 // Data types & assets
@@ -1054,6 +1054,36 @@ export default function App() {
           <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
             <div className="w-full max-w-sm h-[812px] bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden relative border border-slate-850">
               <SecureLockModal lang={lang} onUnlocked={() => setIsAppLocked(false)} />
+            </div>
+          </div>
+        )}
+
+        {currentUser && userData?.isBanned && (
+          <div className="absolute inset-0 z-55 bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
+            <div className="w-16 h-16 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+              <AlertTriangle className="h-8 w-8" />
+            </div>
+            <h2 className="text-xl font-black mb-3 text-white">
+              {lang === 'bn' ? 'অ্যাকাউন্ট স্থগিত করা হয়েছে' : 'Account Suspended'}
+            </h2>
+            <p className="text-sm text-slate-400 max-w-xs leading-relaxed font-semibold mb-6">
+              {lang === 'bn' 
+                ? 'আপনার অ্যাকাউন্টটি নীতিমালার পরিপন্থী কাজের কারণে স্থগিত করা হয়েছে। বিস্তারিত জানতে বা ওয়ালেট সক্রিয় করতে হেল্পলাইনে যোগাযোগ করুন।' 
+                : 'Your account has been suspended due to policy violations. Please contact our helpline to resolve this issue and activate your wallet.'}
+            </p>
+            <div className="bg-slate-900 border border-white/5 rounded-3xl p-5 w-full max-w-xs space-y-3.5 text-left font-mono text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-extrabold">HELPLINE:</span>
+                <span className="text-blue-400 font-black">01970250988</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-extrabold">EMAIL:</span>
+                <span className="text-slate-300">sabihait20@gmail.com</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-white/5 pt-2">
+                <span className="text-slate-500 font-extrabold">STATUS:</span>
+                <span className="text-rose-400 font-extrabold uppercase">SUSPENDED</span>
+              </div>
             </div>
           </div>
         )}

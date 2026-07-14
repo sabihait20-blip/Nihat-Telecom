@@ -316,6 +316,8 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'scratch' | 'kyc'>('requests');
+  const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(true);
+  const [userFilterTab, setUserFilterTab] = useState<'all' | 'verified' | 'pending_kyc' | 'suspended'>('all');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
@@ -1816,6 +1818,36 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     setShowUserForm(true);
   };
 
+  const handleToggleUserBan = async (uid: string, currentlyBanned: boolean) => {
+    const actionText = currentlyBanned ? (lang === 'bn' ? 'সক্রিয়' : 'Unban') : (lang === 'bn' ? 'স্থগিত' : 'Ban');
+    if (!window.confirm(lang === 'bn' ? `আপনি কি এই ব্যবহারকারীকে ${actionText} করতে চান?` : `Are you sure you want to ${actionText} this user?`)) return;
+    
+    setLoading(true);
+    try {
+      const batch = writeBatch(db);
+      const userRef = doc(db, 'users', uid);
+      const regUserRef = doc(db, 'registered_users', uid);
+      
+      const updateData = { isBanned: !currentlyBanned };
+      batch.update(userRef, updateData);
+      batch.update(regUserRef, updateData);
+      
+      await batch.commit();
+      
+      // Update selectedUser local state too if selected
+      if (selectedUser && selectedUser.uid === uid) {
+        setSelectedUser({ ...selectedUser, isBanned: !currentlyBanned });
+      }
+      
+      alert(lang === 'bn' ? `ব্যবহারকারী সফলভাবে ${currentlyBanned ? 'সক্রিয়' : 'স্থগিত'} করা হয়েছে!` : `User account has been successfully ${currentlyBanned ? 'activated' : 'suspended'}!`);
+    } catch (err: any) {
+      console.error("Error toggling user ban status: ", err);
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteUser = (uid: string, name: string) => {
     setDeleteConfirm({ id: uid, type: 'user', title: name });
   };
@@ -2276,6 +2308,174 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     </span>
                   </div>
                 </div>
+
+                {/* PREMIUM REAL-TIME ANALYTICS DASHBOARD */}
+                {(() => {
+                  // 1. Calculate Operator volume share
+                  const opGP = pendingRequests.filter(r => r.status === 'Success' && r.operator === 'GP').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const opRobi = pendingRequests.filter(r => r.status === 'Success' && r.operator === 'Robi').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const opAirtel = pendingRequests.filter(r => r.status === 'Success' && r.operator === 'Airtel').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const opBanglalink = pendingRequests.filter(r => r.status === 'Success' && r.operator === 'Banglalink').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const opTeletalk = pendingRequests.filter(r => r.status === 'Success' && r.operator === 'Teletalk').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const totalOpSum = opGP + opRobi + opAirtel + opBanglalink + opTeletalk || 1;
+
+                  // 2. Calculate Transaction category split
+                  const typeCashIn = pendingRequests.filter(r => r.status === 'Success' && r.type === 'CashIn').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const typeRecharge = pendingRequests.filter(r => r.status === 'Success' && r.type === 'Recharge').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const typeBill = pendingRequests.filter(r => r.status === 'Success' && r.type === 'Bill').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const typeTransfer = pendingRequests.filter(r => r.status === 'Success' && r.type === 'Transfer').reduce((sum, r) => sum + (parseFloat(r.amount + '') || 0), 0);
+                  const totalTypeSum = typeCashIn + typeRecharge + typeBill + typeTransfer || 1;
+
+                  // 3. KYC Verification Rate
+                  const totalUsers = registeredUsers.length || 1;
+                  const verifiedUsers = registeredUsers.filter(u => u.kycStatus === 'verified').length;
+                  const pendingKyc = registeredUsers.filter(u => u.kycStatus === 'pending').length;
+                  const kycPct = Math.round((verifiedUsers / totalUsers) * 100);
+
+                  return (
+                    <div className="bg-slate-950/45 border border-white/10 rounded-[28px] overflow-hidden shadow-xl shadow-slate-950/20">
+                      {/* Collapse Toggle Header */}
+                      <button
+                        type="button"
+                        onClick={() => setIsAnalyticsExpanded(!isAnalyticsExpanded)}
+                        className="w-full px-5 py-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[0.02] transition-colors border-b border-white/5"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="p-1.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400">
+                            <Layers className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                              {lang === 'bn' ? '📊 রিয়েল-টাইম লাইভ অ্যানালিটিক্স ও ডিস্ট্রিবিউশন' : '📊 Real-Time Financial Analytics & Distribution'}
+                            </h3>
+                            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                              {lang === 'bn' ? 'অপারেটর রিচার্জ শেয়ার, ট্রানজেকশন ক্যাটাগরি এবং গ্রাহক যাচাইকরণ ট্র্যাকিং' : 'Operator recharge split, transaction share, and customer KYC tracking'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-xl uppercase tracking-widest font-mono">
+                          {isAnalyticsExpanded ? (lang === 'bn' ? 'লুকান' : 'Hide') : (lang === 'bn' ? 'দেখান' : 'Show')}
+                        </span>
+                      </button>
+
+                      <AnimatePresence>
+                        {isAnalyticsExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5"
+                          >
+                            {/* Column 1: Recharge Operator Shares */}
+                            <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                              <span className="text-[9.5px] font-black text-blue-400 tracking-wider uppercase block font-mono">
+                                📱 Operator Recharge Volume (৳)
+                              </span>
+                              <div className="space-y-3">
+                                {[
+                                  { label: 'GP', val: opGP, pct: (opGP/totalOpSum)*100, color: 'bg-blue-500' },
+                                  { label: 'Robi', val: opRobi, pct: (opRobi/totalOpSum)*100, color: 'bg-red-500' },
+                                  { label: 'Airtel', val: opAirtel, pct: (opAirtel/totalOpSum)*100, color: 'bg-rose-600' },
+                                  { label: 'Banglalink', val: opBanglalink, pct: (opBanglalink/totalOpSum)*100, color: 'bg-orange-500' },
+                                  { label: 'Teletalk', val: opTeletalk, pct: (opTeletalk/totalOpSum)*100, color: 'bg-emerald-500' }
+                                ].map((item) => (
+                                  <div key={item.label} className="space-y-1">
+                                    <div className="flex justify-between text-[10.5px] font-bold">
+                                      <span className="text-white flex items-center gap-1.5">
+                                        <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                                        {item.label}
+                                      </span>
+                                      <span className="text-slate-400 font-mono">
+                                        ৳{item.val.toLocaleString()} ({Math.round(item.pct)}%)
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                                      <div className={`${item.color} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(item.pct, totalOpSum === 1 ? 0 : 3)}%` }} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Column 2: Transaction Category Split */}
+                            <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                              <span className="text-[9.5px] font-black text-pink-400 tracking-wider uppercase block font-mono">
+                                💰 Category Volume Share (৳)
+                              </span>
+                              <div className="space-y-3">
+                                {[
+                                  { label: lang === 'bn' ? 'অ্যাড ফান্ড' : 'Cash In', val: typeCashIn, pct: (typeCashIn/totalTypeSum)*100, color: 'bg-violet-500' },
+                                  { label: lang === 'bn' ? 'রিচার্জ' : 'Recharge', val: typeRecharge, pct: (typeRecharge/totalTypeSum)*100, color: 'bg-blue-500' },
+                                  { label: lang === 'bn' ? 'বিল পে' : 'Bill Payment', val: typeBill, pct: (typeBill/totalTypeSum)*100, color: 'bg-pink-500' },
+                                  { label: lang === 'bn' ? 'ট্রান্সফার' : 'Transfer', val: typeTransfer, pct: (typeTransfer/totalTypeSum)*100, color: 'bg-amber-500' }
+                                ].map((item) => (
+                                  <div key={item.label} className="space-y-1">
+                                    <div className="flex justify-between text-[10.5px] font-bold">
+                                      <span className="text-white flex items-center gap-1.5">
+                                        <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                                        {item.label}
+                                      </span>
+                                      <span className="text-slate-400 font-mono">
+                                        ৳{item.val.toLocaleString()} ({Math.round(item.pct)}%)
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                                      <div className={`${item.color} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(item.pct, totalTypeSum === 1 ? 0 : 3)}%` }} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Column 3: KYC Verification Hub */}
+                            <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                              <div className="space-y-3.5">
+                                <span className="text-[9.5px] font-black text-emerald-400 tracking-wider uppercase block font-mono">
+                                  🪪 KYC Compliance Hub
+                                </span>
+                                <div className="flex items-center gap-4 py-2">
+                                  <div className="relative flex items-center justify-center">
+                                    {/* SVG Circular Indicator */}
+                                    <svg className="w-20 h-20">
+                                      <circle cx="40" cy="40" r="32" className="stroke-white/5 stroke-[5]" fill="transparent" />
+                                      <circle cx="40" cy="40" r="32" className="stroke-emerald-500 stroke-[5] transition-all duration-700" fill="transparent"
+                                              strokeDasharray={`${2 * Math.PI * 32}`}
+                                              strokeDashoffset={`${2 * Math.PI * 32 * (1 - kycPct/100)}`}
+                                              strokeLinecap="round" />
+                                    </svg>
+                                    <span className="absolute text-sm text-white font-mono font-black">{kycPct}%</span>
+                                  </div>
+                                  <div className="space-y-1 text-slate-400 text-[10px] font-semibold">
+                                    <p className="flex items-center gap-1.5 text-white">
+                                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                                      {lang === 'bn' ? `${verifiedUsers} জন ভেরিফাইড` : `${verifiedUsers} Clients Verified`}
+                                    </p>
+                                    <p className="flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                                      {lang === 'bn' ? `${pendingKyc} জন অপেক্ষমান` : `${pendingKyc} Submissions Pending`}
+                                    </p>
+                                    <p className="flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 bg-white/10 rounded-full" />
+                                      {lang === 'bn' ? `মোট গ্রাহক ${totalUsers} জন` : `Total Base: ${totalUsers}`}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setActiveSubTab('kyc')}
+                                className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/15 text-emerald-400 rounded-xl text-[10px] font-black tracking-wider uppercase transition-colors text-center cursor-pointer"
+                              >
+                                {lang === 'bn' ? 'কেওয়াইসি রিকোয়েস্ট দেখুন' : 'Verify KYC Submissions'}
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
@@ -3740,7 +3940,37 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
               {/* Two-Column Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                 {/* Left Side: Users list */}
-                <div className={`space-y-2.5 ${selectedUser ? 'lg:col-span-5' : 'lg:col-span-12'}`}>
+                <div className={`space-y-3.5 ${selectedUser ? 'lg:col-span-5' : 'lg:col-span-12'}`}>
+                  {/* Premium CRM Filter Tabs */}
+                  <div className="flex bg-slate-950/60 p-1 border border-white/5 rounded-2xl gap-1">
+                    {[
+                      { id: 'all', label: lang === 'bn' ? 'সব গ্রাহক' : 'All' },
+                      { id: 'verified', label: lang === 'bn' ? 'ভেরিফাইড' : 'Verified' },
+                      { id: 'pending_kyc', label: lang === 'bn' ? 'কেওয়াইসি অপেক্ষমান' : 'Pending' },
+                      { id: 'suspended', label: lang === 'bn' ? 'স্থগিত' : 'Suspended' }
+                    ].map((tab) => {
+                      const isActive = userFilterTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => {
+                            setUserFilterTab(tab.id as any);
+                            // Clear selected user if they don't match the new filter tab to maintain consistent state
+                            setSelectedUser(null);
+                          }}
+                          className={`flex-1 py-1.5 text-[9.5px] font-black tracking-wider rounded-xl uppercase transition-all cursor-pointer text-center ${
+                            isActive
+                              ? 'bg-blue-600 border border-blue-500 text-white shadow-lg shadow-blue-500/15'
+                              : 'text-slate-400 hover:text-slate-200 border border-transparent hover:bg-white/[0.02]'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <div className="bg-slate-950/30 border border-white/10 rounded-3xl p-3 max-h-[480px] overflow-y-auto">
                     {registeredUsers.length === 0 ? (
                       <div className="text-center py-8 text-xs text-slate-400">
@@ -3750,6 +3980,12 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <div className="space-y-1.5">
                         {registeredUsers
                           .filter((u) => {
+                            // 1. CRM Status Filter Checks
+                            if (userFilterTab === 'verified' && u.kycStatus !== 'verified') return false;
+                            if (userFilterTab === 'pending_kyc' && u.kycStatus !== 'pending') return false;
+                            if (userFilterTab === 'suspended' && !u.isBanned) return false;
+
+                            // 2. Search Text Matches
                             const queryLower = searchUserQuery.toLowerCase().trim();
                             if (!queryLower) return true;
                             return (
@@ -3831,9 +4067,16 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="text-[9px] font-black tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/15 rounded px-1.5 py-0.5 uppercase font-mono">
-                            {lang === 'bn' ? 'নির্বাচিত ইউজার প্রোফাইল' : 'Selected Customer Profile'}
-                          </span>
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            <span className="text-[9px] font-black tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/15 rounded px-1.5 py-0.5 uppercase font-mono">
+                              {lang === 'bn' ? 'নির্বাচিত ইউজার প্রোফাইল' : 'Selected Customer Profile'}
+                            </span>
+                            {selectedUser.isBanned && (
+                              <span className="text-[9px] font-black tracking-widest text-rose-400 bg-rose-500/15 border border-rose-500/35 rounded px-1.5 py-0.5 uppercase font-mono animate-pulse">
+                                {lang === 'bn' ? 'স্থগিত' : 'Suspended'}
+                              </span>
+                            )}
+                          </div>
                           <h3 className="text-sm font-extrabold text-white mt-2 truncate">
                             {selectedUser.displayName}
                           </h3>
@@ -3844,8 +4087,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
                           </p>
 
-                          {/* Edit / Delete control buttons */}
-                          <div className="flex gap-2.5 mt-3">
+                          {/* Edit / Delete / Suspend control buttons */}
+                          <div className="flex flex-wrap gap-2 mt-3">
                             <button
                               type="button"
                               onClick={() => handleEditUser(selectedUser)}
@@ -3853,6 +4096,22 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             >
                               <Edit2 className="h-3.5 w-3.5" />
                               <span>{lang === 'bn' ? 'প্রোফাইল এডিট' : 'Edit Profile'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserBan(selectedUser.uid, !!selectedUser.isBanned)}
+                              className={`p-1 px-2.5 bg-white/5 border text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1 rounded-xl ${
+                                selectedUser.isBanned
+                                  ? 'hover:bg-emerald-600/20 text-emerald-400 border-emerald-500/20'
+                                  : 'hover:bg-amber-600/20 text-amber-500 border-amber-500/20'
+                              }`}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              <span>
+                                {selectedUser.isBanned
+                                  ? (lang === 'bn' ? 'সক্রিয় করুন' : 'Activate User')
+                                  : (lang === 'bn' ? 'স্থগিত করুন' : 'Suspend User')}
+                              </span>
                             </button>
                             <button
                               type="button"
