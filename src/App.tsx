@@ -54,6 +54,7 @@ import CashOutCalculatorModal from './components/CashOutCalculatorModal';
 import StorePanel from './components/StorePanel';
 import ReferralPanel from './components/ReferralPanel';
 import KYCModal from './components/KYCModal';
+import SimCardModal from './components/SimCardModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -158,6 +159,7 @@ export default function App() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isCashOutCalcOpen, setIsCashOutCalcOpen] = useState(false);
   const [isKYCOpen, setIsKYCOpen] = useState(false);
+  const [isSimOpen, setIsSimOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -1007,6 +1009,13 @@ export default function App() {
       action: () => setActiveTab('store')
     },
     {
+      id: 'sim',
+      title: lang === 'bn' ? 'সিম কার্ড' : 'SIM Card',
+      icon: Smartphone,
+      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
+      action: () => setIsSimOpen(true)
+    },
+    {
       id: 'support',
       title: lang === 'bn' ? 'সাপোর্ট ও চ্যাট' : 'Support & Chat',
       icon: MessageSquare,
@@ -1834,6 +1843,16 @@ export default function App() {
               lang={lang}
               isOpen={isSupportOpen}
               onClose={() => setIsSupportOpen(false)}
+            />
+          )}
+
+          {/* SIM CARD ORDERING MODAL */}
+          {isSimOpen && (
+            <SimCardModal
+              lang={lang}
+              isOpen={isSimOpen}
+              onClose={() => setIsSimOpen(false)}
+              walletBalance={balance}
             />
           )}
 

@@ -315,7 +315,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'scratch' | 'kyc'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc'>('requests');
   const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(true);
   const [userFilterTab, setUserFilterTab] = useState<'all' | 'verified' | 'pending_kyc' | 'suspended'>('all');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
@@ -410,6 +410,34 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [orderRejectReason, setOrderRejectReason] = useState('');
   const [rejectingOrderId, setRejectingOrderId] = useState<string | null>(null);
+  
+  // SIM Card order states
+  const [adminSimOrders, setAdminSimOrders] = useState<any[]>([]);
+  const [rejectingSimOrderId, setRejectingSimOrderId] = useState<string | null>(null);
+  const [simOrderRejectReason, setSimOrderRejectReason] = useState('');
+
+  // SIM Card Number Management states
+  const [adminSimNumbers, setAdminSimNumbers] = useState<any[]>([]);
+  const [simNumSubTab, setSimNumSubTab] = useState<'bookings' | 'numbers'>('bookings');
+  const [editingSimNumId, setEditingSimNumId] = useState<string | null>(null);
+  const [isSavingSimNum, setIsSavingSimNum] = useState(false);
+  const [simNumForm, setSimNumForm] = useState({
+    number: '',
+    operator: 'GP' as Operator,
+    type: 'Regular' as 'Regular' | 'VIP',
+    status: 'Available' as 'Available' | 'Locked' | 'Booked',
+    fullPrice: 150,
+    bookingFee: 50
+  });
+  const [simNumbersSearchQuery, setSimNumbersSearchQuery] = useState('');
+
+  const [simBookingOperatorFilter, setSimBookingOperatorFilter] = useState<string>('All');
+  const [simBookingTypeFilter, setSimBookingTypeFilter] = useState<string>('All');
+  const [simBookingStatusFilter, setSimBookingStatusFilter] = useState<string>('All');
+
+  const [simNumberOperatorFilter, setSimNumberOperatorFilter] = useState<string>('All');
+  const [simNumberTypeFilter, setSimNumberTypeFilter] = useState<string>('All');
+  const [simNumberStatusFilter, setSimNumberStatusFilter] = useState<string>('All');
 
   const handleCopyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -854,6 +882,40 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       }
     }, (error) => {
       console.error("Error loading orders in admin panel: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 5e. Listen for SIM card orders
+  useEffect(() => {
+    const q = collection(db, 'sim_orders');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id });
+      });
+      // Sort in-memory descending by date
+      list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setAdminSimOrders(list);
+    }, (error) => {
+      console.error("Error loading SIM orders in admin panel: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 5f. Listen for SIM numbers
+  useEffect(() => {
+    const q = collection(db, 'sim_numbers');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id });
+      });
+      setAdminSimNumbers(list);
+    }, (error) => {
+      console.error("Error loading SIM numbers in admin panel: ", error);
     });
 
     return () => unsubscribe();
@@ -1484,6 +1546,168 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     }
   };
 
+  // ---------------- SIM CARD ORDERS MANAGEMENT ----------------
+  const handleApproveSimOrder = async (order: any) => {
+    if (isProcessing) return;
+    setIsProcessing(order.id);
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Update order status to Approved (Shipped)
+      batch.update(doc(db, 'sim_orders', order.id), { status: 'Approved' });
+
+      // 2. Add customer notifications
+      const addedNotifId = `notif-sim-appr-${Date.now()}`;
+      const addedNotif = {
+        id: addedNotifId,
+        title: lang === 'bn' ? 'সিম কার্ড ডেলিভারি অনুমোদিত' : 'SIM Order Shipped',
+        titleBn: 'সিম কার্ডের আবেদনটি সম্পন্ন হয়েছে',
+        desc: `Your SIM order for ${order.operator} (${order.chosenNumber}) has been approved and shipped for biometric handoff!`,
+        descBn: `আপনার ${order.operator} সিম কার্ডের (${order.chosenNumber}) আবেদনটি সফলভাবে অনুমোদিত এবং বায়োমেট্রিক হ্যান্ডওভারের জন্য পাঠানো হয়েছে!`,
+        time: 'Just now',
+        read: false,
+      };
+      batch.set(doc(db, 'users', order.userId, 'notifications', addedNotifId), addedNotif);
+
+      // 3. Update status to Approved inside the user's transactions array
+      const timestampPart = order.id.replace('sim-', '');
+      const txDocId = `tx-sim-${timestampPart}`;
+      
+      batch.update(doc(db, 'users', order.userId, 'transactions', txDocId), { status: 'Approved' });
+
+      await batch.commit();
+      speak(lang === 'bn' ? 'সিম কার্ডের অর্ডার সফলভাবে সম্পন্ন হয়েছে' : 'SIM card order successfully approved');
+    } catch (err) {
+      console.error("Error approving SIM order:", err);
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleRejectSimOrder = async (order: any, reason: string) => {
+    if (isProcessing) return;
+    if (!reason.trim()) {
+      alert(lang === 'bn' ? 'অনুগ্রহ করে রিজেক্ট করার কারণ লিখুন।' : 'Please enter rejection reason.');
+      return;
+    }
+    setIsProcessing(order.id);
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Update order status to Rejected with reason
+      batch.update(doc(db, 'sim_orders', order.id), { 
+        status: 'Rejected',
+        rejectionReason: reason
+      });
+
+      // Refund amount is bookingFee if present, otherwise totalCost
+      const refundAmt = typeof order.bookingFee === 'number' ? order.bookingFee : (order.totalCost || 0);
+
+      // 2. Refund user's balance
+      const userBalanceDocRef = doc(db, 'users', order.userId, 'wallet', 'balance_doc');
+      const userProfileRef = doc(db, 'registered_users', order.userId);
+      const userBalanceSnap = await getDoc(userBalanceDocRef);
+      if (userBalanceSnap.exists()) {
+        const currentBal = userBalanceSnap.data().balance || 0;
+        const refundedBal = currentBal + refundAmt;
+        batch.set(userBalanceDocRef, { balance: refundedBal });
+        batch.set(userProfileRef, { balance: refundedBal }, { merge: true });
+      }
+
+      // 3. Update transaction status
+      const timestampPart = order.id.replace('sim-', '');
+      const txDocId = `tx-sim-${timestampPart}`;
+      batch.update(doc(db, 'users', order.userId, 'transactions', txDocId), { 
+        status: 'Rejected',
+        rejectionReason: reason
+      });
+
+      // 4. Update the SIM number status back to Available if applicable
+      if (order.numberDocId) {
+        batch.update(doc(db, 'sim_numbers', order.numberDocId), { status: 'Available' });
+      }
+
+      // 5. Add customer notification
+      const addedNotifId = `notif-sim-rej-${Date.now()}`;
+      const addedNotif = {
+        id: addedNotifId,
+        title: lang === 'bn' ? 'সিম অর্ডার বাতিল' : 'SIM Order Rejected',
+        titleBn: 'সিম অর্ডার বাতিল এবং রিফান্ড',
+        desc: `Your SIM order for ${order.operator} has been rejected. Reason: ${reason}. Refunded ৳${refundAmt} to your wallet.`,
+        descBn: `আপনার ${order.operator} সিম কার্ডের আবেদনটি বাতিল করা হয়েছে। কারণ: ${reason}। আপনার ওয়ালেটে ৳${refundAmt} টাকা ফেরত দেওয়া হয়েছে।`,
+        time: 'Just now',
+        read: false,
+      };
+      batch.set(doc(db, 'users', order.userId, 'notifications', addedNotifId), addedNotif);
+
+      await batch.commit();
+      setRejectingSimOrderId(null);
+      setSimOrderRejectReason('');
+    } catch (err) {
+      console.error("Error rejecting SIM order:", err);
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  // ---------------- SIM NUMBERS MANAGEMENT CRUD ----------------
+  const handleSaveSimNumber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!simNumForm.number.trim()) {
+      alert(lang === 'bn' ? 'অনুগ্রহ করে নম্বরটি লিখুন!' : 'Please enter the SIM number!');
+      return;
+    }
+    setIsSavingSimNum(true);
+    try {
+      const docId = editingSimNumId || `sim-num-${Date.now()}`;
+      const docRef = doc(db, 'sim_numbers', docId);
+      await setDoc(docRef, {
+        id: docId,
+        number: simNumForm.number.trim(),
+        operator: simNumForm.operator,
+        type: simNumForm.type,
+        status: simNumForm.status,
+        fullPrice: Number(simNumForm.fullPrice) || 150,
+        bookingFee: Number(simNumForm.bookingFee) || 50
+      }, { merge: true });
+
+      alert(lang === 'bn' ? 'সিম নম্বর সফলভাবে সংরক্ষিত হয়েছে!' : 'SIM Number successfully saved!');
+      setEditingSimNumId(null);
+      setSimNumForm(prev => ({
+        ...prev,
+        number: '',
+        status: 'Available'
+      }));
+    } catch (err: any) {
+      console.error("Error saving SIM number:", err);
+      alert("Error: " + err.message);
+    } finally {
+      setIsSavingSimNum(false);
+    }
+  };
+
+  const handleDeleteSimNumber = async (numId: string) => {
+    if (!confirm(lang === 'bn' ? 'আপনি কি নিশ্চিতভাবে এই নম্বরটি ডিলিট করতে চান?' : 'Are you sure you want to delete this SIM number?')) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'sim_numbers', numId));
+      alert(lang === 'bn' ? 'সিম নম্বর সফলভাবে ডিলিট হয়েছে!' : 'SIM Number successfully deleted!');
+    } catch (err: any) {
+      console.error("Error deleting SIM number:", err);
+      alert("Error: " + err.message);
+    }
+  };
+
+  const handleToggleSimNumberStatus = async (numberObj: any) => {
+    const nextStatus = numberObj.status === 'Locked' ? 'Available' : 'Locked';
+    try {
+      await setDoc(doc(db, 'sim_numbers', numberObj.id), { status: nextStatus }, { merge: true });
+    } catch (err: any) {
+      console.error("Error toggling SIM number status:", err);
+    }
+  };
+
   const handleAdjustUserBalance = async () => {
     if (!selectedUser || selectedUserBalance === null) return;
     const amount = parseFloat(userBalanceAdjustValue);
@@ -1954,6 +2178,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     { id: 'users' as const, label: labels.users, icon: User, badge: registeredUsers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
     { id: 'products' as const, label: lang === 'bn' ? 'স্টোর প্রোডাক্টস' : 'Manage Products', icon: Globe, badge: adminProducts.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
     { id: 'orders' as const, label: lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders', icon: ShoppingBag, badge: adminOrders.filter(o => o.status === 'Pending').length, badgeColor: 'bg-rose-500/15 text-rose-400 border border-rose-500/25' },
+    { id: 'sim_orders' as const, label: lang === 'bn' ? 'সিম অর্ডার্স' : 'SIM Orders', icon: Smartphone, badge: adminSimOrders.filter(s => s.status === 'Pending').length, badgeColor: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25' },
     { id: 'scratch' as const, label: lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Cards', icon: Smartphone, badge: scratchCards.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
     { id: 'kyc' as const, label: lang === 'bn' ? 'কেওয়াইসি ভেরিফিকেশন' : 'KYC Verification', icon: ShieldCheck, badge: registeredUsers.filter(u => u.kycStatus === 'pending').length, badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
     { id: 'support' as const, label: lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets', icon: MessageSquare, badge: supportTickets.filter(t => t.status === 'Open').length, badgeColor: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' },
@@ -2332,6 +2557,18 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   const pendingKyc = registeredUsers.filter(u => u.kycStatus === 'pending').length;
                   const kycPct = Math.round((verifiedUsers / totalUsers) * 100);
 
+                  // Determine column visibility based on active sub tab
+                  const showCol1 = activeSubTab === 'requests' || activeSubTab === 'offers' || activeSubTab === 'sim_orders';
+                  const showCol2 = activeSubTab === 'requests' || activeSubTab === 'billers';
+                  const showCol3 = activeSubTab === 'users' || activeSubTab === 'kyc';
+                  const visibleColsCount = (showCol1 ? 1 : 0) + (showCol2 ? 1 : 0) + (showCol3 ? 1 : 0);
+
+                  if (visibleColsCount === 0) return null;
+
+                  const gridClass = visibleColsCount === 3 ? "p-5 grid grid-cols-1 md:grid-cols-3 gap-5" :
+                                    visibleColsCount === 2 ? "p-5 grid grid-cols-1 md:grid-cols-2 gap-5" :
+                                    "p-5 grid grid-cols-1 gap-5";
+
                   return (
                     <div className="bg-slate-950/45 border border-white/10 rounded-[28px] overflow-hidden shadow-xl shadow-slate-950/20">
                       {/* Collapse Toggle Header */}
@@ -2365,111 +2602,117 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.3 }}
-                            className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5"
+                            className={gridClass}
                           >
                             {/* Column 1: Recharge Operator Shares */}
-                            <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-3.5">
-                              <span className="text-[9.5px] font-black text-blue-400 tracking-wider uppercase block font-mono">
-                                📱 Operator Recharge Volume (৳)
-                              </span>
-                              <div className="space-y-3">
-                                {[
-                                  { label: 'GP', val: opGP, pct: (opGP/totalOpSum)*100, color: 'bg-blue-500' },
-                                  { label: 'Robi', val: opRobi, pct: (opRobi/totalOpSum)*100, color: 'bg-red-500' },
-                                  { label: 'Airtel', val: opAirtel, pct: (opAirtel/totalOpSum)*100, color: 'bg-rose-600' },
-                                  { label: 'Banglalink', val: opBanglalink, pct: (opBanglalink/totalOpSum)*100, color: 'bg-orange-500' },
-                                  { label: 'Teletalk', val: opTeletalk, pct: (opTeletalk/totalOpSum)*100, color: 'bg-emerald-500' }
-                                ].map((item) => (
-                                  <div key={item.label} className="space-y-1">
-                                    <div className="flex justify-between text-[10.5px] font-bold">
-                                      <span className="text-white flex items-center gap-1.5">
-                                        <span className={`w-2 h-2 rounded-full ${item.color}`} />
-                                        {item.label}
-                                      </span>
-                                      <span className="text-slate-400 font-mono">
-                                        ৳{item.val.toLocaleString()} ({Math.round(item.pct)}%)
-                                      </span>
-                                    </div>
-                                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                                      <div className={`${item.color} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(item.pct, totalOpSum === 1 ? 0 : 3)}%` }} />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Column 2: Transaction Category Split */}
-                            <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-3.5">
-                              <span className="text-[9.5px] font-black text-pink-400 tracking-wider uppercase block font-mono">
-                                💰 Category Volume Share (৳)
-                              </span>
-                              <div className="space-y-3">
-                                {[
-                                  { label: lang === 'bn' ? 'অ্যাড ফান্ড' : 'Cash In', val: typeCashIn, pct: (typeCashIn/totalTypeSum)*100, color: 'bg-violet-500' },
-                                  { label: lang === 'bn' ? 'রিচার্জ' : 'Recharge', val: typeRecharge, pct: (typeRecharge/totalTypeSum)*100, color: 'bg-blue-500' },
-                                  { label: lang === 'bn' ? 'বিল পে' : 'Bill Payment', val: typeBill, pct: (typeBill/totalTypeSum)*100, color: 'bg-pink-500' },
-                                  { label: lang === 'bn' ? 'ট্রান্সফার' : 'Transfer', val: typeTransfer, pct: (typeTransfer/totalTypeSum)*100, color: 'bg-amber-500' }
-                                ].map((item) => (
-                                  <div key={item.label} className="space-y-1">
-                                    <div className="flex justify-between text-[10.5px] font-bold">
-                                      <span className="text-white flex items-center gap-1.5">
-                                        <span className={`w-2 h-2 rounded-full ${item.color}`} />
-                                        {item.label}
-                                      </span>
-                                      <span className="text-slate-400 font-mono">
-                                        ৳{item.val.toLocaleString()} ({Math.round(item.pct)}%)
-                                      </span>
-                                    </div>
-                                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                                      <div className={`${item.color} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(item.pct, totalTypeSum === 1 ? 0 : 3)}%` }} />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Column 3: KYC Verification Hub */}
-                            <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
-                              <div className="space-y-3.5">
-                                <span className="text-[9.5px] font-black text-emerald-400 tracking-wider uppercase block font-mono">
-                                  🪪 KYC Compliance Hub
+                            {showCol1 && (
+                              <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                                <span className="text-[9.5px] font-black text-blue-400 tracking-wider uppercase block font-mono">
+                                  📱 Operator Recharge Volume (৳)
                                 </span>
-                                <div className="flex items-center gap-4 py-2">
-                                  <div className="relative flex items-center justify-center">
-                                    {/* SVG Circular Indicator */}
-                                    <svg className="w-20 h-20">
-                                      <circle cx="40" cy="40" r="32" className="stroke-white/5 stroke-[5]" fill="transparent" />
-                                      <circle cx="40" cy="40" r="32" className="stroke-emerald-500 stroke-[5] transition-all duration-700" fill="transparent"
-                                              strokeDasharray={`${2 * Math.PI * 32}`}
-                                              strokeDashoffset={`${2 * Math.PI * 32 * (1 - kycPct/100)}`}
-                                              strokeLinecap="round" />
-                                    </svg>
-                                    <span className="absolute text-sm text-white font-mono font-black">{kycPct}%</span>
-                                  </div>
-                                  <div className="space-y-1 text-slate-400 text-[10px] font-semibold">
-                                    <p className="flex items-center gap-1.5 text-white">
-                                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                                      {lang === 'bn' ? `${verifiedUsers} জন ভেরিফাইড` : `${verifiedUsers} Clients Verified`}
-                                    </p>
-                                    <p className="flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-                                      {lang === 'bn' ? `${pendingKyc} জন অপেক্ষমান` : `${pendingKyc} Submissions Pending`}
-                                    </p>
-                                    <p className="flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 bg-white/10 rounded-full" />
-                                      {lang === 'bn' ? `মোট গ্রাহক ${totalUsers} জন` : `Total Base: ${totalUsers}`}
-                                    </p>
-                                  </div>
+                                <div className="space-y-3">
+                                  {[
+                                    { label: 'GP', val: opGP, pct: (opGP/totalOpSum)*100, color: 'bg-blue-500' },
+                                    { label: 'Robi', val: opRobi, pct: (opRobi/totalOpSum)*100, color: 'bg-red-500' },
+                                    { label: 'Airtel', val: opAirtel, pct: (opAirtel/totalOpSum)*100, color: 'bg-rose-600' },
+                                    { label: 'Banglalink', val: opBanglalink, pct: (opBanglalink/totalOpSum)*100, color: 'bg-orange-500' },
+                                    { label: 'Teletalk', val: opTeletalk, pct: (opTeletalk/totalOpSum)*100, color: 'bg-emerald-500' }
+                                  ].map((item) => (
+                                    <div key={item.label} className="space-y-1">
+                                      <div className="flex justify-between text-[10.5px] font-bold">
+                                        <span className="text-white flex items-center gap-1.5">
+                                          <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                                          {item.label}
+                                        </span>
+                                        <span className="text-slate-400 font-mono">
+                                          ৳{item.val.toLocaleString()} ({Math.round(item.pct)}%)
+                                        </span>
+                                      </div>
+                                      <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                                        <div className={`${item.color} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(item.pct, totalOpSum === 1 ? 0 : 3)}%` }} />
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => setActiveSubTab('kyc')}
-                                className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/15 text-emerald-400 rounded-xl text-[10px] font-black tracking-wider uppercase transition-colors text-center cursor-pointer"
-                              >
-                                {lang === 'bn' ? 'কেওয়াইসি রিকোয়েস্ট দেখুন' : 'Verify KYC Submissions'}
-                              </button>
-                            </div>
+                            )}
+
+                            {/* Column 2: Transaction Category Split */}
+                            {showCol2 && (
+                              <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                                <span className="text-[9.5px] font-black text-pink-400 tracking-wider uppercase block font-mono">
+                                  💰 Category Volume Share (৳)
+                                </span>
+                                <div className="space-y-3">
+                                  {[
+                                    { label: lang === 'bn' ? 'অ্যাড ফান্ড' : 'Cash In', val: typeCashIn, pct: (typeCashIn/totalTypeSum)*100, color: 'bg-violet-500' },
+                                    { label: lang === 'bn' ? 'রিচার্জ' : 'Recharge', val: typeRecharge, pct: (typeRecharge/totalTypeSum)*100, color: 'bg-blue-500' },
+                                    { label: lang === 'bn' ? 'বিল পে' : 'Bill Payment', val: typeBill, pct: (typeBill/totalTypeSum)*100, color: 'bg-pink-500' },
+                                    { label: lang === 'bn' ? 'ট্রান্সফার' : 'Transfer', val: typeTransfer, pct: (typeTransfer/totalTypeSum)*100, color: 'bg-amber-500' }
+                                  ].map((item) => (
+                                    <div key={item.label} className="space-y-1">
+                                      <div className="flex justify-between text-[10.5px] font-bold">
+                                        <span className="text-white flex items-center gap-1.5">
+                                          <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                                          {item.label}
+                                        </span>
+                                        <span className="text-slate-400 font-mono">
+                                          ৳{item.val.toLocaleString()} ({Math.round(item.pct)}%)
+                                        </span>
+                                      </div>
+                                      <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                                        <div className={`${item.color} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(item.pct, totalTypeSum === 1 ? 0 : 3)}%` }} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Column 3: KYC Verification Hub */}
+                            {showCol3 && (
+                              <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                                <div className="space-y-3.5">
+                                  <span className="text-[9.5px] font-black text-emerald-400 tracking-wider uppercase block font-mono">
+                                    🪪 KYC Compliance Hub
+                                  </span>
+                                  <div className="flex items-center gap-4 py-2">
+                                    <div className="relative flex items-center justify-center">
+                                      {/* SVG Circular Indicator */}
+                                      <svg className="w-20 h-20">
+                                        <circle cx="40" cy="40" r="32" className="stroke-white/5 stroke-[5]" fill="transparent" />
+                                        <circle cx="40" cy="40" r="32" className="stroke-emerald-500 stroke-[5] transition-all duration-700" fill="transparent"
+                                                strokeDasharray={`${2 * Math.PI * 32}`}
+                                                strokeDashoffset={`${2 * Math.PI * 32 * (1 - kycPct/100)}`}
+                                                strokeLinecap="round" />
+                                      </svg>
+                                      <span className="absolute text-sm text-white font-mono font-black">{kycPct}%</span>
+                                    </div>
+                                    <div className="space-y-1 text-slate-400 text-[10px] font-semibold">
+                                      <p className="flex items-center gap-1.5 text-white">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                                        {lang === 'bn' ? `${verifiedUsers} জন ভেরিফাইড` : `${verifiedUsers} Clients Verified`}
+                                      </p>
+                                      <p className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                                        {lang === 'bn' ? `${pendingKyc} জন অপেক্ষমান` : `${pendingKyc} Submissions Pending`}
+                                      </p>
+                                      <p className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-white/10 rounded-full" />
+                                        {lang === 'bn' ? `মোট গ্রাহক ${totalUsers} জন` : `Total Base: ${totalUsers}`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveSubTab('kyc')}
+                                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/15 text-emerald-400 rounded-xl text-[10px] font-black tracking-wider uppercase transition-colors text-center cursor-pointer"
+                                >
+                                  {lang === 'bn' ? 'কেওয়াইসি রিকোয়েস্ট দেখুন' : 'Verify KYC Submissions'}
+                                </button>
+                              </div>
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -3995,11 +4238,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                               (u.uid || '').toLowerCase().includes(queryLower)
                             );
                           })
-                          .map((userObj) => {
+                          .map((userObj, idx) => {
                             const isSelected = selectedUser?.uid === userObj.uid;
                             return (
                               <button
-                                key={userObj.uid}
+                                key={userObj.uid || userObj.id || `user-item-${idx}`}
                                 type="button"
                                 onClick={() => {
                                   setSelectedUser(userObj);
@@ -5193,6 +5436,605 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           const orderObj = adminOrders.find(o => o.id === rejectingOrderId);
                           if (orderObj) {
                             handleRejectOrder(orderObj, orderRejectReason);
+                          }
+                        }}
+                        className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-500/10 transition-all active:scale-98 cursor-pointer text-center"
+                      >
+                        {lang === 'bn' ? 'বাতিল করুন' : 'Reject & Refund'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 5e. SIM CARD ORDERS MANAGEMENT */}
+          {activeSubTab === 'sim_orders' && (
+            <div className="space-y-5">
+              {/* Secondary Sub-Tab Toggles */}
+              <div className="flex gap-2 p-1.5 bg-slate-950 border border-white/5 rounded-2xl max-w-sm">
+                <button
+                  type="button"
+                  onClick={() => setSimNumSubTab('bookings')}
+                  className={`flex-1 py-2 text-xs font-black rounded-xl text-center transition-all cursor-pointer ${
+                    simNumSubTab === 'bookings'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {lang === 'bn' ? 'সিম বুকিং অর্ডারস' : 'SIM Bookings'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSimNumSubTab('numbers')}
+                  className={`flex-1 py-2 text-xs font-black rounded-xl text-center transition-all cursor-pointer ${
+                    simNumSubTab === 'numbers'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {lang === 'bn' ? 'সিম নম্বর কালেকশন' : 'Manage Numbers'}
+                </button>
+              </div>
+
+              {simNumSubTab === 'bookings' ? (
+                <div className="bg-slate-900 border border-white/5 rounded-3xl p-6">
+                  <h3 className="text-sm font-black tracking-tight mb-4 flex items-center justify-between">
+                    <span>{lang === 'bn' ? 'সিম কার্ড অর্ডারের আবেদনসমূহ' : 'SIM Card Order Applications'}</span>
+                    <span className="text-xs bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 px-3 py-1 rounded-full font-bold">
+                      {adminSimOrders.filter(o => o.status === 'Pending').length} Pending
+                    </span>
+                  </h3>
+
+                  {/* Dropdown filters for SIM Bookings */}
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'অপারেটর ফিল্টার' : 'Filter Operator'}</label>
+                      <select
+                        value={simBookingOperatorFilter}
+                        onChange={(e) => setSimBookingOperatorFilter(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-1.5 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                      >
+                        <option value="All">{lang === 'bn' ? 'সব অপারেটর' : 'All Operators'}</option>
+                        <option value="GP">GP</option>
+                        <option value="Robi">Robi</option>
+                        <option value="Airtel">Airtel</option>
+                        <option value="Banglalink">Banglalink</option>
+                        <option value="Teletalk">Teletalk</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'টাইপ ফিল্টার' : 'Filter SIM Type'}</label>
+                      <select
+                        value={simBookingTypeFilter}
+                        onChange={(e) => setSimBookingTypeFilter(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-1.5 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                      >
+                        <option value="All">{lang === 'bn' ? 'সব ধরন' : 'All Types'}</option>
+                        <option value="Prepaid">Prepaid</option>
+                        <option value="Postpaid">Postpaid</option>
+                        <option value="eSIM">eSIM</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'স্ট্যাটাস ফিল্টার' : 'Filter Status'}</label>
+                      <select
+                        value={simBookingStatusFilter}
+                        onChange={(e) => setSimBookingStatusFilter(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-1.5 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                      >
+                        <option value="All">{lang === 'bn' ? 'সব স্ট্যাটাস' : 'All Status'}</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const filteredSimOrders = adminSimOrders.filter(o => {
+                      const matchesOp = simBookingOperatorFilter === 'All' || o.operator === simBookingOperatorFilter;
+                      const matchesType = simBookingTypeFilter === 'All' || o.simType === simBookingTypeFilter;
+                      const matchesStatus = simBookingStatusFilter === 'All' || o.status === simBookingStatusFilter;
+                      return matchesOp && matchesType && matchesStatus;
+                    });
+
+                    if (filteredSimOrders.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-slate-500 font-semibold text-xs">
+                          {lang === 'bn' ? 'ফিল্টার অনুযায়ী কোনো সিম কার্ড অর্ডার পাওয়া যায়নি!' : 'No SIM card orders match your selected filters.'}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-4">
+                        {filteredSimOrders.map((order, index) => {
+                          const isPending = order.status === 'Pending';
+                          const operatorColor = order.operator === 'GP' ? 'bg-sky-500' :
+                                                order.operator === 'Robi' ? 'bg-[#e2125d]' :
+                                                order.operator === 'Airtel' ? 'bg-rose-600' :
+                                                order.operator === 'Banglalink' ? 'bg-orange-500' :
+                                                'bg-emerald-600';
+                          
+                          // Handle pricing labels beautifully
+                          const isBookingPaid = typeof order.bookingFee === 'number';
+                          const bookingFeeAmt = isBookingPaid ? order.bookingFee : (order.totalCost || 150);
+                          const dueAmt = isBookingPaid ? (order.dueAmount || 0) : 0;
+
+                        return (
+                          <div key={`${order.id || index}-${index}`} className="bg-slate-950 border border-white/5 rounded-3xl p-5 flex flex-col md:flex-row gap-5 items-start justify-between hover:border-slate-700/80 transition-all">
+                            {/* Order specifications details */}
+                            <div className="space-y-2 flex-1 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                                  order.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                  order.status === 'Rejected' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                                  'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                                }`}>
+                                  {order.status}
+                                </span>
+                                <span className={`text-[9px] font-black text-white px-2 py-0.5 rounded-md ${operatorColor}`}>
+                                  {order.operator}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono font-bold">ID: {order.id}</span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                                {/* Customer Information Column */}
+                                <div className="space-y-1">
+                                  <p className="text-[10px] uppercase font-bold text-slate-400">{lang === 'bn' ? 'গ্রাহকের বিবরণ' : 'Customer Info'}</p>
+                                  <p className="font-extrabold text-slate-200">{order.userName}</p>
+                                  <p className="text-[11px] text-slate-400">{order.userEmail}</p>
+                                  <p className="text-[11px] text-blue-400 font-bold flex items-center gap-1 cursor-pointer" onClick={() => handleCopyToClipboard(order.contactPhone, order.id + '-phone')}>
+                                    <span>{order.contactPhone}</span>
+                                    <Copy className="h-3 w-3" />
+                                  </p>
+                                </div>
+
+                                {/* SIM Specifications Column */}
+                                <div className="space-y-1">
+                                  <p className="text-[10px] uppercase font-bold text-slate-400">{lang === 'bn' ? 'সিমের বিবরণ' : 'SIM Particulars'}</p>
+                                  <p className="font-extrabold text-slate-200">
+                                    {order.simType === 'eSIM' ? 'eSIM (Digital)' : `${order.simType} SIM Card`}
+                                  </p>
+                                  <p className="text-xs font-black font-mono text-indigo-400">
+                                    {lang === 'bn' ? 'পছন্দের নম্বর: ' : 'Chosen Number: '} {order.chosenNumber}
+                                  </p>
+                                  
+                                  {/* Detailed Booking Pricing display */}
+                                  <div className="pt-1.5 space-y-0.5 text-[11px] font-semibold">
+                                    <p className="text-slate-300">
+                                      {lang === 'bn' ? 'মোট মূল্য: ' : 'Total Cost: '} <span className="font-mono text-slate-100 font-black">৳{order.totalCost}</span>
+                                    </p>
+                                    <p className="text-emerald-400">
+                                      {lang === 'bn' ? 'বুকিং ফি পরিশোধিত: ' : 'Booking Fee Paid: '} <span className="font-mono font-black">৳{bookingFeeAmt}</span>
+                                    </p>
+                                    <p className="text-amber-400">
+                                      {lang === 'bn' ? 'দোকানে পরিশোধযোগ্য বাকি: ' : 'Due Amount at Shop: '} <span className="font-mono font-black">৳{dueAmt}</span>
+                                    </p>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 pt-1">{new Date(order.date).toLocaleString()}</p>
+                                </div>
+                              </div>
+
+                              {/* Delivery & NID information */}
+                              <div className="pt-2 border-t border-white/5 space-y-1 text-[11px]">
+                                <p className="text-slate-300">
+                                  <strong className="text-slate-400">{lang === 'bn' ? 'এনআইডি (NID) নম্বর:' : 'NID Number:'}</strong> <span className="font-mono text-indigo-300 font-bold">{order.nidNumber}</span>
+                                </p>
+                                <p className="text-slate-300">
+                                  <strong className="text-slate-400">{lang === 'bn' ? 'ডেলিভারি ঠিকানা:' : 'Shipping Address:'}</strong> {order.deliveryAddress}
+                                </p>
+                                {order.note && (
+                                  <p className="text-slate-400 italic">
+                                    <strong>Memo:</strong> {order.note}
+                                  </p>
+                                )}
+                                {order.rejectionReason && (
+                                  <p className="text-rose-400 font-semibold bg-rose-950/20 border border-rose-900/30 p-2.5 rounded-xl mt-1">
+                                    <strong>Rejection Reason:</strong> {order.rejectionReason}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Approval reject action CTAs */}
+                            {isPending && (
+                              <div className="flex md:flex-col gap-2 shrink-0 w-full md:w-auto">
+                                <button
+                                  onClick={() => handleApproveSimOrder(order)}
+                                  className="flex-1 md:w-36 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md shadow-emerald-500/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <Check className="h-4 w-4" />
+                                  <span>{lang === 'bn' ? 'ডেলিভার করুন' : 'Approve & Ship'}</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setRejectingSimOrderId(order.id);
+                                    setSimOrderRejectReason('');
+                                  }}
+                                  className="flex-1 md:w-36 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black shadow-md shadow-rose-500/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <X className="h-4 w-4" />
+                                  <span>{lang === 'bn' ? 'বাতিল করুন' : 'Reject Order'}</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Form to Add / Edit SIM Numbers */}
+                  <form onSubmit={handleSaveSimNumber} className="bg-slate-900 border border-white/5 rounded-3xl p-5 space-y-4 text-slate-100">
+                    <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">
+                      {editingSimNumId ? (lang === 'bn' ? 'সিম নম্বর এডিট করুন' : 'Edit SIM Number') : (lang === 'bn' ? 'নতুন সিম নম্বর যোগ করুন' : 'Add New SIM Number')}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'অপারেটর' : 'Operator'}</label>
+                        <select
+                          value={simNumForm.operator}
+                          onChange={(e) => setSimNumForm({ ...simNumForm, operator: e.target.value as Operator })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="GP">GP</option>
+                          <option value="Robi">Robi</option>
+                          <option value="Airtel">Airtel</option>
+                          <option value="Banglalink">Banglalink</option>
+                          <option value="Teletalk">Teletalk</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'মোবাইল নম্বর' : 'Phone Number'}</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 01711-223344"
+                          value={simNumForm.number}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            let detectedOp = simNumForm.operator;
+                            const cleanVal = val.replace(/[\s-]/g, '');
+                            if (cleanVal.startsWith('017') || cleanVal.startsWith('013') || cleanVal.startsWith('+88017') || cleanVal.startsWith('+88013')) {
+                              detectedOp = 'GP';
+                            } else if (cleanVal.startsWith('018') || cleanVal.startsWith('+88018')) {
+                              detectedOp = 'Robi';
+                            } else if (cleanVal.startsWith('016') || cleanVal.startsWith('+88016')) {
+                              detectedOp = 'Airtel';
+                            } else if (cleanVal.startsWith('019') || cleanVal.startsWith('014') || cleanVal.startsWith('+88019') || cleanVal.startsWith('+88014')) {
+                              detectedOp = 'Banglalink';
+                            } else if (cleanVal.startsWith('015') || cleanVal.startsWith('+88015')) {
+                              detectedOp = 'Teletalk';
+                            }
+                            setSimNumForm({ ...simNumForm, number: val, operator: detectedOp });
+                          }}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-mono font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'ধরন' : 'Type'}</label>
+                        <select
+                          value={simNumForm.type}
+                          onChange={(e) => {
+                            const newType = e.target.value as 'Regular' | 'VIP';
+                            setSimNumForm({ 
+                              ...simNumForm, 
+                              type: newType,
+                              fullPrice: newType === 'VIP' ? 450 : 150,
+                              bookingFee: newType === 'VIP' ? 100 : 50
+                            });
+                          }}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="Regular">Regular</option>
+                          <option value="VIP">VIP Golden</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'সম্পূর্ণ মূল্য (৳)' : 'Full Price (৳)'}</label>
+                        <input
+                          type="number"
+                          required
+                          value={simNumForm.fullPrice}
+                          onChange={(e) => setSimNumForm({ ...simNumForm, fullPrice: Number(e.target.value) })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-mono font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'বুকিং ফি (৳)' : 'Booking Fee (৳)'}</label>
+                        <input
+                          type="number"
+                          required
+                          value={simNumForm.bookingFee}
+                          onChange={(e) => setSimNumForm({ ...simNumForm, bookingFee: Number(e.target.value) })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-mono font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'স্ট্যাটাস' : 'Status'}</label>
+                        <select
+                          value={simNumForm.status}
+                          onChange={(e) => setSimNumForm({ ...simNumForm, status: e.target.value as any })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="Available">Available</option>
+                          <option value="Locked">Locked (Unavailable)</option>
+                          <option value="Booked">Booked (Ordered)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-1">
+                      {editingSimNumId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSimNumId(null);
+                            setSimNumForm({
+                              number: '',
+                              operator: 'GP',
+                              type: 'Regular',
+                              status: 'Available',
+                              fullPrice: 150,
+                              bookingFee: 50
+                            });
+                          }}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                        >
+                          {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isSavingSimNum}
+                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-500/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {isSavingSimNum ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>{editingSimNumId ? (lang === 'bn' ? 'আপডেট করুন' : 'Update Number') : (lang === 'bn' ? 'নম্বর যোগ করুন' : 'Add Number')}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* List / Table of Available SIM Numbers */}
+                  <div className="bg-slate-900 border border-white/5 rounded-3xl p-6 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <h3 className="text-sm font-black tracking-tight">{lang === 'bn' ? 'সিম নম্বর গ্যালারি' : 'SIM Numbers Collection'}</h3>
+                      <input
+                        type="text"
+                        placeholder={lang === 'bn' ? 'নম্বর দিয়ে খুঁজুন...' : 'Search by number...'}
+                        value={simNumbersSearchQuery}
+                        onChange={(e) => setSimNumbersSearchQuery(e.target.value)}
+                        className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 outline-none w-full md:w-64 focus:border-indigo-500 font-semibold"
+                      />
+                    </div>
+
+                    {/* Dropdown filters for SIM Numbers Collection */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'অপারেটর ফিল্টার' : 'Filter Operator'}</label>
+                        <select
+                          value={simNumberOperatorFilter}
+                          onChange={(e) => setSimNumberOperatorFilter(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-1.5 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="All">{lang === 'bn' ? 'সব অপারেটর' : 'All Operators'}</option>
+                          <option value="GP">GP</option>
+                          <option value="Robi">Robi</option>
+                          <option value="Airtel">Airtel</option>
+                          <option value="Banglalink">Banglalink</option>
+                          <option value="Teletalk">Teletalk</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'টাইপ ফিল্টার' : 'Filter Type'}</label>
+                        <select
+                          value={simNumberTypeFilter}
+                          onChange={(e) => setSimNumberTypeFilter(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-1.5 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="All">{lang === 'bn' ? 'সব ধরন' : 'All Types'}</option>
+                          <option value="Regular">Regular</option>
+                          <option value="VIP">VIP Golden</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'স্ট্যাটাস ফিল্টার' : 'Filter Status'}</label>
+                        <select
+                          value={simNumberStatusFilter}
+                          onChange={(e) => setSimNumberStatusFilter(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-1.5 px-3 text-xs outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="All">{lang === 'bn' ? 'সব স্ট্যাটাস' : 'All Status'}</option>
+                          <option value="Available">Available</option>
+                          <option value="Locked">Locked</option>
+                          <option value="Booked">Booked</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/5 text-slate-400 font-extrabold uppercase text-[10px] tracking-wider">
+                            <th className="py-3 px-4">{lang === 'bn' ? 'অপারেটর' : 'Operator'}</th>
+                            <th className="py-3 px-4">{lang === 'bn' ? 'মোবাইল নম্বর' : 'Phone Number'}</th>
+                            <th className="py-3 px-4">{lang === 'bn' ? 'টাইপ' : 'Type'}</th>
+                            <th className="py-3 px-4">{lang === 'bn' ? 'সম্পূর্ণ মূল্য' : 'Full Price'}</th>
+                            <th className="py-3 px-4">{lang === 'bn' ? 'বুকিং ফি' : 'Booking Fee'}</th>
+                            <th className="py-3 px-4">{lang === 'bn' ? 'স্ট্যাটাস' : 'Status'}</th>
+                            <th className="py-3 px-4 text-right">{lang === 'bn' ? 'অ্যাকশন' : 'Actions'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {adminSimNumbers
+                            .filter(n => {
+                              const queryLower = simNumbersSearchQuery.toLowerCase();
+                              const matchesSearch = (
+                                (n.number || '').toLowerCase().includes(queryLower) ||
+                                (n.operator || '').toLowerCase().includes(queryLower) ||
+                                (n.type || '').toLowerCase().includes(queryLower) ||
+                                (n.status || '').toLowerCase().includes(queryLower)
+                              );
+                              const matchesOp = simNumberOperatorFilter === 'All' || n.operator === simNumberOperatorFilter;
+                              const matchesType = simNumberTypeFilter === 'All' || n.type === simNumberTypeFilter;
+                              const matchesStatus = simNumberStatusFilter === 'All' || n.status === simNumberStatusFilter;
+                              return matchesSearch && matchesOp && matchesType && matchesStatus;
+                            })
+                            .map((num, idx) => {
+                              const opColor = num.operator === 'GP' ? 'bg-sky-500' :
+                                              num.operator === 'Robi' ? 'bg-[#e2125d]' :
+                                              num.operator === 'Airtel' ? 'bg-rose-600' :
+                                              num.operator === 'Banglalink' ? 'bg-orange-500' :
+                                              'bg-emerald-600';
+                              return (
+                                <tr key={num.id || idx} className="hover:bg-white/5 transition-colors font-semibold text-slate-200">
+                                  <td className="py-3 px-4">
+                                    <span className={`text-[10px] font-black text-white px-2 py-0.5 rounded-md ${opColor}`}>
+                                      {num.operator}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 font-mono font-bold text-slate-100">{num.number}</td>
+                                  <td className="py-3 px-4">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      num.type === 'VIP' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-slate-300'
+                                    }`}>
+                                      {num.type}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 font-mono">৳{num.fullPrice}</td>
+                                  <td className="py-3 px-4 font-mono text-[#e2125d]">৳{num.bookingFee}</td>
+                                  <td className="py-3 px-4">
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                      num.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                      num.status === 'Booked' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                      'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                    }`}>
+                                      {num.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <div className="flex justify-end gap-1.5">
+                                      {/* Quick Lock/Unlock Status toggle */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSimNumberStatus(num)}
+                                        title={num.status === 'Locked' ? 'Unlock Number' : 'Lock Number'}
+                                        disabled={num.status === 'Booked'}
+                                        className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                          num.status === 'Locked'
+                                            ? 'bg-rose-600/20 border-rose-500/20 text-rose-400 hover:bg-rose-600/30'
+                                            : 'bg-emerald-600/20 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/30'
+                                        } disabled:opacity-30 disabled:cursor-not-allowed`}
+                                      >
+                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                      </button>
+                                      {/* Edit Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingSimNumId(num.id);
+                                          setSimNumForm({
+                                            number: num.number,
+                                            operator: num.operator,
+                                            type: num.type,
+                                            status: num.status,
+                                            fullPrice: num.fullPrice,
+                                            bookingFee: num.bookingFee
+                                          });
+                                        }}
+                                        className="p-1.5 bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-600/30 rounded-lg cursor-pointer"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      {/* Delete Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteSimNumber(num.id)}
+                                        className="p-1.5 bg-rose-600/20 border border-rose-500/20 text-rose-400 hover:bg-rose-600/30 rounded-lg cursor-pointer"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          {adminSimNumbers.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="text-center py-8 text-slate-500 font-semibold text-xs">
+                                {lang === 'bn' ? 'কোনো নম্বর পাওয়া যায়নি!' : 'No numbers found! Adding or seeding on load...'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SIM Order Rejection Custom Dialog Prompt */}
+              {rejectingSimOrderId && (
+                <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+                  <div 
+                    onClick={() => setRejectingSimOrderId(null)}
+                    className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+                  />
+                  <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-xl p-6 border border-slate-100 flex flex-col space-y-4 relative z-50 animate-scale-up text-slate-800">
+                    <div className="flex items-center gap-2.5 text-rose-600 pb-1 border-b border-slate-100">
+                      <AlertTriangle className="h-5 w-5 shrink-0" />
+                      <h3 className="text-slate-950 font-black text-sm tracking-tight">
+                        {lang === 'bn' ? 'সিম অর্ডার বাতিল করুন' : 'Reject SIM Order'}
+                      </h3>
+                    </div>
+
+                    <p className="text-xs text-slate-500 font-medium">
+                      {lang === 'bn' ? 'অর্ডারটি রিজেক্ট করার কারণ লিখুন। এটি গ্রাহকের প্যানেলে দেখা যাবে এবং ওয়ালেট টাকা ফেরত যাবে।' : 'Specify why you are rejecting this SIM order. The customer will be refunded automatically.'}
+                    </p>
+
+                    <input
+                      type="text"
+                      required
+                      placeholder={lang === 'bn' ? 'যেমন: ভুল এনআইডি নম্বর, অসম্পূর্ণ ঠিকানা ইত্যাদি' : 'e.g., Invalid NID, Incomplete address...'}
+                      value={simOrderRejectReason}
+                      onChange={(e) => setSimOrderRejectReason(e.target.value)}
+                      className="w-full bg-slate-100 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-semibold text-slate-800 outline-none focus:border-rose-500"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setRejectingSimOrderId(null)}
+                        className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-98 cursor-pointer text-center"
+                      >
+                        {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const orderObj = adminSimOrders.find(o => o.id === rejectingSimOrderId);
+                          if (orderObj) {
+                            handleRejectSimOrder(orderObj, simOrderRejectReason);
                           }
                         }}
                         className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-500/10 transition-all active:scale-98 cursor-pointer text-center"

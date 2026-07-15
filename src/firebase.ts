@@ -1,5 +1,5 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import appletConfig from '../firebase-applet-config.json';
 
@@ -17,9 +17,12 @@ const defaultFirebaseConfig = {
 const activeConfig = defaultFirebaseConfig;
 
 const app = !getApps().length ? initializeApp(activeConfig) : getApp();
-export const db = activeConfig.firestoreDatabaseId 
-  ? getFirestore(app, activeConfig.firestoreDatabaseId) 
-  : getFirestore(app); 
+
+// Use initializeFirestore with experimentalForceLongPolling to prevent iframe proxy WebSocket blocks
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, activeConfig.firestoreDatabaseId || undefined);
+
 export const auth = getAuth(app);
 export const currentFirebaseConfig = activeConfig;
 
