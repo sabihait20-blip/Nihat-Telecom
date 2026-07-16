@@ -1490,7 +1490,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen ${(!currentUser || viewMode === 'mobile-mock') ? 'bg-slate-950' : 'bg-slate-50'} flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased text-slate-800`}>
+    <div className={`min-h-screen ${(!currentUser || viewMode === 'mobile-mock') ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased`}>
       
       {/* Dynamic view toggler float pill on computer wide screens */}
       {isLargeScreen && (
@@ -1520,7 +1520,7 @@ export default function App() {
         renderDesktopDashboard()
       ) : (
         /* Smartphone Frame Outer Body container */
-        <div className={`w-full max-w-md ${!currentUser ? 'bg-slate-900 border-slate-800 shadow-slate-950/50' : 'bg-slate-50 border-slate-200/45 shadow-2xl'} min-h-screen md:min-h-[812px] md:rounded-[3rem] relative overflow-hidden flex flex-col pb-24 border`}>
+        <div className={`w-full max-w-md ${!currentUser ? 'bg-slate-900 border-slate-800 shadow-slate-950/50 text-slate-100' : 'bg-slate-50 border-slate-200/45 shadow-2xl text-slate-800'} min-h-screen md:min-h-[812px] md:rounded-[3rem] relative overflow-hidden flex flex-col pb-24 border`}>
         
         {/* Firebase user login / registration system */}
         <AnimatePresence>

@@ -17,7 +17,7 @@
 @layer base {
   body {
     background-color: #020617; /* Slate 950 to prevent white bars */
-    color: #0F172A;
+    color: #F8FAFC;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
