@@ -45,7 +45,7 @@ export interface Transaction {
   userEmail?: string;
   userName?: string;
   rejectionReason?: string;
-  transferMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)' | 'Received from User';
+  transferMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'NIHAD BUSINESS POINT Wallet (User)' | 'Received from User';
   voucherItem?: string;
   voucherCode?: string;
   details?: string;

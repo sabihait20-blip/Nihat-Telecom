@@ -41,8 +41,8 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
   const labels = {
     loginTitle: lang === 'bn' ? 'অ্যাকাউন্টে লগইন করুন' : 'Login to Account',
     signUpTitle: lang === 'bn' ? 'মোবাইল নম্বর দিয়ে সাইন আপ' : 'Sign Up with Phone',
-    loginSubtitle: lang === 'bn' ? 'আপনার নিহাদ টেলিকম অ্যাকাউন্টে প্রবেশ করুন' : 'Access your Nihad Telecom wallet',
-    signUpSubtitle: lang === 'bn' ? 'আপনার ব্যক্তিগত নিহাদ টেলিকম অ্যাকাউন্ট এবং ওয়ালেট খুলুন' : 'Create your secure personal Nihad Telecom wallet',
+    loginSubtitle: lang === 'bn' ? 'আপনার NIHAD BUSINESS POINT অ্যাকাউন্টে প্রবেশ করুন' : 'Access your NIHAD BUSINESS POINT wallet',
+    signUpSubtitle: lang === 'bn' ? 'আপনার ব্যক্তিগত NIHAD BUSINESS POINT অ্যাকাউন্ট এবং ওয়ালেট খুলুন' : 'Create your secure personal NIHAD BUSINESS POINT wallet',
     phoneOrEmailPlaceholder: lang === 'bn' ? 'মোবাইল নম্বর অথবা ইমেইল লিখুন' : 'Enter mobile number or email',
     phonePlaceholder: lang === 'bn' ? 'মোবাইল নম্বর লিখুন (১১ ডিজিট)' : 'Enter 11-digit mobile number',
     passwordPlaceholder: lang === 'bn' ? 'পিন বা পাসওয়ার্ড দিন' : 'Enter PIN or password',
@@ -204,7 +204,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
         return;
       }
       // Map it securely under the hood to a stable virtual email
-      resolvedEmail = `${inputVal}@nihat-telecom.com`;
+      resolvedEmail = `${inputVal}@nihad-business-point.com`;
     }
 
     try {

@@ -259,7 +259,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               <div>
                 <h2 className="text-xl font-black tracking-tight flex items-center gap-1.5">
                   <BagIcon className="h-5 w-5" />
-                  {lang === 'bn' ? 'নিহাদ মেগা স্টোর' : 'Nihad Mega Store'}
+                  {lang === 'bn' ? 'NIHAD BUSINESS POINT মেগা স্টোর' : 'NIHAD BUSINESS POINT Mega Store'}
                 </h2>
                 <p className="text-[11px] text-white/80 font-bold mt-1">
                   {lang === 'bn' ? 'ডিজিটাল ও ফিজিক্যাল লাইফস্টাইল গুডস' : 'Premium Digital & Physical Lifestyle Goods'}

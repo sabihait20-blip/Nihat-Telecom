@@ -165,7 +165,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                         : tx.type === 'Bill'
                         ? `${lang === 'bn' ? tx.billerNameBn : tx.billerName}`
                         : tx.type === 'Transfer'
-                        ? (tx.transferMethod === 'Nihad Wallet (User)'
+                        ? (tx.transferMethod === 'NIHAD BUSINESS POINT Wallet (User)'
                             ? `${lang === 'bn' ? 'ইউজার টু ইউজার সেন্ড মানি' : 'P2P Send Money'}`
                             : `${tx.transferMethod} ${lang === 'bn' ? 'ট্রান্সফার' : 'Transfer'}`)
                         : tx.type === 'Voucher'
@@ -186,7 +186,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                             ? (lang === 'bn' ? `প্রেরক: ${tx.operator || ''} (${tx.targetNumber})` : `Sender: ${tx.operator || ''} (${tx.targetNumber})`)
                             : (lang === 'bn' ? `জমাকৃত মাধ্যম: ${tx.targetNumber}` : `Received via ${tx.targetNumber}`))
                         : tx.type === 'Transfer'
-                        ? (tx.transferMethod === 'Nihad Wallet (User)'
+                        ? (tx.transferMethod === 'NIHAD BUSINESS POINT Wallet (User)'
                             ? (lang === 'bn' ? `প্রাপক: ${tx.operator || ''} (${tx.targetNumber})` : `Recipient: ${tx.operator || ''} (${tx.targetNumber})`)
                             : (lang === 'bn' ? `প্রাপক নম্বর: ${tx.targetNumber}` : `Recipient Number: ${tx.targetNumber}`))
                         : tx.type === 'Voucher'

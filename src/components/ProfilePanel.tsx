@@ -44,8 +44,8 @@ export default function ProfilePanel({
     ? currentUser.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : currentUser?.email
     ? currentUser.email.slice(0, 2).toUpperCase()
-    : 'NT';
-  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Nihad Telecom User';
+    : 'NBP';
+  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'NIHAD BUSINESS POINT User';
   const userEmail = currentUser?.email || 'user@test.com';
 
   // Security States

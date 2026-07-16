@@ -1982,7 +1982,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         uid,
         displayName: userForm.displayName,
         phone: userForm.phone,
-        email: userForm.email || (userForm.phone ? `${userForm.phone}@nihat-telecom.com` : `${uid}@nihat-telecom.com`),
+        email: userForm.email || (userForm.phone ? `${userForm.phone}@nihad-business-point.com` : `${uid}@nihad-business-point.com`),
       };
 
       // Save/update registered_users profile doc
@@ -4119,7 +4119,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input 
                         type="text" 
                         required
-                        placeholder="e.g. Nihat Ahmed"
+                        placeholder="e.g. NIHAD BUSINESS POINT"
                         value={userForm.displayName}
                         onChange={(e) => setUserForm({...userForm, displayName: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"

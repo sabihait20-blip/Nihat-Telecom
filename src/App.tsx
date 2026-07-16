@@ -345,7 +345,7 @@ export default function App() {
           uid: currentUser.uid,
           displayName: currentUser.displayName || 'Unknown User',
           email: currentUser.email || '',
-          phone: existingPhone || (currentUser.email?.endsWith('@nihat-telecom.com') 
+          phone: existingPhone || ((currentUser.email?.endsWith('@nihat-telecom.com') || currentUser.email?.endsWith('@nihad-business-point.com')) 
             ? currentUser.email.split('@')[0] 
             : ''),
           lastActive: new Date().toISOString()
@@ -428,8 +428,8 @@ export default function App() {
         try {
           const welcomeNotif = {
             id: 'notif-welcome',
-            title: 'Welcome to Nihat Telecom',
-            titleBn: 'নিহাত টেলিকমে স্বাগতম',
+            title: 'Welcome to NIHAD BUSINESS POINT',
+            titleBn: 'NIHAD BUSINESS POINT এ স্বাগতম',
             desc: 'Your secure wallet and mobile recharge account is active and verified.',
             descBn: 'আপনার নিরাপদ ওয়ালেট এবং মোবাইল রিচার্জ অ্যাকাউন্টটি সফলভাবে সক্রিয় করা হয়েছে।',
             time: 'Just now',
@@ -456,7 +456,7 @@ export default function App() {
 
               if ('Notification' in window && Notification.permission === 'granted') {
                 try {
-                  new Notification(title || 'Nihat Telecom', {
+                  new Notification(title || 'NIHAD BUSINESS POINT', {
                     body: body || '',
                     icon: '/favicon.ico',
                     tag: notif.id,
@@ -670,7 +670,7 @@ export default function App() {
 
   const handleTransferSuccess = async (
     amount: number, 
-    method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)', 
+    method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'NIHAD BUSINESS POINT Wallet (User)', 
     targetNumber: string,
     note?: string,
     recipientUid?: string,
@@ -684,7 +684,7 @@ export default function App() {
       return;
     }
 
-    if (method === 'Nihad Wallet (User)') {
+    if (method === 'NIHAD BUSINESS POINT Wallet (User)') {
       if (!recipientUid) {
         alert(lang === 'bn' ? 'গ্রাহক তথ্য পাওয়া যায়নি!' : 'Recipient info not found!');
         return;
@@ -715,7 +715,7 @@ export default function App() {
           type: 'Transfer',
           amount,
           targetNumber, // recipient phone/email
-          transferMethod: 'Nihad Wallet (User)',
+          transferMethod: 'NIHAD BUSINESS POINT Wallet (User)',
           date: new Date().toISOString().replace('T', ' ').substring(0, 16),
           txId: txReferenceId,
           status: 'Success', // P2P is instant
@@ -729,7 +729,7 @@ export default function App() {
 
         // Create Recipient's Transaction Document (Received)
         const recipientTxId = `tx-rx-${Date.now()}`;
-        const senderPhone = currentUser.email?.endsWith('@nihat-telecom.com') 
+        const senderPhone = (currentUser.email?.endsWith('@nihat-telecom.com') || currentUser.email?.endsWith('@nihad-business-point.com')) 
           ? currentUser.email.split('@')[0] 
           : currentUser.email || '';
         const recipientTx: Transaction = {
@@ -1258,7 +1258,7 @@ export default function App() {
                 {activeTab === 'profile' && t.profile}
               </h2>
               <p className="text-[12px] text-slate-500 font-medium mt-0.5">
-                {activeTab === 'home' && (lang === 'bn' ? 'আপনার নিহাদ টেলিকম পোর্টালে স্বাগতম' : 'Welcome to your premium Nihad Telecom workspace')}
+                {activeTab === 'home' && (lang === 'bn' ? 'আপনার NIHAD BUSINESS POINT পোর্টালে স্বাগতম' : 'Welcome to your premium NIHAD BUSINESS POINT workspace')}
                 {activeTab === 'packages' && (lang === 'bn' ? 'সেরা অফার ও বান্ডেল চেক করুন' : 'Check out top-tier cellular recharge packages')}
                 {activeTab === 'history' && (lang === 'bn' ? 'সকল মোবাইল রিচার্জ ও বিল বিবরণী' : 'View secure logs and ledgers for references')}
                 {activeTab === 'profile' && (lang === 'bn' ? 'প্রোফাইল সেটিংস ও সাপোর্ট' : 'Manage your billing settings and account parameters')}

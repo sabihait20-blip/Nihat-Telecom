@@ -27,7 +27,7 @@ interface TransferModalProps {
   currentUser?: any;
 }
 
-type TransferMethod = 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'Nihad Wallet (User)';
+type TransferMethod = 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'NIHAD BUSINESS POINT Wallet (User)';
 
 export default function TransferModal({ lang, isOpen, onClose, currentBalance, onSuccess, favorites = [], currentUser }: TransferModalProps) {
   const [method, setMethod] = useState<TransferMethod>('bKash');
@@ -75,20 +75,20 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
     subtitle: lang === 'bn' ? 'আপনার ব্যালেন্স বিকাশ, নগদ, রকেট, উপায় বা অন্য ইউজার ওয়ালেটে ট্রান্সফার করুন' : 'Transfer wallet funds to other MFS or registered users instantly',
     selectMethod: lang === 'bn' ? 'ট্রান্সফারের মাধ্যম নির্বাচন করুন' : 'Select Transfer Method',
     amtLabel: lang === 'bn' ? 'টাকার পরিমাণ (৳)' : 'Enter Amount (৳)',
-    targetLabel: lang === 'bn' ? (method === 'Nihad Wallet (User)' ? 'প্রাপকের মোবাইল বা ইমেইল' : 'প্রাপকের মোবাইল নম্বর') : (method === 'Nihad Wallet (User)' ? 'Recipient Mobile or Email' : 'Recipient Account Number'),
-    placeholderNumber: lang === 'bn' ? (method === 'Nihad Wallet (User)' ? 'যেমন: 017XXXXXXXX বা ইমেইল' : 'যেমন: 017XXXXXXXX') : (method === 'Nihad Wallet (User)' ? 'e.g. 017XXXXXXXX or email' : 'e.g. 017XXXXXXXX'),
+    targetLabel: lang === 'bn' ? (method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'প্রাপকের মোবাইল বা ইমেইল' : 'প্রাপকের মোবাইল নম্বর') : (method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'Recipient Mobile or Email' : 'Recipient Account Number'),
+    placeholderNumber: lang === 'bn' ? (method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'যেমন: 017XXXXXXXX বা ইমেইল' : 'যেমন: 017XXXXXXXX') : (method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'e.g. 017XXXXXXXX or email' : 'e.g. 017XXXXXXXX'),
     placeholderAmt: lang === 'bn' ? `ন্যূনতম ${settings.minTransfer} টাকা` : `Minimum ৳${settings.minTransfer}`,
     cancel: lang === 'bn' ? 'বাতিল' : 'Cancel',
     submit: lang === 'bn' ? 'টাকা ট্রান্সফার করুন' : 'Transfer Balance',
     successTitle: lang === 'bn' ? 'ট্রান্সফার সফল হয়েছে!' : 'Transfer Submitted!',
-    successDesc: lang === 'bn' ? (method === 'Nihad Wallet (User)' ? 'ইউজার টু ইউজার ব্যালেন্স ট্রান্সফার সফলভাবে সম্পন্ন হয়েছে!' : 'আপনার ট্রান্সফার অনুরোধটি এডমিন ভেরিফিকেশনের জন্য পাঠানো হয়েছে।') : (method === 'Nihad Wallet (User)' ? 'Your P2P wallet balance transfer has completed successfully!' : 'Your transfer request is being processed and will complete shortly.'),
+    successDesc: lang === 'bn' ? (method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'ইউজার টু ইউজার ব্যালেন্স ট্রান্সফার সফলভাবে সম্পন্ন হয়েছে!' : 'আপনার ট্রান্সফার অনুরোধটি এডমিন ভেরিফিকেশনের জন্য পাঠানো হয়েছে।') : (method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'Your P2P wallet balance transfer has completed successfully!' : 'Your transfer request is being processed and will complete shortly.'),
     fees: lang === 'bn' ? 'সার্ভিস চার্জ: ৳ ০.০০ (ফ্রি)' : 'Service Charge: ৳0.00 (Free)',
     balWarning: lang === 'bn' ? 'অপর্যাপ্ত ব্যালেন্স!' : 'Insufficient wallet balance!',
     currBal: lang === 'bn' ? `বর্তমান ব্যালেন্স: ৳${currentBalance.toLocaleString()}` : `Current Balance: ৳${currentBalance.toLocaleString()}`,
   };
 
   const getMethodDisplayName = (m: TransferMethod) => {
-    if (m === 'Nihad Wallet (User)') {
+    if (m === 'NIHAD BUSINESS POINT Wallet (User)') {
       return lang === 'bn' ? 'ওয়ালেট' : 'Wallet';
     }
     return m;
@@ -100,7 +100,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
       case 'Nagad': return 'border-orange-500 bg-orange-500/10 text-orange-600';
       case 'Rocket': return 'border-purple-600 bg-purple-600/10 text-purple-700';
       case 'Upay': return 'border-blue-500 bg-blue-500/10 text-blue-600';
-      case 'Nihad Wallet (User)': return 'border-violet-600 bg-violet-500/10 text-violet-700';
+      case 'NIHAD BUSINESS POINT Wallet (User)': return 'border-violet-600 bg-violet-500/10 text-violet-700';
     }
   };
 
@@ -135,7 +135,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
     let recipientName = '';
     let recipientEmail = '';
 
-    if (method === 'Nihad Wallet (User)') {
+    if (method === 'NIHAD BUSINESS POINT Wallet (User)') {
       try {
         const usersRef = collection(db, 'registered_users');
         let recipientUser: any = null;
@@ -148,7 +148,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
           recipientUser = { id: phoneSnap.docs[0].id, ...phoneSnap.docs[0].data() };
         } else {
           // Try email search
-          const resolvedEmail = targetNumber.includes('@') ? targetNumber : `${targetNumber}@nihat-telecom.com`;
+          const resolvedEmail = targetNumber.includes('@') ? targetNumber : `${targetNumber}@nihad-business-point.com`;
           const emailQuery = query(usersRef, where('email', '==', resolvedEmail));
           const emailSnap = await getDocs(emailQuery);
           if (!emailSnap.empty) {
@@ -157,7 +157,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
         }
 
         if (!recipientUser) {
-          setValidationError(lang === 'bn' ? 'দুঃখিত, এই প্রাপক নম্বরটি নিহাদ টেলিকমে নিবন্ধিত নয়!' : 'Sorry, this recipient is not registered on Nihad Telecom!');
+          setValidationError(lang === 'bn' ? 'দুঃখিত, এই প্রাপক নম্বরটি NIHAD BUSINESS POINT এ নিবন্ধিত নয়!' : 'Sorry, this recipient is not registered on NIHAD BUSINESS POINT!');
           setIsLoading(false);
           return;
         }
@@ -257,7 +257,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
               {labels.selectMethod}
             </label>
             <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-2">
-              {(['bKash', 'Nagad', 'Rocket', 'Upay', 'Nihad Wallet (User)'] as TransferMethod[]).map((m) => {
+              {(['bKash', 'Nagad', 'Rocket', 'Upay', 'NIHAD BUSINESS POINT Wallet (User)'] as TransferMethod[]).map((m) => {
                 const isSelected = method === m;
                 return (
                   <button
@@ -296,11 +296,11 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
                 BD
               </div>
               <input
-                type={method === 'Nihad Wallet (User)' ? 'text' : 'tel'}
+                type={method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'text' : 'tel'}
                 required
                 value={targetNumber}
                 onChange={(e) => {
-                  if (method === 'Nihad Wallet (User)') {
+                  if (method === 'NIHAD BUSINESS POINT Wallet (User)') {
                     setTargetNumber(e.target.value);
                   } else {
                     setTargetNumber(e.target.value.replace(/\D/g, ''));
@@ -355,7 +355,7 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
           </div>
 
           {/* Note/Reference Input Block (Only for P2P User Transfers) */}
-          {method === 'Nihad Wallet (User)' && (
+          {method === 'NIHAD BUSINESS POINT Wallet (User)' && (
             <div className="space-y-1.5">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
                 {lang === 'bn' ? 'রেফারেন্স / নোট (ঐচ্ছিক)' : 'Reference / Note (Optional)'}

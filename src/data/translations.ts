@@ -1,6 +1,6 @@
 export const TRANSLATIONS = {
   bn: {
-    appName: 'নিহাদ টেলিকম',
+    appName: 'NIHAD BUSINESS POINT',
     subTitle: 'স্মার্ট ও নিরাপদ টেলিকম অ্যাপ',
     home: 'হোম',
     packages: 'প্যাকেজ',
@@ -110,7 +110,7 @@ export const TRANSLATIONS = {
     biometricRegistered: 'বায়োমেট্রিক সফলভাবে রেজিস্টার করা হয়েছে'
   },
   en: {
-    appName: 'Nihad Telecom',
+    appName: 'NIHAD BUSINESS POINT',
     subTitle: 'Smart & Secure Telecom Solutions',
     home: 'Home',
     packages: 'Packages',
