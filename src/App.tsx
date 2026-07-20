@@ -1353,74 +1353,7 @@ export default function App() {
                     })}
                   </div>
 
-                  {/* Split Layout of Additional widgets */}
-                  <div className="grid grid-cols-12 gap-6">
-                    {/* Left Pane: Favorites list */}
-                    <div className="col-span-12 xl:col-span-7 bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
-                      <FavoritesGrid
-                        favorites={favorites}
-                        onSelectContact={handleSelectFavorite}
-                        onAddContact={handleAddContact}
-                        onRemoveContact={handleRemoveContact}
-                        lang={lang}
-                      />
-                    </div>
 
-                    {/* Right Pane: Compact ledger list */}
-                    <div className="col-span-12 xl:col-span-5 bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-slate-900 font-extrabold text-xs tracking-tight font-display">
-                            {lang === 'bn' ? 'সাম্প্রতিক কার্যকলাপ' : 'Recent Activities'}
-                          </h3>
-                          <button
-                            onClick={() => setActiveTab('history')}
-                            className="text-[10px] font-bold text-blue-600 flex items-center gap-0.5 hover:underline cursor-pointer"
-                          >
-                            <span>{lang === 'bn' ? 'সব দেখুন' : 'See All'}</span>
-                            <ArrowRight className="h-3 w-3" />
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          {transactions.slice(0, 3).map((tx, index) => (
-                            <div
-                              key={`${tx.id || index}-${index}`}
-                              className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors text-xs font-semibold"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs ${
-                                  tx.type === 'Recharge' ? 'bg-blue-50 text-blue-600' : tx.type === 'Bill' ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'
-                                }`}>
-                                  {tx.type === 'Recharge' ? <Smartphone className="h-4.5 w-4.5" /> : <Landmark className="h-4.5 w-4.5 text-emerald-600" />}
-                                </div>
-                                <div className="min-w-0">
-                                  <h4 className="text-slate-800 font-bold text-[11.5px] leading-tight truncate max-w-[140px]">
-                                    {tx.type === 'Recharge'
-                                      ? `${lang === 'bn' ? 'মোবাইল রিচার্জ' : 'Recharge Request'}`
-                                      : tx.type === 'Bill'
-                                      ? `${lang === 'bn' ? tx.billerNameBn : tx.billerName}`
-                                      : `${lang === 'bn' ? 'ক্যাশ ইন' : 'Cash In'}`}
-                                  </h4>
-                                  <span className="text-[9px] text-slate-400 font-mono font-bold block truncate max-w-[140px]">
-                                    {tx.targetNumber || tx.txId}
-                                  </span>
-                                </div>
-                              </div>
-                              <span className={`font-display font-extrabold text-xs tracking-tight shrink-0 ${tx.type === 'CashIn' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                {tx.type === 'CashIn' ? '+' : '-'}৳{tx.amount}
-                              </span>
-                            </div>
-                          ))}
-                          {transactions.length === 0 && (
-                            <div className="text-center py-6 text-slate-400 text-xs font-medium">
-                              {lang === 'bn' ? 'কোনো লেনদেন রেকর্ড নেই।' : 'No transaction records.'}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1647,62 +1580,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Favorable Operators Quick Contacts list */}
-              <FavoritesGrid
-                favorites={favorites}
-                onSelectContact={handleSelectFavorite}
-                onAddContact={handleAddContact}
-                onRemoveContact={handleRemoveContact}
-                lang={lang}
-              />
 
-              {/* Micro recent transaction display panel */}
-              <div className="px-4 py-1 space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-slate-900 font-extrabold text-xs tracking-tight font-display">
-                    {lang === 'bn' ? 'সাম্প্রতিক কার্যকলাপ' : 'Recent Activities'}
-                  </h3>
-                  <button
-                    onClick={() => setActiveTab('history')}
-                    className="text-[10px] font-bold text-blue-600 flex items-center gap-0.5 hover:underline cursor-pointer"
-                  >
-                    <span>{lang === 'bn' ? 'সব দেখুন' : 'See All'}</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </button>
-                </div>
-
-                <div className="bg-white border border-slate-100 rounded-[28px] p-4.5 shadow-sm space-y-1">
-                  {transactions.slice(0, 2).map((tx, index) => (
-                    <div
-                      key={`${tx.id || index}-${index}`}
-                      className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs ${
-                          tx.type === 'Recharge' ? 'bg-blue-50 text-blue-600' : tx.type === 'Bill' ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'
-                        }`}>
-                          {tx.type === 'Recharge' ? <Smartphone className="h-4.5 w-4.5" /> : <Landmark className="h-4.5 w-4.5" />}
-                        </div>
-                        <div>
-                          <h4 className="text-slate-800 font-bold text-[11.5px] leading-tight">
-                            {tx.type === 'Recharge'
-                              ? `${lang === 'bn' ? 'মোবাইল রিচার্জ' : 'Recharge Request'}`
-                              : tx.type === 'Bill'
-                              ? `${lang === 'bn' ? tx.billerNameBn : tx.billerName}`
-                              : `${lang === 'bn' ? 'ক্যাশ ইন' : 'Cash In'}`}
-                          </h4>
-                          <span className="text-[9px] text-slate-400 font-mono font-bold block truncate max-w-[140px]">
-                            {tx.targetNumber || tx.txId}
-                          </span>
-                        </div>
-                      </div>
-                      <span className={`font-display font-extrabold text-xs tracking-tight ${tx.type === 'CashIn' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {tx.type === 'CashIn' ? '+' : '-'}৳{tx.amount}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
             </div>
           )}
