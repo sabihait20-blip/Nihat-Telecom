@@ -4850,30 +4850,6 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </div>
                 </div>
 
-                {/* Section E: Referral Rewards System */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">
-                    5. Referral Rewards Configuration
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
-                        Referral Bonus Amount (৳)
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        value={settingsForm.referralBonus}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, referralBonus: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
-                      />
-                      <p className="text-[9px] text-slate-500 font-bold ml-1">
-                        {lang === 'bn' ? '* নতুন ইউজার রেফারেল কোড ব্যবহার করলে রেফারার এই পরিমাণ বোনাস পাবে।' : '* Referrer will receive this amount when a new user signs up using their code.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="pt-2 border-t border-white/5 flex justify-end">
                   <button
                     type="submit"

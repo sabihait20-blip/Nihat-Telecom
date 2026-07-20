@@ -30,7 +30,6 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
   const [phoneOrEmail, setPhoneOrEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [displayName, setDisplayName] = useState<string>('');
-  const [referralCodeInput, setReferralCodeInput] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
   // Step 2 NID states
@@ -671,22 +670,16 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           throw new Error(lang === 'bn' ? 'পাসওয়ার্ড বা পিন অন্তত ৬ অক্ষরের হতে হবে!' : 'Password/PIN must be at least 6 characters!');
         }
 
-        if (signUpStep === 1) {
-          // Check if this phone number is already registered in our firestore database to prevent duplicate registration early
-          if (isOnlyDigits) {
-            const q = query(collection(db, 'users'), where('phone', '==', inputVal));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-              throw new Error(lang === 'bn' ? 'এই নম্বরটি ইতিমধ্যে ব্যবহৃত হচ্ছে! অনুগ্রহ করে লগইন করুন।' : 'This phone number is already registered. Please sign in instead!');
-            }
+        // Check if this phone number is already registered in our firestore database to prevent duplicate registration early
+        if (isOnlyDigits) {
+          const q = query(collection(db, 'users'), where('phone', '==', inputVal));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            throw new Error(lang === 'bn' ? 'এই নম্বরটি ইতিমধ্যে ব্যবহৃত হচ্ছে! অনুগ্রহ করে লগইন করুন।' : 'This phone number is already registered. Please sign in instead!');
           }
-          
-          setSignUpStep(2);
-          setLoading(false);
-          return;
         }
 
-        // We are on Step 2 of sign up
+        // We require all information together now
         if (!nidFront || !nidBack) {
           throw new Error(lang === 'bn' ? 'অনুগ্রহ করে এনআইডি কার্ডের সামনের এবং পেছনের ছবি আপলোড করুন!' : 'Please upload both front and back images of your NID card!');
         }
@@ -729,59 +722,12 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           displayName: displayName.trim()
         });
 
-        // 3. Referral logic
-        let referrerUid = '';
-        let bonusAmount = 0;
-
-        if (referralCodeInput.trim()) {
-          const q = query(collection(db, 'users'), where('referralCode', '==', referralCodeInput.trim().toUpperCase()));
-          const querySnapshot = await getDocs(q);
-          if (!querySnapshot.empty) {
-            const referrerDoc = querySnapshot.docs[0];
-            referrerUid = referrerDoc.id;
-
-            // Get bonus amount from settings
-            try {
-              const settingsSnap = await getDoc(doc(db, 'settings', 'app_config'));
-              if (settingsSnap.exists()) {
-                bonusAmount = settingsSnap.data().referralBonus || 0;
-              }
-            } catch (e) {
-              console.error("Error getting referral bonus amount:", e);
-            }
-
-            if (bonusAmount > 0) {
-              // Add bonus to referrer
-              const referrerBalanceRef = doc(db, 'users', referrerUid, 'wallet', 'balance_doc');
-              await updateDoc(referrerBalanceRef, {
-                balance: increment(bonusAmount)
-              });
-
-              // Add notification/transaction for referrer
-              const refTxId = 'REF-' + Date.now();
-              await setDoc(doc(db, 'users', referrerUid, 'transactions', refTxId), {
-                id: refTxId,
-                type: 'CashIn',
-                amount: bonusAmount,
-                date: new Date().toISOString(),
-                status: 'Success',
-                txId: refTxId,
-                details: `Referral Bonus for ${displayName.trim()}`,
-                note: `User ${displayName.trim()} signed up using your code.`
-              });
-            }
-          }
-        }
-
-        // Create new user document with a unique referral code and NID / Address details
-        const myReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        // Create new user document with NID / Address details
         await setDoc(doc(db, 'users', newUser.uid), {
           uid: newUser.uid,
           displayName: displayName.trim(),
           phone: isOnlyDigits ? inputVal : '',
           email: newUser.email,
-          referralCode: myReferralCode,
-          referredBy: referrerUid,
           createdAt: new Date().toISOString(),
           address: address.trim(),
           kycStatus: 'pending', // Set to pending, awaiting admin approval as requested
@@ -1036,9 +982,56 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           </form>
         ) : (
           <form onSubmit={handleAuth} className="space-y-3.5">
-            {isSignUp && signUpStep === 2 ? (
+            {isSignUp ? (
               <div className="space-y-3.5">
-                {/* Step 2 Header */}
+                {/* Mobile Number */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
+                    {lang === 'bn' ? 'মোবাইল নম্বর' : 'Phone Number'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                      <Phone className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      placeholder={labels.phonePlaceholder}
+                      value={phoneOrEmail}
+                      onChange={(e) => setPhoneOrEmail(e.target.value)}
+                      className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Password / PIN */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
+                    {lang === 'bn' ? 'সিকিউর পিন / পাসওয়ার্ড (৬ ডিজিটের)' : 'Secure PIN / Password (6+ characters)'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder={labels.passwordPlaceholder}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-11 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white cursor-pointer border-0 bg-transparent"
+                    >
+                      {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* AI Digital KYC Header */}
                 <div className="flex items-center gap-3 bg-emerald-500/10 p-3.5 border border-emerald-500/20 rounded-2xl mb-2 text-emerald-400">
                   <Sparkles className="h-4.5 w-4.5 shrink-0 animate-pulse" />
                   <div className="text-left">
@@ -1259,19 +1252,11 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
                   </div>
                 </div>
 
-                <div className="flex gap-2.5 pt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setSignUpStep(1)}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl py-3 px-4 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    <span>{lang === 'bn' ? 'পিছনে' : 'Back'}</span>
-                  </button>
+                <div className="pt-2">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-[2] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-700 disabled:to-slate-800 text-white rounded-2xl py-3 px-4 text-xs font-bold shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-700 disabled:to-slate-800 text-white rounded-2xl py-3 px-4 text-xs font-bold shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
                   >
                     {loading ? (
                       <>
@@ -1289,50 +1274,25 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
               </div>
             ) : (
               <>
-
-
                 {/* Identifier Input (Phone or Email) */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                    {isSignUp 
-                      ? (lang === 'bn' ? 'মোবাইল নম্বর' : 'Phone Number')
-                      : (lang === 'bn' ? 'মোবাইল নম্বর বা ইমেইল' : 'Mobile Number or Email')
-                    }
+                    {lang === 'bn' ? 'মোবাইল নম্বর বা ইমেইল' : 'Mobile Number or Email'}
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                      {isSignUp ? <Phone className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                      <User className="h-4 w-4" />
                     </span>
                     <input
                       type="text"
                       required
-                      placeholder={isSignUp ? labels.phonePlaceholder : labels.phoneOrEmailPlaceholder}
+                      placeholder={labels.phoneOrEmailPlaceholder}
                       value={phoneOrEmail}
                       onChange={(e) => setPhoneOrEmail(e.target.value)}
                       className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
                     />
                   </div>
                 </div>
-
-                {isSignUp && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'রেফারেল কোড (ঐচ্ছিক)' : 'Referral Code (Optional)'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <Percent className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        placeholder={lang === 'bn' ? 'রেফারেল কোড থাকলে দিন' : 'Enter referral code'}
-                        value={referralCodeInput}
-                        onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors uppercase"
-                      />
-                    </div>
-                  </div>
-                )}
 
                 {/* Password */}
                 <div className="space-y-1">
@@ -1360,24 +1320,22 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
                     </button>
                   </div>
                   
-                  {!isSignUp && (
-                    <div className="flex justify-end mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsResetMode(true);
-                          setErrorMessage('');
-                          setSuccessMessage('');
-                        }}
-                        className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer border-0 bg-transparent"
-                      >
-                        {lang === 'bn' ? 'পাসওয়ার্ড ভুলে গেছেন?' : 'Forgot Password?'}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex justify-end mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsResetMode(true);
+                        setErrorMessage('');
+                        setSuccessMessage('');
+                      }}
+                      className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer border-0 bg-transparent"
+                    >
+                      {lang === 'bn' ? 'পাসওয়ার্ড ভুলে গেছেন?' : 'Forgot Password?'}
+                    </button>
+                  </div>
                 </div>
 
-                {/* Normal Register/Login Submit Button */}
+                {/* Normal Login Submit Button */}
                 <button
                   type="submit"
                   disabled={loading}
@@ -1390,7 +1348,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
                     </>
                   ) : (
                     <>
-                      <span>{isSignUp ? (lang === 'bn' ? 'পরবর্তী ধাপ' : 'Next Step') : labels.submitLogin}</span>
+                      <span>{labels.submitLogin}</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -1401,7 +1359,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
         )}
 
         {/* separator line */}
-        {(!isSignUp || signUpStep === 1) && (
+        {!isSignUp && (
           <>
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center">
@@ -1447,7 +1405,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
 
       {/* Switch auth mode bottom drawer */}
       <div className="px-6 pb-10 pt-4 text-center border-t border-white/5 bg-slate-950/40 relative z-10">
-        {!isResetMode && (!isSignUp || signUpStep === 1) && (
+        {!isResetMode && (
           <button
             onClick={() => {
               setIsSignUp(!isSignUp);

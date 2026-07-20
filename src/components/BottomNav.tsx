@@ -49,7 +49,7 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
           // Check active state
           // If active tab is 'packages' or 'referral', we also highlight 'profile' (since these represent sub-views of Profile)
           const isActive = tab.id === activeTab || 
-                           ((activeTab === 'packages' || activeTab === 'referral') && tab.id === 'profile');
+                           (activeTab === 'packages' && tab.id === 'profile');
 
           return (
             <motion.button

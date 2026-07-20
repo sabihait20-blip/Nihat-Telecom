@@ -51,7 +51,6 @@ import AuthPanel from './components/AuthPanel';
 import AdminPanel from './components/AdminPanel';
 import CashOutCalculatorModal from './components/CashOutCalculatorModal';
 import StorePanel from './components/StorePanel';
-import ReferralPanel from './components/ReferralPanel';
 import KYCModal from './components/KYCModal';
 import SimCardModal from './components/SimCardModal';
 
@@ -1446,16 +1445,6 @@ export default function App() {
                     helplineNumber={appConfig.helplineNumber}
                     whatsappUrl={appConfig.whatsappUrl}
                     onAddFundClick={() => setIsAddFundOpen(true)}
-                    onReferralClick={() => setActiveTab('referral')}
-                  />
-                </div>
-              )}
-
-              {activeTab === 'referral' && (
-                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
-                  <ReferralPanel
-                    lang={lang}
-                    onBack={() => setActiveTab('profile')}
                   />
                 </div>
               )}
@@ -1657,13 +1646,6 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'referral' && (
-            <ReferralPanel
-              lang={lang}
-              onBack={() => setActiveTab('profile')}
-            />
-          )}
-
           {activeTab === 'profile' && (
             <ProfilePanel
               lang={lang}
@@ -1676,7 +1658,6 @@ export default function App() {
               onAddFundClick={() => setIsAddFundOpen(true)}
               userData={userData}
               onKYCClick={() => setIsKYCOpen(true)}
-              onReferralClick={() => setActiveTab('referral')}
             />
           )}
         </div>

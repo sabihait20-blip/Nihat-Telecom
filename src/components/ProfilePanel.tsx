@@ -20,7 +20,6 @@ interface ProfilePanelProps {
   onAddFundClick?: () => void;
   userData?: any;
   onKYCClick?: () => void;
-  onReferralClick?: () => void;
 }
 
 export default function ProfilePanel({
@@ -34,7 +33,6 @@ export default function ProfilePanel({
   onAddFundClick,
   userData,
   onKYCClick,
-  onReferralClick,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -464,32 +462,6 @@ export default function ProfilePanel({
               />
             </button>
           </div>
-
-          {/* Referral Program Action */}
-          {onReferralClick && (
-            <button
-              onClick={onReferralClick}
-              id="profile-referral-btn"
-              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <Gift className="h-4.5 w-4.5 text-emerald-600" />
-                </div>
-                <div>
-                  <h4 className="text-slate-800 font-bold text-xs">
-                    {lang === 'bn' ? 'রেফার করুন ও আয় করুন' : 'Refer & Earn'}
-                  </h4>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                    {lang === 'bn' ? 'বন্ধুদের ইনভাইট করে আনলিমিটেড বোনাস পান!' : 'Invite friends and receive unlimited bonus rewards!'}
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          )}
-
-
 
           {/* Change PIN Action */}
           <button

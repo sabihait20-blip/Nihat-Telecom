@@ -83,7 +83,7 @@ export interface PromoBanner {
   imageUrl?: string;
 }
 
-export type AppTab = 'home' | 'packages' | 'history' | 'profile' | 'store' | 'referral';
+export type AppTab = 'home' | 'packages' | 'history' | 'profile' | 'store';
 
 export type Language = 'bn' | 'en';
 
