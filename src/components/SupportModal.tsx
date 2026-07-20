@@ -194,7 +194,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
                 <ArrowLeft className="h-4.5 w-4.5 stroke-[2.5]" />
               </button>
             ) : (
-              <div className="p-2 bg-pink-50 text-[#e2125d] rounded-2xl">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-2xl">
                 <MessageSquare className="h-4.5 w-4.5" />
               </div>
             )}
@@ -309,7 +309,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
               <button
                 type="button"
                 onClick={() => setIsCreatingTicket(true)}
-                className="w-full py-3.5 bg-[#e2125d] hover:bg-[#d81055] text-white text-xs font-extrabold rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
                 <Plus className="h-4 w-4 stroke-[3]" />
                 <span>{lang === 'bn' ? 'নতুন টিকিট তৈরি করুন' : 'Create Support Ticket'}</span>
@@ -329,7 +329,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-3.5 text-xs font-bold outline-none focus:border-[#e2125d] text-slate-800"
+                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-3.5 text-xs font-bold outline-none focus:border-indigo-600 text-slate-800"
                   >
                     <option value="Recharge">{lang === 'bn' ? 'মোবাইল রিচার্জ' : 'Mobile Recharge'}</option>
                     <option value="Voucher">{lang === 'bn' ? 'ভাউচার স্টোর' : 'Voucher Request'}</option>
@@ -350,7 +350,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
                     placeholder={lang === 'bn' ? 'যেমন: রিচার্জ পেন্ডিং বা ব্যালেন্স সমস্যা...' : 'e.g. Recharge showing pending or Balance missing'}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-xs font-bold outline-none focus:border-[#e2125d] text-slate-800"
+                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-xs font-bold outline-none focus:border-indigo-600 text-slate-800"
                   />
                 </div>
 
@@ -365,7 +365,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
                     placeholder={lang === 'bn' ? 'আপনার সমস্যার বিস্তারিত লিখুন, ট্রানজেকশন আইডি থাকলে সেটিও যুক্ত করুন...' : 'Provide complete details of your transaction/issue here...'}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-xs font-bold outline-none focus:border-[#e2125d] text-slate-800 resize-none"
+                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-xs font-bold outline-none focus:border-indigo-600 text-slate-800 resize-none"
                   />
                 </div>
               </div>
@@ -396,7 +396,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
               {/* Message scroll logs */}
               <div className="flex-1 overflow-y-auto max-h-[340px] pr-1 space-y-3 scroller-hidden">
                 <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1">
-                  <span className="text-[9px] font-mono font-black text-[#e2125d] uppercase tracking-wider">
+                  <span className="text-[9px] font-mono font-black text-indigo-600 uppercase tracking-wider">
                     {lang === 'bn' ? 'সিস্টেম টিকিট ওপেন করা হয়েছে' : 'System Ticket Initiated'}
                   </span>
                   <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
@@ -414,7 +414,7 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
                     >
                       <div className={`p-3 rounded-2xl text-xs font-bold leading-normal ${
                         isMe 
-                          ? 'bg-[#e2125d] text-white rounded-tr-none shadow-xs shadow-pink-500/5' 
+                          ? 'bg-indigo-600 text-white rounded-tr-none shadow-xs shadow-indigo-500/5' 
                           : 'bg-white border border-slate-100 text-slate-800 rounded-tl-none'
                       }`}>
                         {msg.text}
@@ -441,12 +441,12 @@ export default function SupportModal({ lang, isOpen, onClose }: SupportModalProp
                       : (lang === 'bn' ? 'বার্তা লিখুন...' : 'Write your response here...')
                   }
                   disabled={activeTicket.status === 'Closed'}
-                  className="flex-1 bg-slate-50 border border-slate-150 rounded-2xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:border-[#e2125d] focus:bg-white transition-all disabled:opacity-50 font-sans"
+                  className="flex-1 bg-slate-50 border border-slate-150 rounded-2xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:border-indigo-600 focus:bg-white transition-all disabled:opacity-50 font-sans"
                 />
                 <button
                   type="submit"
                   disabled={activeTicket.status === 'Closed'}
-                  className="px-5 bg-[#e2125d] hover:bg-[#d81055] disabled:bg-slate-300 text-white font-black rounded-2xl text-xs transition-all shadow-md flex items-center justify-center cursor-pointer active:scale-95 disabled:scale-100 disabled:opacity-50"
+                  className="px-5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-black rounded-2xl text-xs transition-all shadow-md flex items-center justify-center cursor-pointer active:scale-95 disabled:scale-100 disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
                 </button>

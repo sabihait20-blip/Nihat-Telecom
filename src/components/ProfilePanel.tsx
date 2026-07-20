@@ -305,10 +305,10 @@ export default function ProfilePanel({
             <button
               onClick={onAddFundClick}
               id="profile-add-fund-btn"
-              className="w-full text-left p-3.5 flex items-center justify-between bg-pink-50/20 hover:bg-pink-50/50 transition-colors cursor-pointer group animate-pulse-subtle"
+              className="w-full text-left p-3.5 flex items-center justify-between bg-indigo-50/20 hover:bg-indigo-50/50 transition-colors cursor-pointer group animate-pulse-subtle"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-pink-50 text-[#e2125d] rounded-xl">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                   <Wallet className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -320,7 +320,7 @@ export default function ProfilePanel({
                   </p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-[#e2125d] group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="h-4 w-4 text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
             </button>
           )}
 

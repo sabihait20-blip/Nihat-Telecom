@@ -370,7 +370,7 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
         className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden text-slate-800"
       >
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-[#e2125d] to-pink-600 p-5 text-white flex justify-between items-center relative">
+        <div className="bg-gradient-to-r from-blue-700 to-indigo-600 p-5 text-white flex justify-between items-center relative">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-2xl border border-white/10">
               <Smartphone className="h-5 w-5" />
@@ -379,7 +379,7 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
               <h2 className="text-base font-extrabold font-display">
                 {lang === 'bn' ? 'সিম কার্ড ও ই-সিম হাব' : 'SIM Card & eSIM Hub'}
               </h2>
-              <p className="text-[10px] text-pink-100 font-semibold mt-0.5">
+              <p className="text-[10px] text-indigo-100 font-semibold mt-0.5">
                 {lang === 'bn' ? 'বাংলাদেশের সকল অপারেটরের সিম হোম ডেলিভারি' : 'Get standard & eSIM home delivery inside Bangladesh'}
               </p>
             </div>
@@ -447,13 +447,13 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                           onClick={() => setSimType(type.id as any)}
                           className={`p-3 rounded-2xl border text-left flex flex-col justify-between h-20 transition-all cursor-pointer ${
                             isSelected
-                              ? 'border-[#e2125d] bg-pink-500/5 ring-1 ring-[#e2125d]/20'
+                              ? 'border-indigo-600 bg-indigo-500/5 ring-1 ring-indigo-600/20'
                               : 'border-slate-200 bg-white hover:bg-slate-50'
                           }`}
                         >
                           <div className="flex justify-between items-start w-full">
                             <span className="text-xs font-black text-slate-800">{type.title}</span>
-                            <span className={`text-[10px] font-bold ${isSelected ? 'text-[#e2125d]' : 'text-slate-500'}`}>
+                            <span className={`text-[10px] font-bold ${isSelected ? 'text-indigo-600' : 'text-slate-500'}`}>
                               {type.price}
                             </span>
                           </div>
@@ -488,7 +488,7 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                         onClick={() => setNumberSelectionMode(mode.id as any)}
                         className={`py-1.5 text-[10px] font-black rounded-xl cursor-pointer text-center uppercase transition-colors ${
                           numberSelectionMode === mode.id
-                            ? 'bg-[#e2125d] text-white'
+                            ? 'bg-indigo-600 text-white'
                             : 'text-slate-500 hover:text-slate-800'
                         }`}
                       >
@@ -742,11 +742,11 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-0.5">
-                    <div className="bg-pink-500/5 border border-pink-500/10 p-3 rounded-2xl text-left">
-                      <span className="text-[10px] font-black uppercase text-[#e2125d] tracking-wider block font-mono">
+                    <div className="bg-blue-500/5 border border-blue-500/10 p-3 rounded-2xl text-left">
+                      <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider block font-mono">
                         {lang === 'bn' ? 'বুকিং ফি (এখন পরিশোধ)' : 'Booking Fee (Pay Now)'}
                       </span>
-                      <span className="text-lg font-black text-[#e2125d] font-mono">
+                      <span className="text-lg font-black text-blue-600 font-mono">
                         ৳{finalBookingFee}
                       </span>
                     </div>
@@ -774,7 +774,7 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 py-3 bg-[#e2125d] hover:bg-pink-600 text-white rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-pink-500/15 disabled:opacity-50"
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/15 disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -828,7 +828,7 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                       <span className="text-slate-400 font-bold">TOTAL SIM COST:</span>
                       <span className="font-extrabold text-slate-950">৳{finalFullPrice}</span>
                     </div>
-                    <div className="flex justify-between text-[#e2125d]">
+                    <div className="flex justify-between text-blue-600">
                       <span className="font-bold">BOOKING FEE PAID:</span>
                       <span className="font-extrabold">৳{finalBookingFee}</span>
                     </div>
@@ -842,7 +842,7 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-8 py-2.5 bg-[#e2125d] hover:bg-pink-600 text-white rounded-2xl text-xs font-black transition-colors cursor-pointer inline-block animate-pulse"
+                  className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black transition-colors cursor-pointer inline-block animate-pulse"
                 >
                   {lang === 'bn' ? 'ঠিক আছে' : 'Awesome'}
                 </button>

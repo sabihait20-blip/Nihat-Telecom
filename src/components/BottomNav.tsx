@@ -75,21 +75,21 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
               {/* Elastic Spring active background pill for regular tabs */}
               {isActive && (
                 <motion.div
-                  layoutId="active-nav-pink-pill"
+                  layoutId="active-nav-indigo-pill"
                   transition={{ type: 'spring', stiffness: 380, damping: 22 }}
-                  className="absolute inset-0 bg-pink-50/70 rounded-2xl -z-10 border border-pink-100/30"
+                  className="absolute inset-0 bg-blue-50/80 rounded-2xl -z-10 border border-blue-100/40"
                 />
               )}
 
               {/* Tab Icon */}
               <Icon
-                className={`transition-colors h-5 w-5 mb-1 ${isActive ? 'text-[#e2125d] stroke-[2.5px]' : 'text-slate-400'}`}
+                className={`transition-colors h-5 w-5 mb-1 ${isActive ? 'text-indigo-600 stroke-[2.5px]' : 'text-slate-400'}`}
               />
 
               {/* Tab Label */}
               <span
                 className={`text-[9.5px] font-black transition-all tracking-tight ${
-                  isActive ? 'text-[#e2125d]' : 'text-slate-400'
+                  isActive ? 'text-indigo-600' : 'text-slate-400'
                 }`}
               >
                 {tab.label}

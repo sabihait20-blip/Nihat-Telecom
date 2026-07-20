@@ -5342,7 +5342,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                               <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-slate-400">{lang === 'bn' ? 'পণ্যের বিবরণ' : 'Product Particulars'}</p>
                                 <p className="font-extrabold text-slate-200">{order.productTitle} (x{order.quantity})</p>
-                                <p className="text-[11px] text-[#e2125d] font-bold">Total: ৳{order.totalPrice.toLocaleString()}</p>
+                                <p className="text-[11px] text-indigo-400 font-bold">Total: ৳{order.totalPrice.toLocaleString()}</p>
                                 <p className="text-[10px] text-slate-500">{new Date(order.date).toLocaleString()}</p>
                               </div>
                             </div>
@@ -5922,7 +5922,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 font-mono">৳{num.fullPrice}</td>
-                                  <td className="py-3 px-4 font-mono text-[#e2125d]">৳{num.bookingFee}</td>
+                                  <td className="py-3 px-4 font-mono text-indigo-400">৳{num.bookingFee}</td>
                                   <td className="py-3 px-4">
                                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                                       num.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :

@@ -223,7 +223,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         <button
           onClick={() => { setActiveTab('browse'); setOrderSuccess(null); }}
           className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === 'browse' ? 'bg-white shadow-sm text-pink-600' : 'text-slate-500 hover:text-slate-800'
+            activeTab === 'browse' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'
           }`}
           id="store-tab-browse"
         >
@@ -233,14 +233,14 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         <button
           onClick={() => { setActiveTab('orders'); setOrderSuccess(null); }}
           className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
-            activeTab === 'orders' ? 'bg-white shadow-sm text-pink-600' : 'text-slate-500 hover:text-slate-800'
+            activeTab === 'orders' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'
           }`}
           id="store-tab-orders"
         >
           <Clock className="h-4 w-4" />
           <span>{lang === 'bn' ? 'আমার অর্ডারসমূহ' : 'My Orders'}</span>
           {orders.filter(o => o.status === 'Pending').length > 0 && (
-            <span className="absolute top-1.5 right-2 w-2 h-2 bg-[#e2125d] rounded-full animate-ping" />
+            <span className="absolute top-1.5 right-2 w-2 h-2 bg-indigo-600 rounded-full animate-ping" />
           )}
         </button>
       </div>
@@ -255,7 +255,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             className="space-y-4"
           >
             {/* Header info */}
-            <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-3xl p-5 text-white shadow-lg flex items-center justify-between">
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 rounded-3xl p-5 text-white shadow-lg flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-black tracking-tight flex items-center gap-1.5">
                   <BagIcon className="h-5 w-5" />
@@ -266,7 +266,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-[10px] font-black uppercase text-pink-100 bg-white/10 px-2.5 py-1 rounded-full border border-white/15">
+                <span className="text-[10px] font-black uppercase text-blue-100 bg-white/10 px-2.5 py-1 rounded-full border border-white/15">
                   {lang === 'bn' ? 'ব্যালেন্স' : 'Balance'}
                 </span>
                 <p className="text-lg font-black mt-1">৳{walletBalance.toLocaleString()}</p>
@@ -282,7 +282,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                   placeholder={lang === 'bn' ? 'প্রোডাক্ট অনুসন্ধান করুন...' : 'Search products...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-100 border-none rounded-2xl py-3 pl-11 pr-4 text-xs font-semibold focus:ring-2 focus:ring-pink-500/20 text-slate-800"
+                  className="w-full bg-slate-100 border-none rounded-2xl py-3 pl-11 pr-4 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
                 />
               </div>
 
@@ -294,7 +294,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     onClick={() => setSelectedCategory(cat)}
                     className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] font-black tracking-tight border transition-all cursor-pointer ${
                       selectedCategory === cat 
-                        ? 'bg-pink-600 border-pink-600 text-white shadow-sm' 
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' 
                         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -307,7 +307,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             {/* Products grid */}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-                <RefreshCw className="h-7 w-7 animate-spin text-pink-600" />
+                <RefreshCw className="h-7 w-7 animate-spin text-indigo-600" />
                 <p className="text-xs font-bold">{lang === 'bn' ? 'প্রোডাক্ট লোড হচ্ছে...' : 'Loading products...'}</p>
               </div>
             ) : filteredProducts.length === 0 ? (
@@ -339,7 +339,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
 
                       <div>
                         {/* Image placeholder or real image */}
-                        <div className="aspect-square w-full rounded-2xl bg-gradient-to-tr from-slate-50 to-pink-50/20 border border-slate-100 flex items-center justify-center overflow-hidden mb-2.5 relative">
+                        <div className="aspect-square w-full rounded-2xl bg-gradient-to-tr from-slate-50 to-indigo-50/20 border border-slate-100 flex items-center justify-center overflow-hidden mb-2.5 relative">
                           {product.imageUrl ? (
                             <img
                               src={product.imageUrl}
@@ -348,9 +348,9 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                               className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
                             />
                           ) : (
-                            <ShoppingBag className="h-8 w-8 text-pink-500/30" />
+                            <ShoppingBag className="h-8 w-8 text-indigo-500/30" />
                           )}
-                          <span className="absolute top-2 left-2 bg-pink-100 text-[#e2125d] text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded-full">
+                          <span className="absolute top-2 left-2 bg-indigo-100 text-indigo-600 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded-full">
                             {product.category}
                           </span>
                         </div>
@@ -368,7 +368,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                       <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
                         <div>
                           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
-                          <p className="text-sm font-black text-[#e2125d]">৳{product.price.toLocaleString()}</p>
+                          <p className="text-sm font-black text-indigo-600">৳{product.price.toLocaleString()}</p>
                         </div>
                         <span className="text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full font-bold">
                           {lang === 'bn' ? `স্টক: ${product.stock}` : `${product.stock} In Stock`}
@@ -445,7 +445,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                       </div>
                       <div className="flex justify-between pt-1 border-t border-slate-200 text-xs font-black">
                         <span className="text-slate-700">{lang === 'bn' ? 'মোট পেমেন্ট:' : 'Total Amount:'}</span>
-                        <span className="text-[#e2125d]">৳{order.totalPrice.toLocaleString()}</span>
+                        <span className="text-indigo-600">৳{order.totalPrice.toLocaleString()}</span>
                       </div>
                     </div>
 
@@ -499,7 +499,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-4">
-                <span className="bg-pink-100 text-[#e2125d] text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full">
+                <span className="bg-indigo-100 text-indigo-600 text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full">
                   {selectedProduct.category}
                 </span>
                 <button
@@ -520,7 +520,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <ShoppingBag className="h-12 w-12 text-pink-500/20" />
+                  <ShoppingBag className="h-12 w-12 text-indigo-500/20" />
                 )}
               </div>
 
@@ -529,7 +529,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               </h3>
 
               <div className="flex items-center justify-between mt-2.5 pb-3 border-b border-slate-100">
-                <span className="text-xl font-black text-[#e2125d]">৳{selectedProduct.price.toLocaleString()}</span>
+                <span className="text-xl font-black text-indigo-600">৳{selectedProduct.price.toLocaleString()}</span>
                 <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full font-black">
                   {lang === 'bn' ? `স্টক আছে: ${selectedProduct.stock} টি` : `${selectedProduct.stock} items remaining`}
                 </span>
@@ -551,7 +551,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                   setCheckoutProduct(selectedProduct);
                   setQuantity(1);
                 }}
-                className="w-full bg-[#e2125d] hover:bg-[#c20d4f] text-white py-3.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-pink-500/20 active:scale-95"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-indigo-500/20 active:scale-95"
               >
                 <ShoppingCart className="h-4.5 w-4.5" />
                 <span>{lang === 'bn' ? 'অর্ডার করুন' : 'Purchase Now'}</span>
@@ -579,7 +579,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                  <ShoppingCart className="h-4.5 w-4.5 text-pink-600" />
+                  <ShoppingCart className="h-4.5 w-4.5 text-indigo-600" />
                   {lang === 'bn' ? 'অর্ডার নিশ্চিতকরণ' : 'Confirm Purchase Order'}
                 </h3>
                 <button
@@ -596,14 +596,14 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                   {checkoutProduct.imageUrl ? (
                     <img src={checkoutProduct.imageUrl} alt={checkoutProduct.title} referrerPolicy="no-referrer" className="object-cover w-full h-full" />
                   ) : (
-                    <ShoppingBag className="h-6 w-6 text-pink-500/30" />
+                    <ShoppingBag className="h-6 w-6 text-indigo-500/30" />
                   )}
                 </div>
                 <div>
                   <h4 className="text-xs font-black text-slate-800">
                     {lang === 'bn' ? checkoutProduct.titleBn : checkoutProduct.title}
                   </h4>
-                  <p className="text-xs font-black text-[#e2125d] mt-1">৳{checkoutProduct.price.toLocaleString()}</p>
+                  <p className="text-xs font-black text-indigo-600 mt-1">৳{checkoutProduct.price.toLocaleString()}</p>
                 </div>
               </div>
 
@@ -640,7 +640,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 {/* Delivery details */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5 text-pink-600" />
+                    <MapPin className="h-3.5 w-3.5 text-indigo-600" />
                     {lang === 'bn' ? 'ডেলিভারি ঠিকানা:' : 'Delivery Address:'}
                   </label>
                   <textarea
@@ -649,14 +649,14 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     placeholder={lang === 'bn' ? 'আপনার পূর্ণ ঠিকানা এবং থানা/জেলা লিখুন...' : 'Enter full physical address or digital profile email...'}
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-2xl p-3 text-xs font-semibold focus:ring-2 focus:ring-pink-500/20 text-slate-800"
+                    className="w-full bg-slate-100 border-none rounded-2xl p-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
                   />
                 </div>
 
                 {/* Contact phone */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                    <Phone className="h-3.5 w-3.5 text-pink-600" />
+                    <Phone className="h-3.5 w-3.5 text-indigo-600" />
                     {lang === 'bn' ? 'সচল মোবাইল নম্বর:' : 'Contact Mobile Number:'}
                   </label>
                   <input
@@ -665,7 +665,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     placeholder={lang === 'bn' ? 'যেমন: 01xxxxxxxxx' : 'e.g., 01xxxxxxxxx'}
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-2xl py-3 px-4 text-xs font-semibold focus:ring-2 focus:ring-pink-500/20 text-slate-800"
+                    className="w-full bg-slate-100 border-none rounded-2xl py-3 px-4 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
                   />
                 </div>
 
@@ -679,7 +679,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     placeholder={lang === 'bn' ? 'কোনো বিশেষ নির্দেশনা থাকলে লিখুন...' : 'Write extra requests or size/spec limits...'}
                     value={orderNote}
                     onChange={(e) => setOrderNote(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-2xl py-3 px-4 text-xs font-semibold focus:ring-2 focus:ring-pink-500/20 text-slate-800"
+                    className="w-full bg-slate-100 border-none rounded-2xl py-3 px-4 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
                   />
                 </div>
 
@@ -687,7 +687,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 <div className="border-t border-dashed border-slate-200 pt-3 flex justify-between items-center">
                   <div>
                     <p className="text-[9px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'সর্বমোট মূল্য' : 'Total Price'}</p>
-                    <p className="text-base font-black text-[#e2125d]">৳{(checkoutProduct.price * quantity).toLocaleString()}</p>
+                    <p className="text-base font-black text-indigo-600">৳{(checkoutProduct.price * quantity).toLocaleString()}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'আপনার ব্যালেন্স' : 'Your Balance'}</p>
@@ -708,7 +708,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 <button
                   type="submit"
                   disabled={isSubmitting || walletBalance < (checkoutProduct.price * quantity)}
-                  className="w-full bg-pink-600 hover:bg-pink-700 text-white py-3.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-md shadow-pink-500/10"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-md shadow-indigo-500/10"
                 >
                   {isSubmitting ? (
                     <>
@@ -763,7 +763,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                   setOrderSuccess(null);
                   setActiveTab('orders');
                 }}
-                className="w-full bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-2xl font-black text-xs transition-all cursor-pointer active:scale-95 shadow-sm"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black text-xs transition-all cursor-pointer active:scale-95 shadow-sm"
               >
                 {lang === 'bn' ? 'আমার অর্ডার ট্র্যাক করুন' : 'Track My Order'}
               </button>

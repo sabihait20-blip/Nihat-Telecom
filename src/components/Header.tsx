@@ -75,10 +75,10 @@ export default function Header({
   }, [showBalance]);
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-[#e2125d] via-[#d80f55] to-[#bf0b49] px-5 pt-7 pb-16 shadow-xl rounded-b-[40px] select-none">
+    <div className="relative overflow-hidden bg-gradient-to-b from-blue-700 via-indigo-600 to-indigo-800 px-5 pt-7 pb-16 shadow-xl rounded-b-[40px] select-none">
       {/* bKash Soccer Stadium/Abstract Festive Light Lines */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/15 via-transparent to-transparent opacity-60 pointer-events-none" />
-      <div className="absolute -bottom-8 -right-8 w-44 h-44 bg-pink-400/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-8 -right-8 w-44 h-44 bg-blue-400/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/2 left-0 -translate-y-1/2 h-20 w-full bg-gradient-to-r from-white/5 via-white/0 to-white/5 opacity-45 skew-y-12 pointer-events-none" />
 
       {/* Top Main bKash Header Row */}
@@ -90,7 +90,7 @@ export default function Header({
             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
             className="relative cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full border-2 border-white bg-pink-100 overflow-hidden flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-full border-2 border-white bg-blue-100 overflow-hidden flex items-center justify-center shadow-lg">
               <img 
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" 
                 alt="user" 
@@ -101,7 +101,7 @@ export default function Header({
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
-              <span className="text-sm font-black text-[#e2125d] font-sans absolute">
+              <span className="text-sm font-black text-indigo-600 font-sans absolute">
                 {userInitials}
               </span>
             </div>
@@ -119,7 +119,7 @@ export default function Header({
               <motion.button
                 onClick={handleBalanceTap}
                 whileTap={{ scale: 0.95 }}
-                className="relative flex items-center bg-white rounded-full p-0.5 pr-3 pl-1 h-7.5 min-w-[145px] shadow-sm select-none outline-none overflow-hidden cursor-pointer active:bg-pink-50"
+                className="relative flex items-center bg-white rounded-full p-0.5 pr-3 pl-1 h-7.5 min-w-[145px] shadow-sm select-none outline-none overflow-hidden cursor-pointer active:bg-blue-50"
               >
                 {/* Shimmer loading wave */}
                 {isShimmering && (
@@ -127,12 +127,12 @@ export default function Header({
                     initial={{ x: '-100%' }}
                     animate={{ x: '100%' }}
                     transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e2125d]/10 to-transparent w-full pointer-events-none"
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-600/10 to-transparent w-full pointer-events-none"
                   />
                 )}
 
                 {/* Left bKash Pink token containing "৳" symbol */}
-                <div className="h-6 w-6 rounded-full bg-[#e2125d] flex items-center justify-center text-white text-[12.5px] font-black shrink-0 relative overflow-hidden">
+                <div className="h-6 w-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[12.5px] font-black shrink-0 relative overflow-hidden">
                   <span className="leading-none select-none">৳</span>
                 </div>
 
@@ -144,7 +144,7 @@ export default function Header({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -8 }}
                       transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-                      className="text-[#e2125d] font-bold text-[11px] ml-2 tracking-tight select-none grow text-left"
+                      className="text-indigo-600 font-bold text-[11px] ml-2 tracking-tight select-none grow text-left"
                     >
                       {lang === 'bn' ? 'ব্যালেন্স দেখুন' : 'Tap for Balance'}
                     </motion.span>
@@ -155,7 +155,7 @@ export default function Header({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 8 }}
                       transition={{ type: 'spring', stiffness: 350, damping: 18 }}
-                      className="text-[#e2125d] font-black font-sans text-[12px] ml-2 grow text-left"
+                      className="text-indigo-600 font-black font-sans text-[12px] ml-2 grow text-left"
                     >
                       {formatCurrency(balance)}
                     </motion.span>
@@ -190,7 +190,7 @@ export default function Header({
             animate={{ scale: isHovered === 'notif' ? 1.12 : 1 }}
             whileTap={{ scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-            className="w-10 h-10 rounded-full bg-white text-[#e2125d] hover:bg-pink-50 flex items-center justify-center cursor-pointer shadow-md relative"
+            className="w-10 h-10 rounded-full bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center cursor-pointer shadow-md relative"
           >
             {/* Custom inline-SVG representing official bKash bird logo inside circle */}
             <svg className="w-5.5 h-5.5 fill-current" viewBox="0 0 24 24">

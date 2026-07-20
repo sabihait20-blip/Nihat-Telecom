@@ -94,6 +94,16 @@ export default function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Keep document body background color, font, and text styling completely stable to prevent layout flashes
+  useEffect(() => {
+    const bodyEl = document.body;
+    if (bodyEl) {
+      bodyEl.style.backgroundColor = '#020617';
+      bodyEl.style.color = '#f8fafc';
+      bodyEl.className = 'bg-slate-950 text-slate-100 font-sans antialiased';
+    }
+  }, []);
   
   // Real-time transactional tracking arrays
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -959,7 +969,7 @@ export default function App() {
       id: 'recharge',
       title: t.mobileRecharge,
       icon: Smartphone,
-      color: 'bg-pink-50 text-[#e2125d] border border-pink-100/40 shadow-xs shadow-pink-500/2',
+      color: 'bg-blue-50 text-blue-600 border border-blue-100/40 shadow-xs shadow-blue-500/2',
       action: () => {
         setPrefilledOp(null);
         setPrefilledAmt(null);
@@ -1005,7 +1015,7 @@ export default function App() {
       id: 'store',
       title: lang === 'bn' ? 'মেগা স্টোর' : 'Mega Store',
       icon: ShoppingBag,
-      color: 'bg-pink-50 text-[#e2125d] border border-pink-100/40 shadow-xs shadow-pink-500/2',
+      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
       action: () => setActiveTab('store')
     },
     {
@@ -1244,20 +1254,23 @@ export default function App() {
         </aside>
 
         {/* 2. MAIN SCROLLABLE CONTENT AREA */}
-        <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f8f9fc] relative">
+        <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative">
           {/* Subtle background ambient blur */}
           <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-blue-400/5 rounded-full blur-[100px] pointer-events-none" />
           
           {/* Top Bar Navigation */}
-          <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 px-10 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-200/20">
-            <div>
-              <h2 className="text-slate-900 font-black text-[1.35rem] tracking-tight font-display drop-shadow-sm">
+          <header className="bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 text-white px-10 py-5 flex items-center justify-between sticky top-0 z-10 shadow-md border-b border-indigo-700 relative overflow-hidden">
+            {/* Glossy decorative bubble overlay to match mobile header */}
+            <div className="absolute top-0 right-0 h-40 w-40 bg-white/5 rounded-full translate-x-12 -translate-y-12 blur-md pointer-events-none" />
+            
+            <div className="relative z-10">
+              <h2 className="text-white font-black text-[1.35rem] tracking-tight font-display drop-shadow-sm">
                 {activeTab === 'home' && (lang === 'bn' ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard Overview')}
                 {activeTab === 'packages' && t.packages}
                 {activeTab === 'history' && t.history}
                 {activeTab === 'profile' && t.profile}
               </h2>
-              <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+              <p className="text-[12px] text-indigo-100 font-medium mt-0.5">
                 {activeTab === 'home' && (lang === 'bn' ? 'আপনার NIHAD BUSINESS POINT পোর্টালে স্বাগতম' : 'Welcome to your premium NIHAD BUSINESS POINT workspace')}
                 {activeTab === 'packages' && (lang === 'bn' ? 'সেরা অফার ও বান্ডেল চেক করুন' : 'Check out top-tier cellular recharge packages')}
                 {activeTab === 'history' && (lang === 'bn' ? 'সকল মোবাইল রিচার্জ ও বিল বিবরণী' : 'View secure logs and ledgers for references')}
@@ -1266,11 +1279,11 @@ export default function App() {
             </div>
 
             {/* Toolbar Items */}
-            <div className="flex items-center gap-4">
-              {/* Notification icon */}
+            <div className="flex items-center gap-4 relative z-10">
+              {/* Notification icon - White styling to match mobile gradient header */}
               <button
                 onClick={() => setIsNotificationsOpen(true)}
-                className="relative p-2.5 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 transition-all cursor-pointer shadow-sm hover:shadow active:scale-95"
+                className="relative p-2.5 rounded-2xl border border-white/25 bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer shadow-md backdrop-blur-md active:scale-95"
               >
                 <Bell className="h-5 w-5 stroke-[2]" />
                 {unreadNotifications && (
@@ -1490,7 +1503,11 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen ${(!currentUser || viewMode === 'mobile-mock') ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} flex items-center justify-center p-0 md:p-6 select-none font-sans antialiased`}>
+    <div className={`w-full ${
+      viewMode === 'desktop' && isLargeScreen
+        ? 'h-screen overflow-hidden bg-slate-50 text-slate-800'
+        : `min-h-screen ${(!currentUser || viewMode === 'mobile-mock') ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} flex items-center justify-center p-0 md:p-6`
+    } select-none font-sans antialiased`}>
       
       {/* Dynamic view toggler float pill on computer wide screens */}
       {isLargeScreen && (
