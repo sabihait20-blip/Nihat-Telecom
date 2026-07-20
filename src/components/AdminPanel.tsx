@@ -4520,8 +4520,20 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3.5 bg-slate-950/60 rounded-2xl text-slate-200">
                           <div className="space-y-1">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'এনআইডি নাম' : 'NID Name'}</span>
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'এনআইডি নাম (ইংরেজী)' : 'NID Name (English)'}</span>
                             <p className="text-white text-xs font-bold truncate">{selectedUser.kycData?.fullName || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'এনআইডি নাম (বাংলা)' : 'NID Name (Bengali)'}</span>
+                            <p className="text-white text-xs font-bold truncate">{selectedUser.kycData?.bengaliName || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'পিতার নাম' : "Father's Name"}</span>
+                            <p className="text-white text-xs font-bold truncate">{selectedUser.kycData?.fatherName || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'মাতার নাম' : "Mother's Name"}</span>
+                            <p className="text-white text-xs font-bold truncate">{selectedUser.kycData?.motherName || 'N/A'}</p>
                           </div>
                           <div className="space-y-1">
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'এনআইডি নম্বর' : 'NID Number'}</span>
@@ -4531,16 +4543,20 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'জন্ম তারিখ' : 'Date of Birth'}</span>
                             <p className="text-white text-xs font-bold font-mono">{selectedUser.kycData?.dob || 'N/A'}</p>
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1 col-span-2">
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'কেওয়াইসি স্ট্যাটাস' : 'KYC Status'}</span>
-                            <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                              selectedUser.kycStatus === 'verified' ? 'bg-emerald-500/10 text-emerald-400' :
-                              selectedUser.kycStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 animate-pulse' :
-                              selectedUser.kycStatus === 'rejected' ? 'bg-rose-500/10 text-rose-400' :
-                              'bg-slate-500/10 text-slate-400'
-                            }`}>
-                              {selectedUser.kycStatus || 'Not Submitted'}
-                            </span>
+                            <div>
+                              <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                                selectedUser.kycStatus === 'verified' ? 'bg-emerald-500/10 text-emerald-400' :
+                                selectedUser.kycStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 animate-pulse' :
+                                selectedUser.kycStatus === 'rejected' ? 'bg-rose-500/10 text-rose-400' :
+                                'bg-slate-500/10 text-slate-400'
+                              }`}>
+                                {selectedUser.kycStatus === 'verified' ? (lang === 'bn' ? 'ভেরিফাইড' : 'Verified') :
+                                 selectedUser.kycStatus === 'pending' ? (lang === 'bn' ? 'পেন্ডিং' : 'Pending Approval') :
+                                 selectedUser.kycStatus === 'rejected' ? (lang === 'bn' ? 'প্রত্যাখ্যাত' : 'Rejected') : 'Not Submitted'}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -6087,18 +6103,30 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                     <div className="grid grid-cols-2 gap-3 p-3 bg-white/5 rounded-2xl">
                       <div className="space-y-1">
-                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'এনআইডি নাম' : 'NID Name'}</span>
-                        <p className="text-white text-[11px] font-bold">{user.kycData?.fullName}</p>
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'এনআইডি নাম (ইংরেজী)' : 'NID Name (English)'}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.fullName || 'N/A'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'এনআইডি নাম (বাংলা)' : 'NID Name (Bengali)'}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.bengaliName || 'N/A'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'পিতার নাম' : "Father's Name"}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.fatherName || 'N/A'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'মাতার নাম' : "Mother's Name"}</span>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.motherName || 'N/A'}</p>
                       </div>
                       <div className="space-y-1">
                         <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'এনআইডি নম্বর' : 'NID Number'}</span>
-                        <p className="text-white text-[11px] font-bold">{user.kycData?.nidNumber}</p>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.nidNumber || 'N/A'}</p>
                       </div>
                       <div className="space-y-1">
                         <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'জন্ম তারিখ' : 'Date of Birth'}</span>
-                        <p className="text-white text-[11px] font-bold">{user.kycData?.dob}</p>
+                        <p className="text-white text-[11px] font-bold">{user.kycData?.dob || 'N/A'}</p>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1 col-span-2">
                         <span className="text-[9px] font-black text-slate-500 uppercase">{lang === 'bn' ? 'জমাদান' : 'Submitted'}</span>
                         <p className="text-white text-[11px] font-bold">{user.kycData?.submittedAt ? new Date(user.kycData.submittedAt).toLocaleDateString() : 'N/A'}</p>
                       </div>
