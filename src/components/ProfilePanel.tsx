@@ -395,6 +395,76 @@ export default function ProfilePanel({
             <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
           </button>
 
+          {/* Toggle Push Notifications Switch */}
+          <div className="p-3.5 flex items-center justify-between bg-slate-50/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+                <BellRing className="h-4.5 w-4.5 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="text-slate-800 font-bold text-xs">
+                  {lang === 'bn' ? 'পুশ নোটিফিকেশন' : 'Push Notifications'}
+                </h4>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  {lang === 'bn' ? 'রিয়েল-টাইম পুশ নোটিফিকেশন অন/অফ' : 'Enable real-time push messages'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!currentUser) return;
+                const currentVal = userData?.pushNotificationsEnabled !== false;
+                await updateDoc(doc(db, 'users', currentUser.uid), {
+                  pushNotificationsEnabled: !currentVal
+                });
+              }}
+              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer outline-none ${
+                (userData?.pushNotificationsEnabled !== false) ? 'bg-indigo-600' : 'bg-slate-200'
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                  (userData?.pushNotificationsEnabled !== false) ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Toggle SMS Alerts Switch */}
+          <div className="p-3.5 flex items-center justify-between bg-slate-50/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <Phone className="h-4.5 w-4.5 text-emerald-600" />
+              </div>
+              <div>
+                <h4 className="text-slate-800 font-bold text-xs">
+                  {lang === 'bn' ? 'এসএমএস অ্যালার্ট' : 'SMS Alerts & Chimes'}
+                </h4>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  {lang === 'bn' ? 'লেনদেনের সয়ংক্রিয় এসএমএস ও নোটিফিকেশন টিউন' : 'Simulated incoming SMS text and sound'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!currentUser) return;
+                const currentVal = userData?.smsAlertsEnabled === true;
+                await updateDoc(doc(db, 'users', currentUser.uid), {
+                  smsAlertsEnabled: !currentVal
+                });
+              }}
+              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer outline-none ${
+                (userData?.smsAlertsEnabled === true) ? 'bg-emerald-500' : 'bg-slate-200'
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                  (userData?.smsAlertsEnabled === true) ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
           {/* Referral Program Action */}
           {onReferralClick && (
             <button

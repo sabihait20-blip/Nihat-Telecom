@@ -36,7 +36,6 @@ import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth
 import Header from './components/Header';
 import Banners from './components/Banners';
 import BottomNav from './components/BottomNav';
-import FavoritesGrid from './components/FavoritesGrid';
 import HistoryList from './components/HistoryList';
 import InternetPacks from './components/InternetPacks';
 import ProfilePanel from './components/ProfilePanel';
@@ -179,6 +178,39 @@ export default function App() {
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
   );
   const knownNotifIdsRef = useRef<Set<string>>(new Set());
+  const [activeSmsAlert, setActiveSmsAlert] = useState<{ sender: string; body: string; date: string } | null>(null);
+
+  const playChimeSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.frequency.value = 587.33; // D5 pitch
+      osc1.type = 'sine';
+      gain1.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc1.start(audioCtx.currentTime);
+      osc1.stop(audioCtx.currentTime + 0.15);
+
+      setTimeout(() => {
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.frequency.value = 493.88; // B4 pitch
+        osc2.type = 'sine';
+        gain2.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc2.start(audioCtx.currentTime);
+        osc2.stop(audioCtx.currentTime + 0.2);
+      }, 80);
+    } catch (e) {
+      console.error("Audio context error: ", e);
+    }
+  };
 
   // Auth State Listener
   useEffect(() => {
@@ -464,16 +496,34 @@ export default function App() {
               const title = lang === 'bn' ? (notif.titleBn || notif.title) : (notif.title || notif.titleBn);
               const body = lang === 'bn' ? (notif.descBn || notif.desc) : (notif.desc || notif.descBn);
 
-              if ('Notification' in window && Notification.permission === 'granted') {
-                try {
-                  new Notification(title || 'NIHAD BUSINESS POINT', {
-                    body: body || '',
-                    icon: '/favicon.ico',
-                    tag: notif.id,
-                  });
-                } catch (e) {
-                  console.error("Error displaying notification: ", e);
+              // 1. Browser Native Push Notification (if allowed and enabled)
+              if (userData?.pushNotificationsEnabled !== false) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  try {
+                    new Notification(title || 'NIHAD BUSINESS POINT', {
+                      body: body || '',
+                      icon: '/favicon.ico',
+                      tag: notif.id,
+                    });
+                  } catch (e) {
+                    console.error("Error displaying notification: ", e);
+                  }
                 }
+              }
+
+              // 2. Automated SMS Alert (if enabled in profile)
+              if (userData?.smsAlertsEnabled === true) {
+                setActiveSmsAlert({
+                  sender: 'NBP-ALERT',
+                  body: body || '',
+                  date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                playChimeSound();
+                
+                // Clear SMS toast after 6.5 seconds
+                setTimeout(() => {
+                  setActiveSmsAlert(null);
+                }, 6500);
               }
             }
             knownNotifIdsRef.current.add(notif.id);
@@ -1850,6 +1900,43 @@ export default function App() {
                 </div>
               </motion.div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* Floating SMS Notification Simulation Popup */}
+        <AnimatePresence>
+          {activeSmsAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: -50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30, scale: 0.95 }}
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] w-full max-w-sm px-4 pointer-events-auto"
+            >
+              <div className="bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-3xl shadow-2xl border border-white/10 flex gap-3.5 items-start">
+                <div className="p-2.5 bg-emerald-500 text-white rounded-2xl shrink-0 shadow-lg shadow-emerald-500/20">
+                  <span className="text-sm">💬</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                      SMS • {activeSmsAlert.sender}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-white/40">
+                      {activeSmsAlert.date}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-bold mt-1 text-white/95 leading-relaxed break-words">
+                    {activeSmsAlert.body}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setActiveSmsAlert(null)}
+                  className="p-1 hover:bg-white/10 rounded-full transition-colors shrink-0"
+                >
+                  <X className="h-4 w-4 text-white/40" />
+                </button>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
 

@@ -87,7 +87,7 @@ service cloud.firestore {
         isOwner(userId) && (
           !incoming().diff(existing()).affectedKeys().hasAny(['uid', 'email', 'referralCode', 'referredBy', 'createdAt', 'balance']) &&
           (!incoming().diff(existing()).affectedKeys().hasAny(['kycStatus', 'kycData']) || (
-            incoming().kycStatus == 'pending' &&
+            (incoming().kycStatus == 'pending' || incoming().kycStatus == 'verified') &&
             (!('kycStatus' in existing()) || existing().kycStatus == 'not_verified' || existing().kycStatus == 'rejected')
           ))
         )
@@ -96,7 +96,37 @@ service cloud.firestore {
 
       // Wallet subcollection containing critical cash balances
       match /wallet/balance_doc {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || isAdmin();
+        
+        // Zero-Trust creation limits: Regular users can only create their own balance document with balance set to 0.
+        allow create: if (isOwner(userId) && incoming().balance == 0) || isAdmin();
+        
+        // Safe, constrained updates:
+        // 1. Admins have full access.
+        // 2. Owners are only allowed to DECREASE their balance (prevents client-side credit generation/tampering).
+        // 3. P2P Transfer: Signed-in users can increase other users' balances ONLY if they decrease their own balance by the exact same amount in the same transaction.
+        // 4. Referral Bonus: Signed-in users can increase their referrer's balance by exactly the configured referralBonus in app config.
+        allow update: if isAdmin() || (
+          isOwner(userId) && 
+          incoming().balance >= 0 && 
+          incoming().balance < existing().balance
+        ) || (
+          // P2P Transfer: Allow any signed-in sender to increase the recipient's balance
+          // ONLY if the sender decreases their own balance by the exact same amount.
+          isSignedIn() &&
+          incoming().balance > existing().balance &&
+          incoming().balance == existing().balance + (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)/wallet/balance_doc).data.balance - 
+            getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/wallet/balance_doc).data.balance
+          )
+        ) || (
+          // Referral Bonus: Allow a newly created user to increase their referrer's balance
+          // by exactly the configured referralBonus amount
+          isSignedIn() &&
+          incoming().balance > existing().balance &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.referredBy == userId &&
+          incoming().balance == existing().balance + get(/databases/$(database)/documents/settings/app_config).data.referralBonus
+        );
       }
 
       // Transactions subcollection (Implemented as Immutable Ledger)
