@@ -3,7 +3,8 @@ import Tesseract from 'tesseract.js';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
-  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize
+  LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
+  Eye, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -460,6 +461,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
     globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
     showNotice: true,
+    requireKyc: true,
   });
 
   useEffect(() => {
@@ -479,6 +481,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           globalNoticeEn: data.globalNoticeEn || '',
           globalNoticeBn: data.globalNoticeBn || '',
           showNotice: typeof data.showNotice === 'boolean' ? data.showNotice : true,
+          requireKyc: typeof data.requireKyc === 'boolean' ? data.requireKyc : true,
         });
       }
     }, (error) => {
@@ -568,6 +571,35 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   // KYC management helpers
   const [rejectingKycUserId, setRejectingKycUserId] = useState<string | null>(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
+  
+  // KYC Image Preview & Download states
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>('');
+
+  const handleDownloadImage = async (url: string, filename: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      // Fallback if CORS prevents fetching
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noreferrer';
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
 
   const handleApproveKyc = async (userId: string) => {
     if (!window.confirm(lang === 'bn' ? 'আপনি কি এই গ্রাহকের কেওয়াইসি এপ্রুভ করতে চান?' : 'Do you want to approve this user\'s KYC?')) return;
@@ -727,7 +759,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: RechargePackage[] = [];
       snapshot.forEach((snap) => {
-        list.push(snap.data() as RechargePackage);
+        list.push({ id: snap.id, ...snap.data() } as RechargePackage);
       });
       setOffers(list);
     }, (error) => {
@@ -743,7 +775,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: PromoBanner[] = [];
       snapshot.forEach((snap) => {
-        list.push(snap.data() as PromoBanner);
+        list.push({ id: snap.id, ...snap.data() } as PromoBanner);
       });
       setBanners(list);
     }, (error) => {
@@ -776,7 +808,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: BillProvider[] = [];
       snapshot.forEach((snap) => {
-        list.push(snap.data() as BillProvider);
+        list.push({ id: snap.id, ...snap.data() } as BillProvider);
       });
       setBillers(list);
     }, (error) => {
@@ -4563,33 +4595,91 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">{lang === 'bn' ? 'সামনের অংশ' : 'Front Side'}</span>
-                            <div className="aspect-video bg-slate-950 border border-white/5 rounded-2xl overflow-hidden relative group shadow-md">
+                            <div 
+                              onClick={() => {
+                                if (selectedUser.kycData?.nidFrontUrl) {
+                                  setPreviewImageUrl(selectedUser.kycData.nidFrontUrl);
+                                  setPreviewTitle(lang === 'bn' ? `${selectedUser.displayName || 'গ্রাহক'}-এর এনআইডি সামনের অংশ` : `${selectedUser.displayName || 'User'}'s NID Front`);
+                                }
+                              }}
+                              className="aspect-video bg-slate-950 border border-white/5 rounded-2xl overflow-hidden relative group shadow-md cursor-pointer"
+                            >
                               {selectedUser.kycData?.nidFrontUrl ? (
-                                <a href={selectedUser.kycData.nidFrontUrl} target="_blank" rel="noreferrer" className="block w-full h-full relative">
+                                <>
                                   <img src={selectedUser.kycData.nidFrontUrl} alt="NID Front" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350" referrerPolicy="no-referrer" />
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[10px] font-bold text-white">
-                                    {lang === 'bn' ? 'ক্লিক করে বড় করুন' : 'Click to Zoom'}
+                                    {lang === 'bn' ? 'ক্লিক করে প্রিভিউ করুন' : 'Click to Preview'}
                                   </div>
-                                </a>
+                                </>
                               ) : (
                                 <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500 font-bold">No Image</span>
                               )}
                             </div>
+                            {selectedUser.kycData?.nidFrontUrl && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setPreviewImageUrl(selectedUser.kycData.nidFrontUrl);
+                                    setPreviewTitle(lang === 'bn' ? `${selectedUser.displayName || 'গ্রাহক'}-এর এনআইডি সামনের অংশ` : `${selectedUser.displayName || 'User'}'s NID Front`);
+                                  }}
+                                  className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                                >
+                                  <Eye className="h-3 w-3 text-blue-400" />
+                                  <span>{lang === 'bn' ? 'প্রিভিউ' : 'Preview'}</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadImage(selectedUser.kycData.nidFrontUrl, `${(selectedUser.displayName || 'user').replace(/\s+/g, '_').toLowerCase()}_nid_front.jpg`)}
+                                  className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                                >
+                                  <Download className="h-3 w-3 text-emerald-400" />
+                                  <span>{lang === 'bn' ? 'ডাউনলোড' : 'Download'}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">{lang === 'bn' ? 'পিছনের অংশ' : 'Back Side'}</span>
-                            <div className="aspect-video bg-slate-950 border border-white/5 rounded-2xl overflow-hidden relative group shadow-md">
+                            <div 
+                              onClick={() => {
+                                if (selectedUser.kycData?.nidBackUrl) {
+                                  setPreviewImageUrl(selectedUser.kycData.nidBackUrl);
+                                  setPreviewTitle(lang === 'bn' ? `${selectedUser.displayName || 'গ্রাহক'}-এর এনআইডি পিছনের অংশ` : `${selectedUser.displayName || 'User'}'s NID Back`);
+                                }
+                              }}
+                              className="aspect-video bg-slate-950 border border-white/5 rounded-2xl overflow-hidden relative group shadow-md cursor-pointer"
+                            >
                               {selectedUser.kycData?.nidBackUrl ? (
-                                <a href={selectedUser.kycData.nidBackUrl} target="_blank" rel="noreferrer" className="block w-full h-full relative">
+                                <>
                                   <img src={selectedUser.kycData.nidBackUrl} alt="NID Back" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350" referrerPolicy="no-referrer" />
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[10px] font-bold text-white">
-                                    {lang === 'bn' ? 'ক্লিক করে বড় করুন' : 'Click to Zoom'}
+                                    {lang === 'bn' ? 'ক্লিক করে প্রিভিউ করুন' : 'Click to Preview'}
                                   </div>
-                                </a>
+                                </>
                               ) : (
                                 <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500 font-bold">No Image</span>
                               )}
                             </div>
+                            {selectedUser.kycData?.nidBackUrl && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setPreviewImageUrl(selectedUser.kycData.nidBackUrl);
+                                    setPreviewTitle(lang === 'bn' ? `${selectedUser.displayName || 'গ্রাহক'}-এর এনআইডি পিছনের অংশ` : `${selectedUser.displayName || 'User'}'s NID Back`);
+                                  }}
+                                  className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                                >
+                                  <Eye className="h-3 w-3 text-blue-400" />
+                                  <span>{lang === 'bn' ? 'প্রিভিউ' : 'Preview'}</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadImage(selectedUser.kycData.nidBackUrl, `${(selectedUser.displayName || 'user').replace(/\s+/g, '_').toLowerCase()}_nid_back.jpg`)}
+                                  className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                                >
+                                  <Download className="h-3 w-3 text-emerald-400" />
+                                  <span>{lang === 'bn' ? 'ডাউনলোড' : 'Download'}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -4847,6 +4937,31 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-medium outline-none focus:border-blue-500 font-semibold"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Section E: KYC Customer Identity Verification Settings */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono flex items-center justify-between">
+                    <span>5. KYC Customer Verification Settings</span>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsForm({ ...settingsForm, requireKyc: !settingsForm.requireKyc })}
+                      className={`px-3 py-1 text-[9px] font-black rounded-lg uppercase tracking-wider border transition-all ${
+                        settingsForm.requireKyc 
+                          ? 'bg-emerald-600/10 border-emerald-500/20 text-emerald-400' 
+                          : 'bg-white/5 border-white/5 text-slate-500'
+                      }`}
+                    >
+                      {settingsForm.requireKyc ? 'Status: Active / Required' : 'Status: Disabled / Optional'}
+                    </button>
+                  </h3>
+                  <div className="bg-slate-950/50 rounded-2xl p-4 border border-white/5 text-xs text-slate-400 leading-relaxed">
+                    <p className="font-semibold text-slate-300">
+                      {lang === 'bn' 
+                        ? 'কেওয়াইসি (গ্রাহক পরিচয় যাচাইকরণ) সিস্টেম সচল রাখুন যাতে গ্রাহকরা আর্থিক লেনদেন করার পূর্বে তাদের জাতীয় পরিচয়পত্র সাবমিট করে এবং এডমিন সেটি ম্যানুয়ালি রিভিউ ও এপ্রুভ করতে পারে।' 
+                        : 'Enable KYC Customer Verification system so that users are prompted/required to submit their National ID cards and admin can manually review and approve them before they access full services.'}
+                    </p>
                   </div>
                 </div>
 
@@ -6111,15 +6226,79 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <span className="text-[9px] font-black text-slate-500 uppercase ml-1">{lang === 'bn' ? 'সামনের অংশ' : 'Front Side'}</span>
-                        <div className="aspect-video bg-white/5 rounded-2xl overflow-hidden border border-white/5">
-                          <img src={user.kycData?.nidFrontUrl} alt="Front" className="w-full h-full object-cover" />
+                        <div 
+                          onClick={() => {
+                            if (user.kycData?.nidFrontUrl) {
+                              setPreviewImageUrl(user.kycData.nidFrontUrl);
+                              setPreviewTitle(lang === 'bn' ? `${user.displayName || 'গ্রাহক'}-এর এনআইডি সামনের অংশ` : `${user.displayName || 'User'}'s NID Front`);
+                            }
+                          }}
+                          className="aspect-video bg-white/5 rounded-2xl overflow-hidden border border-white/5 relative group cursor-pointer"
+                        >
+                          <img src={user.kycData?.nidFrontUrl} alt="Front" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                            <Eye className="h-5 w-5 text-white" />
+                          </div>
                         </div>
+                        {user.kycData?.nidFrontUrl && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setPreviewImageUrl(user.kycData.nidFrontUrl);
+                                setPreviewTitle(lang === 'bn' ? `${user.displayName || 'গ্রাহক'}-এর এনআইডি সামনের অংশ` : `${user.displayName || 'User'}'s NID Front`);
+                              }}
+                              className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                            >
+                              <Eye className="h-3 w-3 text-blue-400" />
+                              <span>{lang === 'bn' ? 'প্রিভিউ' : 'Preview'}</span>
+                            </button>
+                            <button
+                              onClick={() => handleDownloadImage(user.kycData.nidFrontUrl, `${(user.displayName || 'user').replace(/\s+/g, '_').toLowerCase()}_nid_front.jpg`)}
+                              className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                            >
+                              <Download className="h-3 w-3 text-emerald-400" />
+                              <span>{lang === 'bn' ? 'ডাউনলোড' : 'Download'}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <span className="text-[9px] font-black text-slate-500 uppercase ml-1">{lang === 'bn' ? 'পিছনের অংশ' : 'Back Side'}</span>
-                        <div className="aspect-video bg-white/5 rounded-2xl overflow-hidden border border-white/5">
-                          <img src={user.kycData?.nidBackUrl} alt="Back" className="w-full h-full object-cover" />
+                        <div 
+                          onClick={() => {
+                            if (user.kycData?.nidBackUrl) {
+                              setPreviewImageUrl(user.kycData.nidBackUrl);
+                              setPreviewTitle(lang === 'bn' ? `${user.displayName || 'গ্রাহক'}-এর এনআইডি পিছনের অংশ` : `${user.displayName || 'User'}'s NID Back`);
+                            }
+                          }}
+                          className="aspect-video bg-white/5 rounded-2xl overflow-hidden border border-white/5 relative group cursor-pointer"
+                        >
+                          <img src={user.kycData?.nidBackUrl} alt="Back" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                            <Eye className="h-5 w-5 text-white" />
+                          </div>
                         </div>
+                        {user.kycData?.nidBackUrl && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setPreviewImageUrl(user.kycData.nidBackUrl);
+                                setPreviewTitle(lang === 'bn' ? `${user.displayName || 'গ্রাহক'}-এর এনআইডি পিছনের অংশ` : `${user.displayName || 'User'}'s NID Back`);
+                              }}
+                              className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                            >
+                              <Eye className="h-3 w-3 text-blue-400" />
+                              <span>{lang === 'bn' ? 'প্রিভিউ' : 'Preview'}</span>
+                            </button>
+                            <button
+                              onClick={() => handleDownloadImage(user.kycData.nidBackUrl, `${(user.displayName || 'user').replace(/\s+/g, '_').toLowerCase()}_nid_back.jpg`)}
+                              className="flex-1 py-1.5 bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-slate-800 transition-all cursor-pointer"
+                            >
+                              <Download className="h-3 w-3 text-emerald-400" />
+                              <span>{lang === 'bn' ? 'ডাউনলোড' : 'Download'}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -6536,6 +6715,47 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* FULL SCREEN IMAGE PREVIEW LIGHTBOX */}
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in">
+          {/* Header Controls */}
+          <div className="w-full max-w-4xl flex items-center justify-between mb-4 text-white">
+            <span className="text-xs font-black uppercase tracking-widest text-slate-300 font-mono">
+              {previewTitle || (lang === 'bn' ? 'ছবি প্রিভিউ' : 'Image Preview')}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleDownloadImage(previewImageUrl, `${previewTitle.replace(/\s+/g, '_').toLowerCase()}.jpg`)}
+                className="p-2.5 bg-slate-900 border border-white/10 rounded-xl hover:bg-slate-800 text-white flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Download className="h-4 w-4 text-blue-400 animate-bounce" />
+                <span>{lang === 'bn' ? 'ডাউনলোড' : 'Download'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setPreviewImageUrl(null);
+                  setPreviewTitle('');
+                }}
+                className="p-2.5 bg-rose-600 rounded-xl text-white font-bold transition-all hover:bg-rose-700 cursor-pointer text-xs flex items-center gap-1"
+              >
+                <X className="h-4 w-4" />
+                <span>{lang === 'bn' ? 'বন্ধ করুন' : 'Close'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Image Container */}
+          <div className="w-full max-w-4xl flex-1 flex items-center justify-center overflow-auto rounded-3xl border border-white/10 bg-slate-950 p-2 relative group">
+            <img
+              src={previewImageUrl}
+              alt="Preview"
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
           </div>
         </div>
       )}

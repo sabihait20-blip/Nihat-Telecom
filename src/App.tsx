@@ -123,7 +123,8 @@ export default function App() {
     maxAddFund: 25000,
     globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
     globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
-    showNotice: true
+    showNotice: true,
+    requireKyc: true
   });
 
   // Dynamic App Settings / Notice Ticker observer
@@ -145,7 +146,8 @@ export default function App() {
           maxAddFund: 25000,
           globalNoticeEn: 'Airtel packages are currently in maintenance. Please purchase other packages!',
           globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
-          showNotice: true
+          showNotice: true,
+          requireKyc: true
         }).catch(err => console.error("Error seeding config: ", err));
       }
     }, (error) => {
@@ -272,7 +274,7 @@ export default function App() {
       } else {
         const list: RechargePackage[] = [];
         snapshot.forEach((snap) => {
-          list.push(snap.data() as RechargePackage);
+          list.push({ id: snap.id, ...snap.data() } as RechargePackage);
         });
         setDbOffers(list);
       }
@@ -332,7 +334,7 @@ export default function App() {
       } else {
         const list: PromoBanner[] = [];
         snapshot.forEach((snap) => {
-          list.push(snap.data() as PromoBanner);
+          list.push({ id: snap.id, ...snap.data() } as PromoBanner);
         });
         setDbBanners(list);
       }
@@ -360,7 +362,7 @@ export default function App() {
       } else {
         const list: BillProvider[] = [];
         snapshot.forEach((snap) => {
-          list.push(snap.data() as BillProvider);
+          list.push({ id: snap.id, ...snap.data() } as BillProvider);
         });
         setDbBillers(list);
       }
@@ -1445,6 +1447,9 @@ export default function App() {
                     helplineNumber={appConfig.helplineNumber}
                     whatsappUrl={appConfig.whatsappUrl}
                     onAddFundClick={() => setIsAddFundOpen(true)}
+                    userData={userData}
+                    onKYCClick={() => setIsKYCOpen(true)}
+                    requireKyc={appConfig.requireKyc}
                   />
                 </div>
               )}
@@ -1658,6 +1663,7 @@ export default function App() {
               onAddFundClick={() => setIsAddFundOpen(true)}
               userData={userData}
               onKYCClick={() => setIsKYCOpen(true)}
+              requireKyc={appConfig.requireKyc}
             />
           )}
         </div>

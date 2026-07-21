@@ -20,6 +20,7 @@ interface ProfilePanelProps {
   onAddFundClick?: () => void;
   userData?: any;
   onKYCClick?: () => void;
+  requireKyc?: boolean;
 }
 
 export default function ProfilePanel({
@@ -33,6 +34,7 @@ export default function ProfilePanel({
   onAddFundClick,
   userData,
   onKYCClick,
+  requireKyc = true,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -221,7 +223,7 @@ export default function ProfilePanel({
                 {kycStatus === 'verified' ? (lang === 'bn' ? 'ভেরিফাইড' : 'Verified') :
                  kycStatus === 'pending' ? (lang === 'bn' ? 'অপেক্ষমান' : 'Pending Verification') :
                  kycStatus === 'rejected' ? (lang === 'bn' ? 'বাতিল করা হয়েছে' : 'Rejected') :
-                 (lang === 'bn' ? 'ভেরিফাইড নয়' : 'Not Verified')}
+                 (!requireKyc ? (lang === 'bn' ? 'ঐচ্ছিক / ভেরিফাইড নয়' : 'Optional / Not Verified') : (lang === 'bn' ? 'ভেরিফাইড নয়' : 'Not Verified'))}
               </p>
             </div>
           </div>
