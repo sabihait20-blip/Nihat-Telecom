@@ -484,6 +484,9 @@ export default function App() {
         txList.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
       });
       setTransactions(txList);
+      updateDoc(doc(db, 'registered_users', currentUser.uid), {
+        transactionCount: txList.length
+      }).catch(() => {});
     });
     return () => unsubscribe();
   }, [currentUser]);

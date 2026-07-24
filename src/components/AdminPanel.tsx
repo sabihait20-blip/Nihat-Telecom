@@ -1417,6 +1417,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       snapshot.forEach((snap) => {
         list.push({ ...snap.data(), id: snap.id });
       });
+      // Sort: highest transactionCount at the very top
+      list.sort((a, b) => (b.transactionCount || 0) - (a.transactionCount || 0));
       setRegisteredUsers(list);
     }, (error) => {
       console.error("Error loading registered users list: ", error);
