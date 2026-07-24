@@ -285,10 +285,10 @@ export default function App() {
   const handleAcceptIncomingAdminCall = async () => {
     if (!currentUser?.uid) return;
     try {
-      await updateDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), {
+      await setDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), {
         status: 'Connected',
         connectedTime: Date.now()
-      });
+      }, { merge: true });
       setIncomingAdminCall(null);
       setIsSupportOpen(true);
     } catch (e) {
@@ -299,9 +299,9 @@ export default function App() {
   const handleRejectIncomingAdminCall = async () => {
     if (!currentUser?.uid) return;
     try {
-      await updateDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), {
+      await setDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), {
         status: 'Rejected'
-      });
+      }, { merge: true });
       setIncomingAdminCall(null);
     } catch (e) {
       console.error("Reject call error:", e);

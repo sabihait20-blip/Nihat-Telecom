@@ -714,7 +714,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       snap.forEach(docSnap => {
         const data = docSnap.data();
         if (data.status === 'Ringing' || data.status === 'Connected') {
-          activeCalls.push(data);
+          const resolvedCallId = data.callId || docSnap.id || (data.userId ? `call_${data.userId}` : 'unknown');
+          activeCalls.push({ id: docSnap.id, callId: resolvedCallId, ...data });
         }
       });
 
@@ -749,36 +750,42 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     return () => clearInterval(interval);
   }, [adminActiveCall]);
 
-  const handleAcceptCall = async (callId: string) => {
+  const handleAcceptCall = async (callId?: string) => {
     stopAdminRingtone();
     await startAdminMic();
+    const targetId = callId || adminActiveCall?.callId || adminActiveCall?.id || (adminActiveCall?.userId ? `call_${adminActiveCall.userId}` : null);
+    if (!targetId) return;
     try {
-      await updateDoc(doc(db, 'admin_calls', callId), {
+      await setDoc(doc(db, 'admin_calls', targetId), {
         status: 'Connected',
         connectedTime: Date.now()
-      });
+      }, { merge: true });
       setAdminActiveCall((prev: any) => prev ? { ...prev, status: 'Connected' } : null);
     } catch (err) {
       console.error("Accept call error:", err);
     }
   };
 
-  const handleRejectCall = async (callId: string) => {
+  const handleRejectCall = async (callId?: string) => {
     stopAdminRingtone();
     stopAdminMic();
+    const targetId = callId || adminActiveCall?.callId || adminActiveCall?.id || (adminActiveCall?.userId ? `call_${adminActiveCall.userId}` : null);
+    if (!targetId) return;
     try {
-      await updateDoc(doc(db, 'admin_calls', callId), { status: 'Rejected' });
+      await setDoc(doc(db, 'admin_calls', targetId), { status: 'Rejected' }, { merge: true });
     } catch (err) {
       console.error("Reject call error:", err);
     }
     setAdminActiveCall(null);
   };
 
-  const handleAdminEndCall = async (callId: string) => {
+  const handleAdminEndCall = async (callId?: string) => {
     stopAdminRingtone();
     stopAdminMic();
+    const targetId = callId || adminActiveCall?.callId || adminActiveCall?.id || (adminActiveCall?.userId ? `call_${adminActiveCall.userId}` : null);
+    if (!targetId) return;
     try {
-      await updateDoc(doc(db, 'admin_calls', callId), { status: 'Ended' });
+      await setDoc(doc(db, 'admin_calls', targetId), { status: 'Ended' }, { merge: true });
     } catch (err) {
       console.error("End call error:", err);
     }
