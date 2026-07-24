@@ -533,10 +533,10 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
                       </div>
                     );
                   }
-                  return filtered.map((contact) => {
+                  return filtered.map((contact, idx) => {
                     return (
                       <button
-                        key={contact.id}
+                        key={`${contact.id || contact.number || 'contact'}-${idx}`}
                         type="button"
                         onClick={() => {
                           setTargetNumber(contact.number);

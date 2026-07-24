@@ -646,9 +646,9 @@ export default function CashOutCalculatorModal({
                         </div>
                         <div className="space-y-1.5">
                           {filteredFavorites.length > 0 ? (
-                            filteredFavorites.map(fav => (
+                            filteredFavorites.map((fav, idx) => (
                               <button
-                                key={fav.id}
+                                key={`${fav.id || fav.number || 'fav'}-${idx}`}
                                 onClick={() => handleSelectContact(fav.number)}
                                 className="w-full text-left bg-white hover:bg-slate-100 p-2.5 rounded-xl flex items-center justify-between border border-slate-100"
                               >

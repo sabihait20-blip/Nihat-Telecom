@@ -97,7 +97,7 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
       <div className="relative overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
-            key={activePromo.id}
+            key={activePromo.id || `promo-${activeIndex}`}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}

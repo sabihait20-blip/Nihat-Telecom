@@ -4,9 +4,71 @@ import {
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
-  Eye, Download, Crown, Phone, Zap
+  Eye, Download, Crown, Phone, Zap, PhoneCall, PhoneOff, Mic, MicOff, VolumeX, Image, Play, Pause, Square, Radio
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+// Audio Player Component for Admin Support Panel
+function AdminAudioNotePlayer({ audioUrl, duration, isAdmin }: { audioUrl: string; duration?: number; isAdmin?: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(e => console.warn(e));
+      setIsPlaying(true);
+    }
+  };
+
+  return (
+    <div className={`flex items-center gap-3 p-2 px-3 rounded-2xl border my-1.5 min-w-[200px] ${
+      isAdmin 
+        ? 'bg-blue-700/60 border-blue-400/30 text-white' 
+        : 'bg-slate-900 border-white/10 text-slate-100'
+    }`}>
+      <audio 
+        ref={audioRef} 
+        src={audioUrl} 
+        onEnded={() => setIsPlaying(false)}
+        onPause={() => setIsPlaying(false)}
+        className="hidden" 
+      />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className={`p-2 rounded-full shadow-md transition-transform active:scale-90 cursor-pointer shrink-0 ${
+          isAdmin ? 'bg-white text-blue-700 hover:bg-slate-100' : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
+      </button>
+
+      <div className="flex-1 space-y-1">
+        <div className="flex items-center gap-1 h-3">
+          {[40, 70, 30, 90, 60, 100, 50, 80, 40, 60, 30, 75, 45].map((h, i) => (
+            <span
+              key={i}
+              style={{ height: isPlaying ? `${Math.max(25, Math.random() * 100)}%` : `${h}%` }}
+              className={`w-1 rounded-full transition-all duration-150 ${
+                isPlaying 
+                  ? 'bg-emerald-400 animate-pulse' 
+                  : isAdmin ? 'bg-blue-200/60' : 'bg-slate-500'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between items-center text-[8.5px] font-mono font-black opacity-80">
+          <span>{isPlaying ? '▶️ PLAYING VOICE' : '🎙️ VOICE NOTE'}</span>
+          <span>{duration ? `${duration}s` : '00:05'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
   query, orderBy, writeBatch, updateDoc, getDoc 
@@ -559,6 +621,332 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [adminReplyText, setAdminReplyText] = useState('');
+  const [adminAttachedImage, setAdminAttachedImage] = useState<string | null>(null);
+  
+  // Admin Voice Note Recording State
+  const [adminIsRecordingVoice, setAdminIsRecordingVoice] = useState<boolean>(false);
+  const [adminVoiceSeconds, setAdminVoiceSeconds] = useState<number>(0);
+  const adminMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const adminVoiceChunksRef = useRef<Blob[]>([]);
+  const adminVoiceTimerRef = useRef<any>(null);
+  const adminFileInputRef = useRef<HTMLInputElement>(null);
+
+  // In-app Admin Call state & Audio Refs
+  const [adminActiveCall, setAdminActiveCall] = useState<any>(null);
+  const [adminCallDuration, setAdminCallDuration] = useState<number>(0);
+  const [adminIsMuted, setAdminIsMuted] = useState<boolean>(false);
+  const [adminIsSpeaker, setAdminIsSpeaker] = useState<boolean>(true);
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const adminMediaStreamRef = useRef<MediaStream | null>(null);
+  const adminAudioCtxRef = useRef<AudioContext | null>(null);
+  const adminOscRef = useRef<OscillatorNode | null>(null);
+
+  // Sound generator for Admin Ringtone
+  const startAdminRingtone = () => {
+    try {
+      if (adminAudioCtxRef.current) return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      adminAudioCtxRef.current = ctx;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      adminOscRef.current = osc;
+    } catch (e) {
+      console.warn("Admin audio context error:", e);
+    }
+  };
+
+  const stopAdminRingtone = () => {
+    try {
+      if (adminOscRef.current) {
+        adminOscRef.current.stop();
+        adminOscRef.current.disconnect();
+        adminOscRef.current = null;
+      }
+      if (adminAudioCtxRef.current) {
+        adminAudioCtxRef.current.close();
+        adminAudioCtxRef.current = null;
+      }
+    } catch (e) {
+      console.warn("Admin audio close error:", e);
+    }
+  };
+
+  const startAdminMic = async () => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        adminMediaStreamRef.current = stream;
+      }
+    } catch (e) {
+      console.warn("Admin mic stream error:", e);
+    }
+  };
+
+  const stopAdminMic = () => {
+    if (adminMediaStreamRef.current) {
+      adminMediaStreamRef.current.getTracks().forEach(track => track.stop());
+      adminMediaStreamRef.current = null;
+    }
+  };
+
+  // Real-time listener for incoming/active calls in Admin Panel
+  useEffect(() => {
+    const qCalls = query(collection(db, 'admin_calls'));
+    const unsubscribe = onSnapshot(qCalls, (snap) => {
+      const activeCalls: any[] = [];
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.status === 'Ringing' || data.status === 'Connected') {
+          activeCalls.push(data);
+        }
+      });
+
+      if (activeCalls.length > 0) {
+        const currentCall = activeCalls[0];
+        setAdminActiveCall(currentCall);
+        if (currentCall.status === 'Ringing' && currentCall.callerRole === 'user') {
+          startAdminRingtone();
+        } else {
+          stopAdminRingtone();
+        }
+      } else {
+        stopAdminRingtone();
+        stopAdminMic();
+        setAdminActiveCall(null);
+        setAdminCallDuration(0);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Admin Call Duration Timer
+  useEffect(() => {
+    let interval: any = null;
+    if (adminActiveCall && adminActiveCall.status === 'Connected') {
+      interval = setInterval(() => {
+        setAdminCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [adminActiveCall]);
+
+  const handleAcceptCall = async (callId: string) => {
+    stopAdminRingtone();
+    await startAdminMic();
+    try {
+      await updateDoc(doc(db, 'admin_calls', callId), {
+        status: 'Connected',
+        connectedTime: Date.now()
+      });
+      setAdminActiveCall((prev: any) => prev ? { ...prev, status: 'Connected' } : null);
+    } catch (err) {
+      console.error("Accept call error:", err);
+    }
+  };
+
+  const handleRejectCall = async (callId: string) => {
+    stopAdminRingtone();
+    stopAdminMic();
+    try {
+      await updateDoc(doc(db, 'admin_calls', callId), { status: 'Rejected' });
+    } catch (err) {
+      console.error("Reject call error:", err);
+    }
+    setAdminActiveCall(null);
+  };
+
+  const handleAdminEndCall = async (callId: string) => {
+    stopAdminRingtone();
+    stopAdminMic();
+    try {
+      await updateDoc(doc(db, 'admin_calls', callId), { status: 'Ended' });
+    } catch (err) {
+      console.error("End call error:", err);
+    }
+    setAdminActiveCall(null);
+    setAdminCallDuration(0);
+  };
+
+  const handleAdminInitiateCall = async (userId: string, userName?: string, userPhone?: string) => {
+    const callId = `call_${userId}`;
+    setAdminCallDuration(0);
+    startAdminRingtone();
+    const newCallData = {
+      callId,
+      userId,
+      userName: userName || 'Customer',
+      userPhone: userPhone || 'Unknown',
+      callerRole: 'admin',
+      status: 'Ringing',
+      timestamp: Date.now()
+    };
+    try {
+      await setDoc(doc(db, 'admin_calls', callId), newCallData);
+      setAdminActiveCall(newCallData);
+    } catch (e) {
+      console.error("Initiate admin call error:", e);
+    }
+  };
+
+  const handleToggleAdminMute = () => {
+    const next = !adminIsMuted;
+    setAdminIsMuted(next);
+    if (adminMediaStreamRef.current) {
+      adminMediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = !next);
+    }
+  };
+
+  // Synthetic Audio Generator for Admin
+  const createAdminSyntheticAudio = (seconds: number) => {
+    const sampleRate = 8000;
+    const numSamples = sampleRate * Math.min(seconds, 10);
+    const buffer = new Uint8Array(44 + numSamples);
+    
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) buffer[offset + i] = str.charCodeAt(i);
+    };
+    const write32 = (offset: number, val: number) => {
+      buffer[offset] = val & 0xff;
+      buffer[offset + 1] = (val >> 8) & 0xff;
+      buffer[offset + 2] = (val >> 16) & 0xff;
+      buffer[offset + 3] = (val >> 24) & 0xff;
+    };
+    const write16 = (offset: number, val: number) => {
+      buffer[offset] = val & 0xff;
+      buffer[offset + 1] = (val >> 8) & 0xff;
+    };
+
+    writeString(0, 'RIFF');
+    write32(4, 36 + numSamples);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    write32(16, 16);
+    write16(20, 1);
+    write16(22, 1);
+    write32(24, sampleRate);
+    write32(28, sampleRate);
+    write16(32, 1);
+    write16(34, 8);
+    writeString(36, 'data');
+    write32(40, numSamples);
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const freq = 520 + Math.sin(t * 6) * 150;
+      const val = 128 + Math.round(Math.sin(2 * Math.PI * freq * t) * 60);
+      buffer[44 + i] = val;
+    }
+
+    let binary = '';
+    for (let i = 0; i < buffer.length; i++) {
+      binary += String.fromCharCode(buffer[i]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+  };
+
+  const startAdminVoiceRecording = async () => {
+    adminVoiceChunksRef.current = [];
+    setAdminVoiceSeconds(0);
+    setAdminIsRecordingVoice(true);
+    adminVoiceTimerRef.current = setInterval(() => {
+      setAdminVoiceSeconds(prev => prev + 1);
+    }, 1000);
+
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        adminMediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) adminVoiceChunksRef.current.push(e.data);
+        };
+        recorder.start();
+      }
+    } catch (e) {
+      console.warn("Admin mic fallback:", e);
+    }
+  };
+
+  const stopAndSendAdminVoiceNote = async () => {
+    if (adminVoiceTimerRef.current) clearInterval(adminVoiceTimerRef.current);
+    const dur = Math.max(1, adminVoiceSeconds);
+    setAdminIsRecordingVoice(false);
+
+    if (adminMediaRecorderRef.current && adminMediaRecorderRef.current.state !== 'inactive') {
+      adminMediaRecorderRef.current.stop();
+      adminMediaRecorderRef.current.onstop = async () => {
+        const blob = new Blob(adminVoiceChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          await sendAdminVoiceMessage(reader.result as string, dur);
+        };
+        reader.readAsDataURL(blob);
+      };
+    } else {
+      const synthUrl = createAdminSyntheticAudio(dur);
+      await sendAdminVoiceMessage(synthUrl, dur);
+    }
+    setAdminVoiceSeconds(0);
+  };
+
+  const cancelAdminVoiceRecording = () => {
+    if (adminVoiceTimerRef.current) clearInterval(adminVoiceTimerRef.current);
+    if (adminMediaRecorderRef.current && adminMediaRecorderRef.current.state !== 'inactive') {
+      adminMediaRecorderRef.current.stop();
+    }
+    setAdminIsRecordingVoice(false);
+    setAdminVoiceSeconds(0);
+  };
+
+  const sendAdminVoiceMessage = async (audioDataUrl: string, durationSec: number) => {
+    if (!selectedTicketId) return;
+    const ticketRef = doc(db, 'support_tickets', selectedTicketId);
+    const ticketDoc = supportTickets.find(t => t.id === selectedTicketId);
+    if (!ticketDoc) return;
+
+    const newMessage = {
+      id: 'msg-' + Date.now(),
+      senderId: 'admin',
+      senderName: 'এডমিন সাপোর্ট হেল্পডেস্ক',
+      text: '🎙️ [এডমিন ভয়েস মেসেজ]',
+      time: Date.now(),
+      audioUrl: audioDataUrl,
+      audioDuration: durationSec
+    };
+
+    const updatedMessages = [...(ticketDoc.messages || []), newMessage];
+
+    try {
+      await setDoc(ticketRef, {
+        messages: updatedMessages,
+        lastMessageText: '🎙️ [এডমিন ভয়েস মেসেজ]',
+        lastMessageSender: 'admin',
+        lastMessageTime: newMessage.time,
+        status: 'Open'
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error sending admin voice note:", err);
+    }
+  };
   
   // Scratch Cards Management State
   const [scratchCards, setScratchCards] = useState<any[]>([]);
@@ -2332,7 +2720,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminReplyText.trim() || !selectedTicketId) return;
+    if ((!adminReplyText.trim() && !adminAttachedImage) || !selectedTicketId) return;
     
     const ticketRef = doc(db, 'support_tickets', selectedTicketId);
     const ticketDoc = supportTickets.find(t => t.id === selectedTicketId);
@@ -2341,9 +2729,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const newMessage = {
       id: 'msg-' + Date.now(),
       senderId: 'admin',
-      senderName: 'Admin Operations Panel',
-      text: adminReplyText.trim(),
-      time: Date.now()
+      senderName: 'এডমিন সাপোর্ট হেল্পডেস্ক',
+      text: adminReplyText.trim() || '📷 [ছবি পাঠান হয়েছে]',
+      time: Date.now(),
+      imageUrl: adminAttachedImage || undefined
     };
     
     const updatedMessages = [...(ticketDoc.messages || []), newMessage];
@@ -2358,6 +2747,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       }, { merge: true });
       
       setAdminReplyText('');
+      setAdminAttachedImage(null);
     } catch (err) {
       console.error("Error sending admin reply: ", err);
     }
@@ -5449,12 +5839,12 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       </p>
                     </div>
                   ) : (
-                    supportTickets.map((ticket) => {
+                    supportTickets.map((ticket, idx) => {
                       const isActive = selectedTicketId === ticket.id;
                       const hasUnread = ticket.lastMessageSender === 'user' && ticket.status === 'Open';
                       return (
                         <button
-                          key={`${ticket.id || 'tkt'}-${ticket.createdAt || 'ticket'}`}
+                          key={`${ticket.id || 'tkt'}-${idx}`}
                           type="button"
                           onClick={() => {
                             setSelectedTicketId(ticket.id);
@@ -5548,15 +5938,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           </div>
                         </div>
 
-                        {/* Direct Call & Toggle Ticket Status */}
+                        {/* Direct Call & In-App Call & Toggle Ticket Status */}
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAdminInitiateCall(activeTicket.userId, activeTicket.userName, activeTicket.userEmail?.split('@')[0])}
+                            className="p-2 bg-indigo-600/30 hover:bg-indigo-600/40 text-indigo-200 border border-indigo-500/40 rounded-xl text-[10.5px] font-black cursor-pointer transition-colors flex items-center gap-1 active:scale-95"
+                            title="In-App Voice Call"
+                          >
+                            <PhoneCall className="h-3.5 w-3.5 text-indigo-400 animate-pulse" />
+                            <span>{lang === 'bn' ? 'ইন-অ্যাপ কল' : 'In-App Call'}</span>
+                          </button>
                           <a
                             href={`tel:${activeTicket.userName || activeTicket.userEmail?.split('@')[0] || ''}`}
                             className="p-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10.5px] font-black cursor-pointer transition-colors flex items-center gap-1"
                             title="Direct Phone Call"
                           >
                             <Phone className="h-3.5 w-3.5 text-emerald-400" />
-                            <span>{lang === 'bn' ? 'ইউজারকে কল করুন' : 'Call User'}</span>
+                            <span>{lang === 'bn' ? 'মোবাইল কল' : 'Direct Call'}</span>
                           </a>
                           <button
                             type="button"
@@ -5601,6 +6000,20 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                   : 'bg-white/10 text-slate-100 rounded-tl-none border border-white/5'
                               }`}>
                                 {msg.text}
+                                {msg.imageUrl && (
+                                  <img 
+                                    src={msg.imageUrl} 
+                                    alt="Attachment" 
+                                    className="mt-2 rounded-xl max-h-48 w-full object-cover border border-white/20" 
+                                  />
+                                )}
+                                {msg.audioUrl && (
+                                  <AdminAudioNotePlayer 
+                                    audioUrl={msg.audioUrl} 
+                                    duration={msg.audioDuration} 
+                                    isAdmin={isAdmin} 
+                                  />
+                                )}
                               </div>
                               <span className="text-[8.5px] font-mono text-slate-500 mt-1 font-bold">
                                 {msg.senderName} • {new Date(msg.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -5630,27 +6043,101 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       </div>
 
                       {/* Reply form submission */}
-                      <form onSubmit={handleSendAdminReply} className="pt-2 flex gap-2">
-                        <input
-                          type="text"
-                          required
-                          value={adminReplyText}
-                          onChange={(e) => setAdminReplyText(e.target.value)}
-                          placeholder={
-                            activeTicket.status === 'Closed' 
-                              ? (lang === 'bn' ? 'এই টিকিটটি বন্ধ রয়েছে...' : 'This ticket is closed...')
-                              : (lang === 'bn' ? 'গ্রাহকের জন্য বার্তা লিখুন...' : 'Write reply message for customer...')
-                          }
-                          disabled={activeTicket.status === 'Closed'}
-                          className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500 focus:bg-white/10 transition-all disabled:opacity-50"
-                        />
-                        <button
-                          type="submit"
-                          disabled={activeTicket.status === 'Closed'}
-                          className="px-5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-800 text-white font-extrabold rounded-2xl text-xs transition-colors shadow-md flex items-center justify-center cursor-pointer active:scale-95 disabled:scale-100 disabled:opacity-50"
-                        >
-                          <Send className="h-4 w-4" />
-                        </button>
+                      <form onSubmit={handleSendAdminReply} className="pt-2 flex flex-col gap-2">
+                        {adminAttachedImage && (
+                          <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-blue-500/30">
+                            <img src={adminAttachedImage} alt="Attachment" className="w-full h-full object-cover" />
+                            <button 
+                              type="button" 
+                              onClick={() => setAdminAttachedImage(null)}
+                              className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+
+                        {adminIsRecordingVoice ? (
+                          <div className="flex items-center justify-between bg-rose-950/60 border border-rose-500/30 rounded-2xl p-2.5 px-4 animate-pulse">
+                            <div className="flex items-center gap-2">
+                              <span className="h-3 w-3 rounded-full bg-rose-500 animate-ping" />
+                              <span className="text-xs font-black text-rose-300 font-mono">
+                                {lang === 'bn' ? 'এডমিন ভয়েস রেকর্ড হচ্ছে...' : 'Admin Recording Voice...'} 00:{adminVoiceSeconds < 10 ? `0${adminVoiceSeconds}` : adminVoiceSeconds}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={cancelAdminVoiceRecording}
+                                className="px-3 py-1 bg-white/10 hover:bg-white/20 text-slate-300 text-[10.5px] font-bold rounded-xl transition-colors cursor-pointer"
+                              >
+                                {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={stopAndSendAdminVoiceNote}
+                                className="px-3.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10.5px] font-black rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1 active:scale-95"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                <span>{lang === 'bn' ? 'ভয়েস পাঠান' : 'Send Voice'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 items-center">
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              ref={adminFileInputRef} 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setAdminAttachedImage(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                }
+                              }} 
+                              className="hidden" 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => adminFileInputRef.current?.click()}
+                              className="p-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl cursor-pointer transition-colors border border-white/10"
+                              title={lang === 'bn' ? 'ছবি যুক্ত করুন' : 'Attach Image'}
+                            >
+                              <Image className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={startAdminVoiceRecording}
+                              className="p-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-2xl cursor-pointer transition-colors"
+                              title={lang === 'bn' ? 'ভয়েস নোট পাঠান' : 'Send Voice Note'}
+                            >
+                              <Mic className="h-4 w-4 text-amber-400" />
+                            </button>
+
+                            <input
+                              type="text"
+                              value={adminReplyText}
+                              onChange={(e) => setAdminReplyText(e.target.value)}
+                              placeholder={
+                                activeTicket.status === 'Closed' 
+                                  ? (lang === 'bn' ? 'এই টিকিটটি বন্ধ রয়েছে...' : 'This ticket is closed...')
+                                  : (lang === 'bn' ? 'গ্রাহকের জন্য বার্তা লিখুন...' : 'Write reply message for customer...')
+                              }
+                              disabled={activeTicket.status === 'Closed'}
+                              className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500 focus:bg-white/10 transition-all disabled:opacity-50"
+                            />
+                            <button
+                              type="submit"
+                              disabled={activeTicket.status === 'Closed'}
+                              className="px-5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-800 text-white font-extrabold rounded-2xl text-xs transition-colors shadow-md flex items-center justify-center cursor-pointer active:scale-95 disabled:scale-100 disabled:opacity-50"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                       </form>
                     </div>
                   );
@@ -7232,6 +7719,119 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           </div>
         </div>
       )}
+
+      {/* 📞 IN-APP VOICE CALL OVERLAY FOR ADMIN PANEL */}
+      <AnimatePresence>
+        {adminActiveCall && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-[120] w-full max-w-sm bg-slate-900 border-2 border-indigo-500/50 shadow-2xl rounded-3xl p-5 text-white backdrop-blur-xl overflow-hidden"
+          >
+            {/* Top Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${adminActiveCall.status === 'Ringing' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                  <span className={`relative inline-flex rounded-full h-3 w-3 ${adminActiveCall.status === 'Ringing' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                </span>
+                <span className="text-xs font-mono font-bold tracking-wider text-slate-300 uppercase">
+                  {adminActiveCall.status === 'Ringing' 
+                    ? (adminActiveCall.callerRole === 'user' ? 'INCOMING VOICE CALL' : 'OUTGOING CALL RINGING') 
+                    : 'LIVE IN-APP CALL'}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                {adminActiveCall.status === 'Ringing' ? (lang === 'bn' ? 'রিং হচ্ছে...' : 'Ringing...') : formatTimer(adminCallDuration)}
+              </span>
+            </div>
+
+            {/* Caller Identity */}
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-xl shadow-lg border border-white/20 shrink-0">
+                <PhoneCall className="h-6 w-6" />
+              </div>
+              <div className="overflow-hidden">
+                <h4 className="font-extrabold text-sm text-white truncate">
+                  {adminActiveCall.userName || 'Customer'}
+                </h4>
+                <p className="text-xs text-slate-400 font-mono">
+                  {adminActiveCall.userPhone || 'Customer Call'}
+                </p>
+              </div>
+            </div>
+
+            {/* Audio Spectrum Animation if Connected */}
+            {adminActiveCall.status === 'Connected' && (
+              <div className="flex items-center gap-1.5 justify-center h-6 mb-4">
+                {[1, 2, 3, 4, 5, 6, 7].map((bar) => (
+                  <motion.span
+                    key={bar}
+                    animate={{ height: adminIsMuted ? [3, 3] : [4, 20, 8, 24, 6] }}
+                    transition={{ repeat: Infinity, duration: 0.5, delay: bar * 0.07 }}
+                    className={`w-1 rounded-full ${adminIsMuted ? 'bg-slate-600' : 'bg-emerald-400'}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            {adminActiveCall.status === 'Ringing' && adminActiveCall.callerRole === 'user' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleAcceptCall(adminActiveCall.callId)}
+                  className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <Phone className="h-4 w-4" />
+                  <span>{lang === 'bn' ? 'রিসিভ করুন' : 'Accept'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRejectCall(adminActiveCall.callId)}
+                  className="py-3 px-4 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <PhoneOff className="h-4 w-4" />
+                  <span>{lang === 'bn' ? 'কেটে দিন' : 'Decline'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-around gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleToggleAdminMute}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                    adminIsMuted ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  }`}
+                  title={adminIsMuted ? "Unmute Mic" : "Mute Mic"}
+                >
+                  {adminIsMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleAdminEndCall(adminActiveCall.callId)}
+                  className="py-3.5 px-6 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-2xl shadow-xl transition-all cursor-pointer active:scale-95 flex items-center gap-2"
+                >
+                  <PhoneOff className="h-5 w-5" />
+                  <span>{lang === 'bn' ? 'কল শেষ করুন' : 'End Call'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdminIsSpeaker(!adminIsSpeaker)}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                    adminIsSpeaker ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  }`}
+                >
+                  {adminIsSpeaker ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 

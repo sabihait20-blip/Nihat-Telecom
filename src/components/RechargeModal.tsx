@@ -793,11 +793,11 @@ export default function RechargeModal({
                       </div>
                     );
                   }
-                  return filtered.map((contact) => {
+                  return filtered.map((contact, idx) => {
                     const opDetails = OPERATORS[contact.operator];
                     return (
                       <button
-                        key={contact.id}
+                        key={`${contact.id || contact.number || 'contact'}-${idx}`}
                         type="button"
                         onClick={() => {
                           setPhoneNumber(contact.number);

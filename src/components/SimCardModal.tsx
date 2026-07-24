@@ -513,9 +513,9 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                         <div className="grid grid-cols-2 gap-2">
                           {availableNumbers
                             .filter(n => n.operator === operator && n.status === 'Available' && n.type === 'Regular')
-                            .map((numObj) => (
+                            .map((numObj, idx) => (
                               <button
-                                key={numObj.id}
+                                key={`${numObj.id || numObj.number || 'reg'}-${idx}`}
                                 type="button"
                                 onClick={() => setSelectedGalleryNumber(numObj.number)}
                                 className={`p-2 rounded-xl text-center font-mono text-xs font-black border transition-all cursor-pointer ${
@@ -545,9 +545,9 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                         <div className="grid grid-cols-2 gap-2">
                           {availableNumbers
                             .filter(n => n.operator === operator && n.status === 'Available' && n.type === 'VIP')
-                            .map((numObj) => (
+                            .map((numObj, idx) => (
                               <button
-                                key={numObj.id}
+                                key={`${numObj.id || numObj.number || 'vip'}-${idx}`}
                                 type="button"
                                 onClick={() => setSelectedGalleryNumber(numObj.number)}
                                 className={`p-2 rounded-xl text-center font-mono text-xs font-black border transition-all cursor-pointer ${

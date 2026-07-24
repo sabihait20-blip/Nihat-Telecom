@@ -4,7 +4,7 @@ import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
   Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare,
-  Calculator, CreditCard, AlertTriangle
+  Calculator, CreditCard, AlertTriangle, ShieldCheck, Phone, PhoneOff, PhoneCall
 } from 'lucide-react';
 
 // Data types & assets
@@ -257,6 +257,56 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [currentUser]);
+
+  // Global Incoming Admin Call State
+  const [incomingAdminCall, setIncomingAdminCall] = useState<any>(null);
+
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setIncomingAdminCall(null);
+      return;
+    }
+    const callDocRef = doc(db, 'admin_calls', `call_${currentUser.uid}`);
+    const unsubscribe = onSnapshot(callDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.status === 'Ringing' && data.callerRole === 'admin') {
+          setIncomingAdminCall(data);
+        } else {
+          setIncomingAdminCall(null);
+        }
+      } else {
+        setIncomingAdminCall(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
+  const handleAcceptIncomingAdminCall = async () => {
+    if (!currentUser?.uid) return;
+    try {
+      await updateDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), {
+        status: 'Connected',
+        connectedTime: Date.now()
+      });
+      setIncomingAdminCall(null);
+      setIsSupportOpen(true);
+    } catch (e) {
+      console.error("Accept call error:", e);
+    }
+  };
+
+  const handleRejectIncomingAdminCall = async () => {
+    if (!currentUser?.uid) return;
+    try {
+      await updateDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), {
+        status: 'Rejected'
+      });
+      setIncomingAdminCall(null);
+    } catch (e) {
+      console.error("Reject call error:", e);
+    }
+  };
 
   // Firestore dynamic offers database snap observer
   useEffect(() => {
@@ -1752,14 +1802,16 @@ export default function App() {
           )}
 
           {/* SCRATCH CARD STORE */}
-          <ScratchCardModal
-            lang={lang}
-            isOpen={isScratchCardOpen}
-            onClose={() => setIsScratchCardOpen(false)}
-            balance={balance}
-            uid={currentUser?.uid || null}
-            onSuccess={handleScratchCardSuccess}
-          />
+          {isScratchCardOpen && (
+            <ScratchCardModal
+              lang={lang}
+              isOpen={isScratchCardOpen}
+              onClose={() => setIsScratchCardOpen(false)}
+              balance={balance}
+              uid={currentUser?.uid || null}
+              onSuccess={handleScratchCardSuccess}
+            />
+          )}
 
           {/* CASHOUT CALCULATOR & SIMULATOR DIALOGUE */}
           {isCashOutCalcOpen && (
@@ -1937,6 +1989,61 @@ export default function App() {
                   className="p-1 hover:bg-white/10 rounded-full transition-colors shrink-0"
                 >
                   <X className="h-4 w-4 text-white/40" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 📞 GLOBAL INCOMING ADMIN CALL OVERLAY FOR USER */}
+        <AnimatePresence>
+          {incomingAdminCall && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 50 }}
+              className="fixed bottom-6 right-6 z-[150] w-full max-w-sm bg-slate-950/95 border-2 border-indigo-500/80 shadow-2xl rounded-3xl p-6 text-white backdrop-blur-xl overflow-hidden select-none"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500" />
+                </span>
+                <span className="text-xs font-mono font-bold tracking-wider text-indigo-300 uppercase">
+                  INCOMING ADMIN SUPPORT CALL
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 border-2 border-white/20 flex items-center justify-center text-white font-black shadow-xl shrink-0">
+                  <ShieldCheck className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base text-white">
+                    {lang === 'bn' ? 'এডমিন সাপোর্ট প্যানেল' : 'Admin Support Agent'}
+                  </h4>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {lang === 'bn' ? 'আপনাকে সাপোর্ট কল দেওয়া হচ্ছে...' : 'Calling for customer support...'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleAcceptIncomingAdminCall}
+                  className="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <PhoneCall className="h-4 w-4" />
+                  <span>{lang === 'bn' ? 'রিসিভ করুন' : 'Answer'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectIncomingAdminCall}
+                  className="py-3.5 px-4 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <PhoneOff className="h-4 w-4" />
+                  <span>{lang === 'bn' ? 'কেটে দিন' : 'Decline'}</span>
                 </button>
               </div>
             </motion.div>

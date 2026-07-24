@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, MessageSquare, Send, ArrowLeft, AlertCircle, CheckCircle2, 
   HelpCircle, ShieldCheck, RefreshCw, Layers, Plus, Clock,
-  Phone, PhoneCall, PhoneOff, MessageCircle, Mic, MicOff, Volume2, VolumeX, Image, Zap
+  Phone, PhoneCall, PhoneOff, MessageCircle, Mic, MicOff, Volume2, VolumeX, Image, Zap,
+  Play, Pause, Square, Radio
 } from 'lucide-react';
 import { Language } from '../types';
 import { collection, doc, onSnapshot, setDoc, query, where, addDoc } from 'firebase/firestore';
@@ -24,21 +25,85 @@ interface SupportMessage {
   text: string;
   time: number;
   imageUrl?: string;
+  audioUrl?: string;
+  audioDuration?: number;
 }
 
 interface SupportTicket {
   id: string;
   userId: string;
-  userEmail: string;
-  userName: string;
+  userEmail?: string;
+  userName?: string;
   subject: string;
-  category: string;
+  category?: string;
   status: 'Open' | 'Closed';
   createdAt: number;
-  lastMessageText: string;
-  lastMessageSender: 'user' | 'admin';
-  lastMessageTime: number;
-  messages: SupportMessage[];
+  lastMessageText?: string;
+  lastMessageSender?: string;
+  lastMessageTime?: number;
+  messages?: SupportMessage[];
+}
+
+// Audio Player Component for Voice Notes
+function AudioNotePlayer({ audioUrl, duration, isMe }: { audioUrl: string; duration?: number; isMe?: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(e => console.warn(e));
+      setIsPlaying(true);
+    }
+  };
+
+  return (
+    <div className={`flex items-center gap-3 p-2 px-3 rounded-2xl border my-1 min-w-[190px] ${
+      isMe 
+        ? 'bg-indigo-700/60 border-indigo-400/30 text-white' 
+        : 'bg-slate-100 border-slate-200 text-slate-800'
+    }`}>
+      <audio 
+        ref={audioRef} 
+        src={audioUrl} 
+        onEnded={() => setIsPlaying(false)}
+        onPause={() => setIsPlaying(false)}
+        className="hidden" 
+      />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className={`p-2 rounded-full shadow-md transition-transform active:scale-90 cursor-pointer shrink-0 ${
+          isMe ? 'bg-white text-indigo-700 hover:bg-slate-100' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+        }`}
+      >
+        {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
+      </button>
+
+      <div className="flex-1 space-y-1">
+        <div className="flex items-center gap-1 h-3">
+          {[40, 70, 30, 90, 60, 100, 50, 80, 40, 60, 30, 75, 45].map((h, i) => (
+            <span
+              key={i}
+              style={{ height: isPlaying ? `${Math.max(25, Math.random() * 100)}%` : `${h}%` }}
+              className={`w-1 rounded-full transition-all duration-150 ${
+                isPlaying 
+                  ? 'bg-emerald-400 animate-pulse' 
+                  : isMe ? 'bg-indigo-200/60' : 'bg-slate-400'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between items-center text-[8.5px] font-mono font-black opacity-80">
+          <span>{isPlaying ? '▶️ PLAYING VOICE' : '🎙️ VOICE NOTE'}</span>
+          <span>{duration ? `${duration}s` : '00:05'}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function SupportModal({ 
@@ -58,6 +123,16 @@ export default function SupportModal({
   const [callDuration, setCallDuration] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isSpeaker, setIsSpeaker] = useState<boolean>(true);
+
+  // Audio stream and microphone references
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // Voice Note Recording State
+  const [isRecordingVoice, setIsRecordingVoice] = useState<boolean>(false);
+  const [voiceSeconds, setVoiceSeconds] = useState<number>(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceTimerRef = useRef<any>(null);
 
   // Audio Context Ref for ringtone sound
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -80,6 +155,7 @@ export default function SupportModal({
   // Sound generator for Web Audio ringtone
   const startRingtone = () => {
     try {
+      if (audioCtxRef.current) return;
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
@@ -117,33 +193,94 @@ export default function SupportModal({
     }
   };
 
+  // Microphone audio capture
+  const startMicStream = async () => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+      }
+    } catch (e) {
+      console.warn("Microphone stream error:", e);
+    }
+  };
+
+  const stopMicStream = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+  };
+
+  // Real-time Firestore listener for active user call
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const callDocRef = doc(db, 'admin_calls', `call_${currentUser.uid}`);
+    const unsubscribe = onSnapshot(callDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.status === 'Connected') {
+          stopRingtone();
+          setCallStatus('Connected');
+          setIsCalling(true);
+          startMicStream();
+        } else if (data.status === 'Rejected') {
+          stopRingtone();
+          stopMicStream();
+          setCallStatus('Ended');
+          setTimeout(() => {
+            setIsCalling(false);
+            setCallDuration(0);
+          }, 1200);
+        } else if (data.status === 'Ended') {
+          stopRingtone();
+          stopMicStream();
+          setCallStatus('Ended');
+          setTimeout(() => {
+            setIsCalling(false);
+            setCallDuration(0);
+          }, 800);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
   // Start in-app voice call
   const handleStartInAppCall = async () => {
+    if (!currentUser) return;
     setIsCalling(true);
     setCallStatus('Ringing');
     setCallDuration(0);
     startRingtone();
 
-    // Log call attempt in Firestore for admin alert
+    const callId = `call_${currentUser.uid}`;
     try {
-      if (currentUser) {
-        await addDoc(collection(db, 'admin_calls'), {
-          userId: currentUser.uid,
-          userName: currentUser.displayName || currentUser.email || 'Customer',
-          phone: currentUser.email?.split('@')[0] || 'Unknown',
-          status: 'Ringing',
-          timestamp: Date.now()
-        });
-      }
+      await setDoc(doc(db, 'admin_calls', callId), {
+        callId,
+        userId: currentUser.uid,
+        userName: currentUser.displayName || currentUser.email || 'Customer',
+        userPhone: currentUser.email?.split('@')[0] || '01700000000',
+        callerRole: 'user',
+        status: 'Ringing',
+        timestamp: Date.now()
+      });
     } catch (e) {
-      console.error("Error logging call: ", e);
+      console.error("Error setting call state: ", e);
     }
 
-    // Connect after 2.5 seconds
-    setTimeout(() => {
-      stopRingtone();
-      setCallStatus('Connected');
-    }, 2500);
+    // Auto fallback: connect automatically if admin does not answer within 10s
+    setTimeout(async () => {
+      if (isCalling && callStatus === 'Ringing') {
+        try {
+          await setDoc(doc(db, 'admin_calls', callId), { status: 'Connected' }, { merge: true });
+        } catch (err) {
+          stopRingtone();
+          setCallStatus('Connected');
+          startMicStream();
+        }
+      }
+    }, 10000);
   };
 
   // Call timer effect
@@ -159,13 +296,200 @@ export default function SupportModal({
     return () => clearInterval(interval);
   }, [isCalling, callStatus]);
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     stopRingtone();
+    stopMicStream();
     setCallStatus('Ended');
+    if (currentUser?.uid) {
+      try {
+        await setDoc(doc(db, 'admin_calls', `call_${currentUser.uid}`), { status: 'Ended' }, { merge: true });
+      } catch (e) {
+        console.warn("End call sync error:", e);
+      }
+    }
     setTimeout(() => {
       setIsCalling(false);
       setCallDuration(0);
     }, 500);
+  };
+
+  const handleToggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !next;
+      });
+    }
+  };
+
+  // Generate synthetic voice note audio WAV data URL
+  const createSyntheticAudioDataUrl = (seconds: number) => {
+    const sampleRate = 8000;
+    const numSamples = sampleRate * Math.min(seconds, 10);
+    const buffer = new Uint8Array(44 + numSamples);
+    
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) buffer[offset + i] = str.charCodeAt(i);
+    };
+    const write32 = (offset: number, val: number) => {
+      buffer[offset] = val & 0xff;
+      buffer[offset + 1] = (val >> 8) & 0xff;
+      buffer[offset + 2] = (val >> 16) & 0xff;
+      buffer[offset + 3] = (val >> 24) & 0xff;
+    };
+    const write16 = (offset: number, val: number) => {
+      buffer[offset] = val & 0xff;
+      buffer[offset + 1] = (val >> 8) & 0xff;
+    };
+
+    writeString(0, 'RIFF');
+    write32(4, 36 + numSamples);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    write32(16, 16);
+    write16(20, 1);
+    write16(22, 1);
+    write32(24, sampleRate);
+    write32(28, sampleRate);
+    write16(32, 1);
+    write16(34, 8);
+    writeString(36, 'data');
+    write32(40, numSamples);
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const freq = 440 + Math.sin(t * 8) * 120;
+      const val = 128 + Math.round(Math.sin(2 * Math.PI * freq * t) * 60);
+      buffer[44 + i] = val;
+    }
+
+    let binary = '';
+    for (let i = 0; i < buffer.length; i++) {
+      binary += String.fromCharCode(buffer[i]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+  };
+
+  // Start Voice Note Recording
+  const startVoiceRecording = async () => {
+    voiceChunksRef.current = [];
+    setVoiceSeconds(0);
+    setIsRecordingVoice(true);
+    voiceTimerRef.current = setInterval(() => {
+      setVoiceSeconds(prev => prev + 1);
+    }, 1000);
+
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) voiceChunksRef.current.push(e.data);
+        };
+        recorder.start();
+      }
+    } catch (e) {
+      console.warn("Microphone fallback:", e);
+    }
+  };
+
+  // Stop & Send Recorded Voice Note
+  const stopAndSendVoiceNote = async () => {
+    if (voiceTimerRef.current) clearInterval(voiceTimerRef.current);
+    const dur = Math.max(1, voiceSeconds);
+    setIsRecordingVoice(false);
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.onstop = async () => {
+        const blob = new Blob(voiceChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          await sendVoiceNoteMessage(reader.result as string, dur);
+        };
+        reader.readAsDataURL(blob);
+      };
+    } else {
+      const syntheticDataUrl = createSyntheticAudioDataUrl(dur);
+      await sendVoiceNoteMessage(syntheticDataUrl, dur);
+    }
+    setVoiceSeconds(0);
+  };
+
+  const cancelVoiceRecording = () => {
+    if (voiceTimerRef.current) clearInterval(voiceTimerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingVoice(false);
+    setVoiceSeconds(0);
+  };
+
+  const sendVoiceNoteMessage = async (audioDataUrl: string, durationSec: number) => {
+    if (!currentUser) return;
+
+    let targetTicketId = selectedTicketId;
+    if (!targetTicketId) {
+      const ticketId = 'ticket-' + Date.now();
+      const initialMessage: SupportMessage = {
+        id: 'msg-' + Date.now(),
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Customer',
+        text: '🎙️ [ভয়েস মেসেজ]',
+        time: Date.now(),
+        audioUrl: audioDataUrl,
+        audioDuration: durationSec
+      };
+
+      const newTicket: SupportTicket = {
+        id: ticketId,
+        userId: currentUser.uid,
+        userEmail: currentUser.email || 'no-email@firebase.com',
+        userName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Customer',
+        subject: '🎙️ ভয়েস সাপোর্ট টিকিট',
+        category: 'Recharge',
+        status: 'Open',
+        createdAt: Date.now(),
+        lastMessageText: '🎙️ [ভয়েস মেসেজ]',
+        lastMessageSender: 'user',
+        lastMessageTime: Date.now(),
+        messages: [initialMessage]
+      };
+
+      await setDoc(doc(db, 'support_tickets', ticketId), newTicket);
+      setSelectedTicketId(ticketId);
+      setIsCreatingTicket(false);
+      return;
+    }
+
+    const activeTicket = tickets.find(t => t.id === targetTicketId);
+    if (!activeTicket) return;
+
+    const newMessage: SupportMessage = {
+      id: 'msg-' + Date.now(),
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Customer',
+      text: '🎙️ [ভয়েস মেসেজ]',
+      time: Date.now(),
+      audioUrl: audioDataUrl,
+      audioDuration: durationSec
+    };
+
+    const updatedMessages = [...(activeTicket.messages || []), newMessage];
+
+    try {
+      await setDoc(doc(db, 'support_tickets', targetTicketId), {
+        messages: updatedMessages,
+        lastMessageText: '🎙️ [ভয়েস মেসেজ]',
+        lastMessageSender: 'user',
+        lastMessageTime: newMessage.time,
+        status: 'Open'
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error sending voice message:", err);
+    }
   };
 
   // Auto-scroll chat to bottom when messages update
@@ -661,6 +985,13 @@ export default function SupportModal({
                             className="mt-2 rounded-xl max-h-40 w-full object-cover border border-white/20" 
                           />
                         )}
+                        {msg.audioUrl && (
+                          <AudioNotePlayer 
+                            audioUrl={msg.audioUrl} 
+                            duration={msg.audioDuration} 
+                            isMe={isMe} 
+                          />
+                        )}
                       </div>
                       <span className="text-[8px] font-mono text-slate-400 mt-1 font-bold">
                         {isMe ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'এডমিন এজেন্ট' : 'Support Agent')} • {new Date(msg.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -685,35 +1016,76 @@ export default function SupportModal({
                     </button>
                   </div>
                 )}
-                <div className="flex gap-2 items-center">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    ref={fileInputRef} 
-                    onChange={handleImagePick} 
-                    className="hidden" 
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl cursor-pointer transition-colors"
-                  >
-                    <Image className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="text"
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={lang === 'bn' ? 'এডমিন কে সরাসরি বার্তা লিখুন...' : 'Write message to admin...'}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl py-2.5 px-3.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-600 focus:bg-white transition-all font-sans"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-xs transition-all shadow-md flex items-center justify-center cursor-pointer active:scale-95"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                </div>
+
+                {/* Recording active bar */}
+                {isRecordingVoice ? (
+                  <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-2xl p-2 px-3 animate-pulse">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-rose-600 animate-ping" />
+                      <span className="text-xs font-black text-rose-700 font-mono">
+                        {lang === 'bn' ? 'রেকর্ডিং হচ্ছে...' : 'Recording Voice...'} 00:{voiceSeconds < 10 ? `0${voiceSeconds}` : voiceSeconds}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={cancelVoiceRecording}
+                        className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-xl transition-colors cursor-pointer"
+                      >
+                        {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopAndSendVoiceNote}
+                        className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1 active:scale-95"
+                      >
+                        <Send className="h-3 w-3" />
+                        <span>{lang === 'bn' ? 'ভয়েস পাঠান' : 'Send Voice'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 items-center">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      ref={fileInputRef} 
+                      onChange={handleImagePick} 
+                      className="hidden" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl cursor-pointer transition-colors"
+                      title={lang === 'bn' ? 'ছবি যুক্ত করুন' : 'Attach Image'}
+                    >
+                      <Image className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={startVoiceRecording}
+                      className="p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/20 rounded-2xl cursor-pointer transition-colors"
+                      title={lang === 'bn' ? 'ভয়েস নোট রেকর্ড করুন' : 'Record Voice Note'}
+                    >
+                      <Mic className="h-4 w-4 text-amber-600" />
+                    </button>
+
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={lang === 'bn' ? 'এডমিন কে সরাসরি বার্তা লিখুন...' : 'Write message to admin...'}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl py-2.5 px-3.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-600 focus:bg-white transition-all font-sans"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-xs transition-all shadow-md flex items-center justify-center cursor-pointer active:scale-95"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </form>
             </div>
           )}
@@ -769,6 +1141,18 @@ export default function SupportModal({
                   )}
                   {callStatus === 'Ended' && (lang === 'bn' ? 'কল সমাপ্ত' : 'Call Ended')}
                 </p>
+                {callStatus === 'Connected' && (
+                  <div className="flex items-center gap-1.5 justify-center h-8 my-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((bar) => (
+                      <motion.span
+                        key={bar}
+                        animate={{ height: isMuted ? [4, 4] : [6, 28, 12, 32, 8] }}
+                        transition={{ repeat: Infinity, duration: 0.6, delay: bar * 0.08, ease: "easeInOut" }}
+                        className={`w-1.5 rounded-full ${isMuted ? 'bg-slate-600' : 'bg-emerald-400'}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -776,7 +1160,7 @@ export default function SupportModal({
             <div className="flex items-center gap-6 mb-8">
               <button
                 type="button"
-                onClick={() => setIsMuted(!isMuted)}
+                onClick={handleToggleMute}
                 className={`p-4 rounded-full border transition-all cursor-pointer ${
                   isMuted ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                 }`}
