@@ -71,7 +71,7 @@ function AdminAudioNotePlayer({ audioUrl, duration, isAdmin }: { audioUrl: strin
 }
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
-  query, orderBy, writeBatch, updateDoc, getDoc 
+  query, orderBy, writeBatch, updateDoc, getDoc, addDoc 
 } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -644,8 +644,17 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   };
 
   const adminMediaStreamRef = useRef<MediaStream | null>(null);
+  const adminPcRef = useRef<RTCPeerConnection | null>(null);
+  const adminRemoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const adminAudioCtxRef = useRef<AudioContext | null>(null);
   const adminOscRef = useRef<OscillatorNode | null>(null);
+
+  const rtcConfig: RTCConfiguration = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
 
   // Sound generator for Admin Ringtone
   const startAdminRingtone = () => {
@@ -693,16 +702,32 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         adminMediaStreamRef.current = stream;
+        return stream;
       }
     } catch (e) {
       console.warn("Admin mic stream error:", e);
     }
+    return null;
   };
 
   const stopAdminMic = () => {
     if (adminMediaStreamRef.current) {
       adminMediaStreamRef.current.getTracks().forEach(track => track.stop());
       adminMediaStreamRef.current = null;
+    }
+  };
+
+  const cleanupAdminWebRTC = () => {
+    if (adminPcRef.current) {
+      try {
+        adminPcRef.current.close();
+      } catch (e) {
+        console.warn("Error closing admin PC:", e);
+      }
+      adminPcRef.current = null;
+    }
+    if (adminRemoteAudioRef.current) {
+      adminRemoteAudioRef.current.srcObject = null;
     }
   };
 
@@ -730,6 +755,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       } else {
         stopAdminRingtone();
         stopAdminMic();
+        cleanupAdminWebRTC();
         setAdminActiveCall(null);
         setAdminCallDuration(0);
       }
@@ -752,23 +778,75 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   const handleAcceptCall = async (callId?: string) => {
     stopAdminRingtone();
-    await startAdminMic();
+    cleanupAdminWebRTC();
+
     const targetId = callId || adminActiveCall?.callId || adminActiveCall?.id || (adminActiveCall?.userId ? `call_${adminActiveCall.userId}` : null);
     if (!targetId) return;
+
+    const pc = new RTCPeerConnection(rtcConfig);
+    adminPcRef.current = pc;
+
+    const stream = await startAdminMic();
+    if (stream) {
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    }
+
+    pc.ontrack = (event) => {
+      if (adminRemoteAudioRef.current && event.streams[0]) {
+        adminRemoteAudioRef.current.srcObject = event.streams[0];
+        adminRemoteAudioRef.current.play().catch(err => console.warn("Admin remote audio playback error:", err));
+      }
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        addDoc(collection(db, 'admin_calls', targetId, 'calleeCandidates'), event.candidate.toJSON()).catch(() => {});
+      }
+    };
+
     try {
-      await setDoc(doc(db, 'admin_calls', targetId), {
-        status: 'Connected',
-        connectedTime: Date.now()
-      }, { merge: true });
+      let offer = adminActiveCall?.offer;
+      if (!offer) {
+        const snap = await getDoc(doc(db, 'admin_calls', targetId));
+        offer = snap.data()?.offer;
+      }
+
+      if (offer) {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        await setDoc(doc(db, 'admin_calls', targetId), {
+          answer: { type: answer.type, sdp: answer.sdp },
+          status: 'Connected',
+          connectedTime: Date.now()
+        }, { merge: true });
+      } else {
+        await setDoc(doc(db, 'admin_calls', targetId), {
+          status: 'Connected',
+          connectedTime: Date.now()
+        }, { merge: true });
+      }
+
       setAdminActiveCall((prev: any) => prev ? { ...prev, status: 'Connected' } : null);
+
+      // Listen for caller candidates
+      onSnapshot(collection(db, 'admin_calls', targetId, 'callerCandidates'), (candSnap) => {
+        candSnap.docChanges().forEach(change => {
+          if (change.type === 'added' && adminPcRef.current) {
+            adminPcRef.current.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
+          }
+        });
+      });
     } catch (err) {
-      console.error("Accept call error:", err);
+      console.error("Accept call WebRTC error:", err);
     }
   };
 
   const handleRejectCall = async (callId?: string) => {
     stopAdminRingtone();
     stopAdminMic();
+    cleanupAdminWebRTC();
     const targetId = callId || adminActiveCall?.callId || adminActiveCall?.id || (adminActiveCall?.userId ? `call_${adminActiveCall.userId}` : null);
     if (!targetId) return;
     try {
@@ -782,6 +860,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const handleAdminEndCall = async (callId?: string) => {
     stopAdminRingtone();
     stopAdminMic();
+    cleanupAdminWebRTC();
     const targetId = callId || adminActiveCall?.callId || adminActiveCall?.id || (adminActiveCall?.userId ? `call_${adminActiveCall.userId}` : null);
     if (!targetId) return;
     try {
@@ -797,18 +876,65 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const callId = `call_${userId}`;
     setAdminCallDuration(0);
     startAdminRingtone();
-    const newCallData = {
-      callId,
-      userId,
-      userName: userName || 'Customer',
-      userPhone: userPhone || 'Unknown',
-      callerRole: 'admin',
-      status: 'Ringing',
-      timestamp: Date.now()
+    cleanupAdminWebRTC();
+
+    const pc = new RTCPeerConnection(rtcConfig);
+    adminPcRef.current = pc;
+
+    const stream = await startAdminMic();
+    if (stream) {
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    }
+
+    pc.ontrack = (event) => {
+      if (adminRemoteAudioRef.current && event.streams[0]) {
+        adminRemoteAudioRef.current.srcObject = event.streams[0];
+        adminRemoteAudioRef.current.play().catch(err => console.warn(err));
+      }
     };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        addDoc(collection(db, 'admin_calls', callId, 'callerCandidates'), event.candidate.toJSON()).catch(() => {});
+      }
+    };
+
     try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      const newCallData = {
+        callId,
+        userId,
+        userName: userName || 'Customer',
+        userPhone: userPhone || 'Unknown',
+        callerRole: 'admin',
+        status: 'Ringing',
+        timestamp: Date.now(),
+        offer: { type: offer.type, sdp: offer.sdp }
+      };
+
       await setDoc(doc(db, 'admin_calls', callId), newCallData);
       setAdminActiveCall(newCallData);
+
+      // Listen for answer from user
+      onSnapshot(doc(db, 'admin_calls', callId), async (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.status === 'Connected' && data.answer && adminPcRef.current && adminPcRef.current.signalingState === 'have-local-offer') {
+            await adminPcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          }
+        }
+      });
+
+      // Listen for callee candidates
+      onSnapshot(collection(db, 'admin_calls', callId, 'calleeCandidates'), (candSnap) => {
+        candSnap.docChanges().forEach(change => {
+          if (change.type === 'added' && adminPcRef.current) {
+            adminPcRef.current.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
+          }
+        });
+      });
     } catch (e) {
       console.error("Initiate admin call error:", e);
     }
@@ -7726,6 +7852,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           </div>
         </div>
       )}
+
+      {/* Hidden audio element for Admin WebRTC stream */}
+      <audio ref={adminRemoteAudioRef} autoPlay playsInline className="hidden" />
 
       {/* 📞 IN-APP VOICE CALL OVERLAY FOR ADMIN PANEL */}
       <AnimatePresence>

@@ -124,8 +124,17 @@ export default function SupportModal({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isSpeaker, setIsSpeaker] = useState<boolean>(true);
 
-  // Audio stream and microphone references
+  // Audio stream, microphone, WebRTC references
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const rtcConfig: RTCConfiguration = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
 
   // Voice Note Recording State
   const [isRecordingVoice, setIsRecordingVoice] = useState<boolean>(false);
@@ -199,10 +208,12 @@ export default function SupportModal({
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
+        return stream;
       }
     } catch (e) {
       console.warn("Microphone stream error:", e);
     }
+    return null;
   };
 
   const stopMicStream = () => {
@@ -212,29 +223,102 @@ export default function SupportModal({
     }
   };
 
+  const cleanupWebRTC = () => {
+    if (pcRef.current) {
+      try {
+        pcRef.current.close();
+      } catch (e) {
+        console.warn("Error closing PC:", e);
+      }
+      pcRef.current = null;
+    }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
+  };
+
   // Real-time Firestore listener for active user call
   useEffect(() => {
     if (!currentUser?.uid) return;
     const callDocRef = doc(db, 'admin_calls', `call_${currentUser.uid}`);
-    const unsubscribe = onSnapshot(callDocRef, (snap) => {
+    let unsubCandidates: (() => void) | null = null;
+
+    const unsubscribe = onSnapshot(callDocRef, async (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (data.status === 'Connected') {
           stopRingtone();
           setCallStatus('Connected');
           setIsCalling(true);
-          startMicStream();
-        } else if (data.status === 'Rejected') {
+
+          // If user initiated call, set remote answer when available
+          if (data.callerRole === 'user' && data.answer && pcRef.current) {
+            if (pcRef.current.signalingState === 'have-local-offer') {
+              try {
+                await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+              } catch (e) {
+                console.warn("Set remote answer error:", e);
+              }
+            }
+          }
+
+          // If admin initiated call, create answer if not already created
+          if (data.callerRole === 'admin' && data.offer && (!pcRef.current || pcRef.current.signalingState === 'closed')) {
+            const pc = new RTCPeerConnection(rtcConfig);
+            pcRef.current = pc;
+
+            const stream = await startMicStream();
+            if (stream) {
+              stream.getTracks().forEach(t => pc.addTrack(t, stream));
+            }
+
+            pc.ontrack = (event) => {
+              if (remoteAudioRef.current && event.streams[0]) {
+                remoteAudioRef.current.srcObject = event.streams[0];
+                remoteAudioRef.current.play().catch(err => console.warn("Remote audio error:", err));
+              }
+            };
+
+            pc.onicecandidate = (event) => {
+              if (event.candidate) {
+                addDoc(collection(db, 'admin_calls', snap.id, 'calleeCandidates'), event.candidate.toJSON()).catch(() => {});
+              }
+            };
+
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+
+              await setDoc(doc(db, 'admin_calls', snap.id), {
+                answer: { type: answer.type, sdp: answer.sdp },
+                status: 'Connected'
+              }, { merge: true });
+            } catch (e) {
+              console.warn("Answer creation error:", e);
+            }
+          }
+
+          // Listen for ICE candidates
+          const candidateCol = data.callerRole === 'user' ? 'calleeCandidates' : 'callerCandidates';
+          if (!unsubCandidates) {
+            unsubCandidates = onSnapshot(collection(db, 'admin_calls', snap.id, candidateCol), (candSnap) => {
+              candSnap.docChanges().forEach(change => {
+                if (change.type === 'added' && pcRef.current) {
+                  pcRef.current.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
+                }
+              });
+            });
+          }
+
+        } else if (data.status === 'Rejected' || data.status === 'Ended') {
           stopRingtone();
           stopMicStream();
-          setCallStatus('Ended');
-          setTimeout(() => {
-            setIsCalling(false);
-            setCallDuration(0);
-          }, 1200);
-        } else if (data.status === 'Ended') {
-          stopRingtone();
-          stopMicStream();
+          cleanupWebRTC();
+          if (unsubCandidates) {
+            unsubCandidates();
+            unsubCandidates = null;
+          }
           setCallStatus('Ended');
           setTimeout(() => {
             setIsCalling(false);
@@ -243,19 +327,48 @@ export default function SupportModal({
         }
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (unsubCandidates) unsubCandidates();
+    };
   }, [currentUser?.uid]);
 
   // Start in-app voice call
   const handleStartInAppCall = async () => {
     if (!currentUser) return;
+    cleanupWebRTC();
     setIsCalling(true);
     setCallStatus('Ringing');
     setCallDuration(0);
     startRingtone();
 
     const callId = `call_${currentUser.uid}`;
+    const pc = new RTCPeerConnection(rtcConfig);
+    pcRef.current = pc;
+
+    const stream = await startMicStream();
+    if (stream) {
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    }
+
+    pc.ontrack = (event) => {
+      if (remoteAudioRef.current && event.streams[0]) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+        remoteAudioRef.current.play().catch(err => console.warn("Remote audio play error:", err));
+      }
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        addDoc(collection(db, 'admin_calls', callId, 'callerCandidates'), event.candidate.toJSON()).catch(() => {});
+      }
+    };
+
     try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
       await setDoc(doc(db, 'admin_calls', callId), {
         callId,
         userId: currentUser.uid,
@@ -263,24 +376,12 @@ export default function SupportModal({
         userPhone: currentUser.email?.split('@')[0] || '01700000000',
         callerRole: 'user',
         status: 'Ringing',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        offer: { type: offer.type, sdp: offer.sdp }
       });
     } catch (e) {
       console.error("Error setting call state: ", e);
     }
-
-    // Auto fallback: connect automatically if admin does not answer within 10s
-    setTimeout(async () => {
-      if (isCalling && callStatus === 'Ringing') {
-        try {
-          await setDoc(doc(db, 'admin_calls', callId), { status: 'Connected' }, { merge: true });
-        } catch (err) {
-          stopRingtone();
-          setCallStatus('Connected');
-          startMicStream();
-        }
-      }
-    }, 10000);
   };
 
   // Call timer effect
@@ -299,6 +400,7 @@ export default function SupportModal({
   const handleEndCall = async () => {
     stopRingtone();
     stopMicStream();
+    cleanupWebRTC();
     setCallStatus('Ended');
     if (currentUser?.uid) {
       try {
@@ -1092,6 +1194,9 @@ export default function SupportModal({
 
         </div>
       </motion.div>
+
+      {/* Hidden audio element for remote WebRTC stream */}
+      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
 
       {/* 🎙️ IN-APP LIVE AUDIO CALL OVERLAY MODAL */}
       <AnimatePresence>
