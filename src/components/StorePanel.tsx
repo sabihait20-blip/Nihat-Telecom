@@ -317,11 +317,11 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3" id="products-grid">
-                {filteredProducts.map((product) => {
+                {filteredProducts.map((product, idx) => {
                   const outOfStock = product.stock <= 0;
                   return (
                     <motion.div
-                      key={product.id}
+                      key={`${product.id || 'prod'}-${idx}`}
                       onClick={() => !outOfStock && setSelectedProduct(product)}
                       whileTap={!outOfStock ? { scale: 0.98 } : undefined}
                       className={`bg-white border border-slate-100 rounded-3xl p-3 shadow-sm hover:shadow-md transition-all flex flex-col justify-between cursor-pointer relative group overflow-hidden ${
@@ -398,14 +398,14 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 </div>
               </div>
             ) : (
-              orders.map((order) => {
+              orders.map((order, idx) => {
                 const isPending = order.status === 'Pending';
                 const isApproved = order.status === 'Approved';
                 const isRejected = order.status === 'Rejected';
 
                 return (
                   <div
-                    key={order.id}
+                    key={`${order.id || 'order'}-${idx}`}
                     className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden"
                   >
                     {/* Status accent indicator */}

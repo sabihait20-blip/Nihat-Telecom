@@ -311,7 +311,7 @@ export default function KYCModal({ lang, onClose, onSuccess }: KYCModalProps) {
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input 
                     type="text"
-                    value={formData.fullName}
+                    value={formData.fullName || ''}
                     onChange={e => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                     placeholder={lang === 'bn' ? 'আপনার নাম লিখুন' : 'Enter your full name'}
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3.5 pl-11 pr-4 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500 transition-colors"
@@ -327,7 +327,7 @@ export default function KYCModal({ lang, onClose, onSuccess }: KYCModalProps) {
                   <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input 
                     type="text"
-                    value={formData.nidNumber}
+                    value={formData.nidNumber || ''}
                     onChange={e => setFormData(prev => ({ ...prev, nidNumber: e.target.value }))}
                     placeholder={lang === 'bn' ? '১০ বা ১৭ ডিজিটের নম্বর' : '10 or 17 digit number'}
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3.5 pl-11 pr-4 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500 transition-colors"
@@ -343,7 +343,7 @@ export default function KYCModal({ lang, onClose, onSuccess }: KYCModalProps) {
                   <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input 
                     type="text"
-                    value={formData.dob}
+                    value={formData.dob || ''}
                     onChange={e => setFormData(prev => ({ ...prev, dob: e.target.value }))}
                     placeholder={lang === 'bn' ? 'উদাহরণ: DD/MM/YYYY' : 'Example: DD/MM/YYYY'}
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3.5 pl-11 pr-4 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500 transition-colors"

@@ -300,12 +300,12 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
                 {lang === 'bn' ? 'সার্ভিস নির্বাচন করুন' : 'Select Service Platform'}
               </label>
               <div className="grid grid-cols-2 gap-2.5">
-                {filteredItems.map((item) => {
+                {filteredItems.map((item, idx) => {
                   const isSelected = selectedItem?.id === item.id;
                   const IconComp = item.icon;
                   return (
                     <div
-                      key={item.id}
+                      key={`${item.id || 'voucher'}-${idx}`}
                       onClick={() => handleSelectItem(item)}
                       className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between gap-3 ${
                         isSelected 
@@ -355,11 +355,11 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
-                  {selectedItem.packages.map((pack) => {
+                  {selectedItem.packages.map((pack, idx) => {
                     const isPackSelected = selectedPack?.id === pack.id;
                     return (
                       <div
-                        key={pack.id}
+                        key={`${pack.id || 'pack'}-${idx}`}
                         onClick={() => { setSelectedPack(pack); setErrorMsg(''); }}
                         className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
                           isPackSelected

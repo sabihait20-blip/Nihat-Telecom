@@ -4,14 +4,16 @@ import {
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
-  Eye, Download, Crown
+  Eye, Download, Crown, Phone, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   collection, doc, onSnapshot, setDoc, deleteDoc, 
   query, orderBy, writeBatch, updateDoc, getDoc 
 } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { db, auth, currentFirebaseConfig } from '../firebase';
 import { Language, Operator, RechargePackage, PromoBanner, Transaction, BillProvider, StoreProduct, StoreOrder } from '../types';
 
 const ADMIN_EMAILS = [
@@ -536,7 +538,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     phone: '',
     email: '',
     balance: 0,
-    isVip: false
+    isVip: false,
+    password: '',
+    sendEmailNotice: true
   });
 
   // New States for Advanced Search & Filters
@@ -603,21 +607,37 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   };
 
   const handleApproveKyc = async (userId: string) => {
+    if (!userId) {
+      alert(lang === 'bn' ? 'ইউজার আইডি পাওয়া যায়নি!' : 'Invalid User ID');
+      return;
+    }
     if (!window.confirm(lang === 'bn' ? 'আপনি কি এই গ্রাহকের কেওয়াইসি এপ্রুভ করতে চান?' : 'Do you want to approve this user\'s KYC?')) return;
     try {
-      const userRef = doc(db, 'users', userId);
-      const regUserRef = doc(db, 'registered_users', userId);
-      
+      const targetUser = registeredUsers.find(u => u.uid === userId || u.id === userId);
+      const existingKycData = targetUser?.kycData || {};
+
+      const updatedKycData = {
+        ...existingKycData,
+        verifiedAt: new Date().toISOString(),
+        verifiedBy: 'admin'
+      };
+
       const updateData = {
         kycStatus: 'verified',
-        kycData: {
-          verifiedAt: new Date().toISOString(),
-          verifiedBy: 'admin'
-        }
+        kycData: updatedKycData
       };
+
+      const userRef = doc(db, 'users', userId);
+      const regUserRef = doc(db, 'registered_users', userId);
 
       await setDoc(userRef, updateData, { merge: true });
       await setDoc(regUserRef, updateData, { merge: true });
+
+      // Update local state immediately
+      setRegisteredUsers(prev => prev.map(u => (u.uid === userId || u.id === userId) ? { ...u, kycStatus: 'verified', kycData: updatedKycData } : u));
+      if (selectedUser && (selectedUser.uid === userId || selectedUser.id === userId)) {
+        setSelectedUser(prev => prev ? { ...prev, kycStatus: 'verified', kycData: updatedKycData } : null);
+      }
 
       // Add user notification
       try {
@@ -647,24 +667,37 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     e.preventDefault();
     if (!rejectingKycUserId || !kycRejectReason) return;
     try {
-      const userRef = doc(db, 'users', rejectingKycUserId);
-      const regUserRef = doc(db, 'registered_users', rejectingKycUserId);
-      
+      const userId = rejectingKycUserId;
+      const targetUser = registeredUsers.find(u => u.uid === userId || u.id === userId);
+      const existingKycData = targetUser?.kycData || {};
+
+      const updatedKycData = {
+        ...existingKycData,
+        rejectionReason: kycRejectReason,
+        rejectedAt: new Date().toISOString()
+      };
+
       const updateData = {
         kycStatus: 'rejected',
-        kycData: {
-          rejectionReason: kycRejectReason,
-          rejectedAt: new Date().toISOString()
-        }
+        kycData: updatedKycData
       };
+
+      const userRef = doc(db, 'users', userId);
+      const regUserRef = doc(db, 'registered_users', userId);
 
       await setDoc(userRef, updateData, { merge: true });
       await setDoc(regUserRef, updateData, { merge: true });
 
+      // Update local state immediately
+      setRegisteredUsers(prev => prev.map(u => (u.uid === userId || u.id === userId) ? { ...u, kycStatus: 'rejected', kycData: updatedKycData } : u));
+      if (selectedUser && (selectedUser.uid === userId || selectedUser.id === userId)) {
+        setSelectedUser(prev => prev ? { ...prev, kycStatus: 'rejected', kycData: updatedKycData } : null);
+      }
+
       // Send notification
       try {
         const notifId = `notif-kycrej-${Date.now()}`;
-        const notifRef = doc(db, 'users', rejectingKycUserId, 'notifications', notifId);
+        const notifRef = doc(db, 'users', userId, 'notifications', notifId);
         await setDoc(notifRef, {
           id: notifId,
           title: 'KYC Rejected / কেওয়াইসি প্রত্যাখ্যাত',
@@ -2038,22 +2071,55 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userForm.displayName || (!userForm.phone && !userForm.email)) {
+      alert(lang === 'bn' ? 'দয়া করে ইউজারের নাম এবং মোবাইল নম্বর বা ইমেইল লিখুন!' : 'Please enter full name and phone or email!');
+      return;
+    }
+
+    if (!editingUserId && userForm.password && userForm.password.trim().length < 6) {
+      alert(lang === 'bn' ? 'পাসওয়ার্ড বা পিন অন্তত ৬ অক্ষরের হতে হবে!' : 'Password/PIN must be at least 6 characters!');
+      return;
+    }
+
     setLoading(true);
     try {
-      const uid = editingUserId || `user-${Date.now()}`;
+      let createdAuthUid: string | null = null;
+      const targetEmail = userForm.email || (userForm.phone ? `${userForm.phone}@nihad-business-point.com` : `user-${Date.now()}@nihad-business-point.com`);
+
+      // 1. Create Firebase Auth account for new users if password is provided
+      if (!editingUserId && userForm.password && userForm.password.trim().length >= 6) {
+        try {
+          const tempAppName = `create-user-app-${Date.now()}`;
+          const secondaryApp = initializeApp(currentFirebaseConfig, tempAppName);
+          const secondaryAuth = getAuth(secondaryApp);
+          const userCred = await createUserWithEmailAndPassword(secondaryAuth, targetEmail, userForm.password.trim());
+          createdAuthUid = userCred.user.uid;
+          await deleteApp(secondaryApp);
+        } catch (authErr: any) {
+          console.warn("Firebase Auth secondary user creation note:", authErr.message);
+        }
+      }
+
+      const uid = editingUserId || createdAuthUid || `user-${Date.now()}`;
       const userRef = doc(db, 'registered_users', uid);
       const balanceRef = doc(db, 'users', uid, 'wallet', 'balance_doc');
       const userProfileRef = doc(db, 'users', uid);
       
       const batch = writeBatch(db);
       
-      const profileData = {
+      const profileData: any = {
         uid,
-        displayName: userForm.displayName,
-        phone: userForm.phone,
-        email: userForm.email || (userForm.phone ? `${userForm.phone}@nihad-business-point.com` : `${uid}@nihad-business-point.com`),
+        displayName: userForm.displayName.trim(),
+        phone: userForm.phone.trim(),
+        email: userForm.email.trim() || targetEmail,
         isVip: userForm.isVip || false,
       };
+
+      if (userForm.password && userForm.password.trim()) {
+        profileData.pin = userForm.password.trim();
+        profileData.password = userForm.password.trim();
+        profileData.initialPassword = userForm.password.trim();
+      }
 
       // Save/update registered_users profile doc
       batch.set(userRef, {
@@ -2070,8 +2136,49 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       }, { merge: true });
       
       await batch.commit();
-      
-      alert(lang === 'bn' ? 'ব্যবহারকারী তথ্য সফলভাবে সংরক্ষিত হয়েছে!' : 'User information saved successfully!');
+
+      // 2. Send login details to email if requested
+      let emailSuccess = false;
+      let emailErrorMsg = '';
+
+      if (userForm.email && userForm.sendEmailNotice) {
+        try {
+          const res = await fetch('/api/send-user-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: userForm.email.trim(),
+              phone: userForm.phone.trim(),
+              displayName: userForm.displayName.trim(),
+              password: userForm.password.trim() || '123456',
+              pin: userForm.password.trim() || '123456'
+            })
+          });
+          const result = await res.json();
+          if (result.success) {
+            emailSuccess = true;
+          } else {
+            emailErrorMsg = result.error || 'ইমেইল পাঠানো সম্ভব হয়নি';
+          }
+        } catch (e: any) {
+          emailErrorMsg = e.message;
+        }
+      }
+
+      // Summary alert
+      let msg = lang === 'bn' 
+        ? `✅ ব্যবহারকারী তথ্য সফলভাবে সংরক্ষিত হয়েছে!\n\nনাম: ${userForm.displayName}\nমোবাইল/আইডি: ${userForm.phone || userForm.email}\nপিন/পাসওয়ার্ড: ${userForm.password || 'সেট করা হয়েছে'}`
+        : `✅ User information saved successfully!\n\nName: ${userForm.displayName}\nMobile/ID: ${userForm.phone || userForm.email}\nPIN/Password: ${userForm.password || 'Set'}`;
+
+      if (userForm.email && userForm.sendEmailNotice) {
+        if (emailSuccess) {
+          msg += lang === 'bn' ? `\n\n📧 ইউজারের ইমেইলে (${userForm.email}) ইউজারনেম ও পাসওয়ার্ড সফলভাবে পাঠানো হয়েছে!` : `\n\n📧 Login credentials sent to user email (${userForm.email})!`;
+        } else {
+          msg += lang === 'bn' ? `\n\n⚠️ ইমেইল নোটিফিকেশন তথ্য: ${emailErrorMsg}` : `\n\n⚠️ Email notification note: ${emailErrorMsg}`;
+        }
+      }
+
+      alert(msg);
       
       // Clear states
       setShowUserForm(false);
@@ -2081,7 +2188,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         phone: '',
         email: '',
         balance: 0,
-        isVip: false
+        isVip: false,
+        password: '',
+        sendEmailNotice: true
       });
     } catch (err: any) {
       console.error("Error saving user: ", err);
@@ -2109,7 +2218,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       phone: userObj.phone || '',
       email: userObj.email || '',
       balance: currentBal,
-      isVip: !!userObj.isVip
+      isVip: !!userObj.isVip,
+      password: userObj.pin || userObj.password || '',
+      sendEmailNotice: false
     });
     setShowUserForm(true);
   };
@@ -2269,117 +2380,202 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   };
 
   const adminTabsList = [
-    { id: 'requests' as const, label: labels.requests, icon: Layers, badge: pendingRequests.filter(r => r.status === 'Pending').length, badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' },
-    { id: 'offers' as const, label: labels.offers, icon: Gift, badge: offers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
-    { id: 'banners' as const, label: labels.banners, icon: Sparkles, badge: banners.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
-    { id: 'billers' as const, label: labels.billers, icon: CreditCard, badge: billers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
-    { id: 'users' as const, label: labels.users, icon: User, badge: registeredUsers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
-    { id: 'products' as const, label: lang === 'bn' ? 'স্টোর প্রোডাক্টস' : 'Manage Products', icon: Globe, badge: adminProducts.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
-    { id: 'orders' as const, label: lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders', icon: ShoppingBag, badge: adminOrders.filter(o => o.status === 'Pending').length, badgeColor: 'bg-rose-500/15 text-rose-400 border border-rose-500/25' },
-    { id: 'sim_orders' as const, label: lang === 'bn' ? 'সিম অর্ডার্স' : 'SIM Orders', icon: Smartphone, badge: adminSimOrders.filter(s => s.status === 'Pending').length, badgeColor: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25' },
-    { id: 'scratch' as const, label: lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Cards', icon: Smartphone, badge: scratchCards.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
-    { id: 'kyc' as const, label: lang === 'bn' ? 'কেওয়াইসি ভেরিফিকেশন' : 'KYC Verification', icon: ShieldCheck, badge: registeredUsers.filter(u => u.kycStatus === 'pending').length, badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
-    { id: 'support' as const, label: lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets', icon: MessageSquare, badge: supportTickets.filter(t => t.status === 'Open').length, badgeColor: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' },
-    { id: 'settings' as const, label: lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, badge: 0, badgeColor: '' },
+    // Group 1: Operations
+    { id: 'requests' as const, group: 'ops', label: labels.requests, icon: Layers, badge: pendingRequests.filter(r => r.status === 'Pending').length, badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' },
+    { id: 'support' as const, group: 'ops', label: lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets', icon: MessageSquare, badge: supportTickets.filter(t => t.status === 'Open').length, badgeColor: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' },
+    { id: 'kyc' as const, group: 'ops', label: lang === 'bn' ? 'কেওয়াইসি ভেরিফিকেশন' : 'KYC Verification', icon: ShieldCheck, badge: registeredUsers.filter(u => u.kycStatus === 'pending').length, badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
+    
+    // Group 2: Commerce & Store
+    { id: 'products' as const, group: 'commerce', label: lang === 'bn' ? 'স্টোর প্রোডাক্টস' : 'Manage Products', icon: Globe, badge: adminProducts.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'orders' as const, group: 'commerce', label: lang === 'bn' ? 'স্টোর অর্ডার্স' : 'Store Orders', icon: ShoppingBag, badge: adminOrders.filter(o => o.status === 'Pending').length, badgeColor: 'bg-rose-500/15 text-rose-400 border border-rose-500/25' },
+    { id: 'sim_orders' as const, group: 'commerce', label: lang === 'bn' ? 'সিম অর্ডার্স' : 'SIM Orders', icon: Smartphone, badge: adminSimOrders.filter(s => s.status === 'Pending').length, badgeColor: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25' },
+    { id: 'offers' as const, group: 'commerce', label: labels.offers, icon: Gift, badge: offers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'scratch' as const, group: 'commerce', label: lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Cards', icon: Smartphone, badge: scratchCards.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+
+    // Group 3: System & Users
+    { id: 'users' as const, group: 'system', label: labels.users, icon: User, badge: registeredUsers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'billers' as const, group: 'system', label: labels.billers, icon: CreditCard, badge: billers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'banners' as const, group: 'system', label: labels.banners, icon: Sparkles, badge: banners.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'settings' as const, group: 'system', label: lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, badge: 0, badgeColor: '' },
   ];
 
   const adminPanelBody = (
     <>
-      <div className={isFullScreen || isStandalone ? "w-full h-full bg-slate-950 flex flex-col lg:flex-row relative overflow-hidden text-slate-100 font-sans" : "relative bg-slate-900/85 backdrop-blur-2xl w-full h-full lg:h-[90%] lg:max-w-6xl rounded-none lg:rounded-[36px] shadow-2xl border-none lg:border lg:border-white/10 flex flex-col lg:flex-row relative z-10 overflow-hidden text-slate-100 animate-scale-up font-sans"}>
+      <div className={isFullScreen || isStandalone ? "w-full h-full bg-slate-950 flex flex-col lg:flex-row relative overflow-hidden text-slate-100 font-sans" : "relative bg-slate-950/90 backdrop-blur-3xl w-full h-full lg:h-[92%] lg:max-w-7xl rounded-none lg:rounded-[40px] shadow-2xl border-none lg:border lg:border-blue-500/20 flex flex-col lg:flex-row relative z-10 overflow-hidden text-slate-100 animate-scale-up font-sans"}>
       
-      {/* Dynamic Ambient Blur Spheres */}
-      <div className="absolute top-[-50px] right-[-50px] w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none select-none" />
-      <div className="absolute bottom-[-50px] left-[-50px] w-80 h-80 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none select-none" />
+      {/* Dynamic Ambient Cyber Spheres */}
+      <div className="absolute top-[-100px] right-[-100px] w-96 h-96 bg-blue-600/15 rounded-full blur-[120px] pointer-events-none select-none animate-pulse" />
+      <div className="absolute bottom-[-100px] left-[-100px] w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none select-none animate-pulse" />
 
       {/* 1. DESKTOP PERMANENT SIDEBAR */}
-      <div className="hidden lg:flex flex-col w-72 bg-slate-950/70 border-r border-white/10 h-full shrink-0 relative z-20 overflow-hidden">
-        {/* Left header with elite status panel */}
-        <div className="p-6 border-b border-white/10 flex items-center gap-3.5 bg-slate-950/40">
-          <div className="p-3 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-xl shadow-blue-500/20 border border-blue-400/30 ring-4 ring-blue-500/10 shrink-0">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-white font-extrabold text-sm tracking-tight truncate uppercase leading-none">
-              {labels.title}
-            </h2>
-            <p className="text-[9px] text-blue-400 font-black font-mono tracking-widest mt-1.5 uppercase truncate">
-              {isStandalone ? "HARDENED ADM SYSTEM" : "SANDBOX SECURE ADM"}
-            </p>
+      <div className="hidden lg:flex flex-col w-72 bg-slate-950/80 border-r border-white/10 h-full shrink-0 relative z-20 overflow-hidden">
+        {/* Left header with elite 2026 status panel */}
+        <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950/60">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-cyan-500/20 border border-cyan-400/30 ring-2 ring-cyan-500/20 shrink-0">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-white font-black text-xs tracking-tight uppercase leading-none font-mono flex items-center gap-1.5">
+                <span>{labels.title}</span>
+              </h2>
+              <p className="text-[8.5px] text-cyan-400 font-bold font-mono tracking-widest mt-1 uppercase truncate flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping inline-block" />
+                <span>2026 CORE v4.2</span>
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Scrollable vertical navigation of tabs */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-1.5 scroller-hidden">
-          {adminTabsList.map((tab) => {
-            const TabIcon = tab.icon;
-            const isTabActive = activeSubTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveSubTab(tab.id);
-                  if (tab.id === 'users') {
-                    setSelectedUser(null);
-                  }
-                }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[11.5px] font-bold tracking-wide transition-all duration-200 cursor-pointer text-left border relative group ${
-                  isTabActive 
-                    ? 'bg-blue-600/90 text-white shadow-lg shadow-blue-600/20 border-blue-500/20' 
-                    : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
-                }`}
-              >
-                {/* Visual active tab left accent bar */}
-                {isTabActive && (
-                  <div className="absolute left-1.5 top-3 bottom-3 w-1 bg-white rounded-full" />
-                )}
-                
-                <div className="flex items-center gap-3 min-w-0">
-                  <TabIcon className={`h-4 w-4 shrink-0 transition-colors ${isTabActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'}`} />
-                  <span className="truncate">{tab.label}</span>
-                </div>
+        {/* Scrollable vertical navigation grouped by category */}
+        <div className="flex-1 overflow-y-auto px-3.5 py-4 space-y-4 scroller-hidden">
+          {/* Section 1: Operations */}
+          <div className="space-y-1">
+            <span className="text-[9px] font-black font-mono tracking-widest text-slate-500 uppercase px-3 block">
+              ⚡ {lang === 'bn' ? 'মেইন অপারেশনস' : 'OPERATIONS'}
+            </span>
+            {adminTabsList.filter(t => t.group === 'ops').map((tab) => {
+              const TabIcon = tab.icon;
+              const isTabActive = activeSubTab === tab.id;
+              return (
+                <button
+                  key={`desktop-admin-tab-${tab.id}`}
+                  onClick={() => {
+                    setActiveSubTab(tab.id);
+                    if (tab.id === 'users') setSelectedUser(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-[11px] font-bold tracking-wide transition-all duration-200 cursor-pointer text-left border relative group ${
+                    isTabActive 
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border-blue-400/30' 
+                      : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
+                  }`}
+                >
+                  {isTabActive && (
+                    <div className="absolute left-1 top-2.5 bottom-2.5 w-1 bg-cyan-300 rounded-full shadow-sm shadow-cyan-400" />
+                  )}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <TabIcon className={`h-4 w-4 shrink-0 transition-colors ${isTabActive ? 'text-cyan-200' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  {tab.badge > 0 && (
+                    <span className={`text-[8.5px] font-black tracking-tight px-2 py-0.5 rounded-lg border font-mono ${
+                      isTabActive ? 'bg-white/20 text-white border-white/20' : tab.badgeColor
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-                {tab.badge > 0 && (
-                  <span className={`text-[9px] font-extrabold tracking-tight px-2 py-0.5 rounded-lg border font-mono ${
-                    isTabActive ? 'bg-white/20 text-white border-white/20' : tab.badgeColor
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {/* Section 2: Commerce */}
+          <div className="space-y-1">
+            <span className="text-[9px] font-black font-mono tracking-widest text-slate-500 uppercase px-3 block pt-1">
+              🛍️ {lang === 'bn' ? 'স্টোর ও সার্ভিসেস' : 'COMMERCE & SERVICES'}
+            </span>
+            {adminTabsList.filter(t => t.group === 'commerce').map((tab) => {
+              const TabIcon = tab.icon;
+              const isTabActive = activeSubTab === tab.id;
+              return (
+                <button
+                  key={`desktop-admin-tab-${tab.id}`}
+                  onClick={() => {
+                    setActiveSubTab(tab.id);
+                    if (tab.id === 'users') setSelectedUser(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-[11px] font-bold tracking-wide transition-all duration-200 cursor-pointer text-left border relative group ${
+                    isTabActive 
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border-blue-400/30' 
+                      : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
+                  }`}
+                >
+                  {isTabActive && (
+                    <div className="absolute left-1 top-2.5 bottom-2.5 w-1 bg-cyan-300 rounded-full shadow-sm shadow-cyan-400" />
+                  )}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <TabIcon className={`h-4 w-4 shrink-0 transition-colors ${isTabActive ? 'text-cyan-200' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  {tab.badge > 0 && (
+                    <span className={`text-[8.5px] font-black tracking-tight px-2 py-0.5 rounded-lg border font-mono ${
+                      isTabActive ? 'bg-white/20 text-white border-white/20' : tab.badgeColor
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Section 3: System */}
+          <div className="space-y-1">
+            <span className="text-[9px] font-black font-mono tracking-widest text-slate-500 uppercase px-3 block pt-1">
+              ⚙️ {lang === 'bn' ? 'সিস্টেম ও কনফিগ' : 'SYSTEM & USERS'}
+            </span>
+            {adminTabsList.filter(t => t.group === 'system').map((tab) => {
+              const TabIcon = tab.icon;
+              const isTabActive = activeSubTab === tab.id;
+              return (
+                <button
+                  key={`desktop-admin-tab-${tab.id}`}
+                  onClick={() => {
+                    setActiveSubTab(tab.id);
+                    if (tab.id === 'users') setSelectedUser(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-[11px] font-bold tracking-wide transition-all duration-200 cursor-pointer text-left border relative group ${
+                    isTabActive 
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border-blue-400/30' 
+                      : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
+                  }`}
+                >
+                  {isTabActive && (
+                    <div className="absolute left-1 top-2.5 bottom-2.5 w-1 bg-cyan-300 rounded-full shadow-sm shadow-cyan-400" />
+                  )}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <TabIcon className={`h-4 w-4 shrink-0 transition-colors ${isTabActive ? 'text-cyan-200' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  {tab.badge > 0 && (
+                    <span className={`text-[8.5px] font-black tracking-tight px-2 py-0.5 rounded-lg border font-mono ${
+                      isTabActive ? 'bg-white/20 text-white border-white/20' : tab.badgeColor
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Sidebar bottom control deck */}
-        <div className="p-4 border-t border-white/10 bg-slate-950/60 space-y-3 shrink-0">
-          {/* Fullscreen & View Switches */}
+        <div className="p-3.5 border-t border-white/10 bg-slate-950/80 space-y-2 shrink-0">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={toggleFullScreen}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 text-slate-300 hover:text-white transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
-              title={isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 hover:text-white transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              {isFullScreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
-              <span>{isFullScreen ? (lang === 'bn' ? 'মিনিমাইজ' : 'Min') : (lang === 'bn' ? 'ফুলস্ক্রিন' : 'Full')}</span>
+              {isFullScreen ? <Minimize className="h-3.5 w-3.5 text-cyan-400" /> : <Maximize className="h-3.5 w-3.5 text-cyan-400" />}
+              <span>{isFullScreen ? 'Min' : 'Full'}</span>
             </button>
             {isStandalone && onToggleUserView && (
               <button
                 onClick={onToggleUserView}
-                className="p-2.5 rounded-xl bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 text-blue-400 hover:text-blue-300 transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Globe className="h-3.5 w-3.5" />
-                <span>{lang === 'bn' ? 'ইউজার ভিউ' : 'User'}</span>
+                <span>User</span>
               </button>
             )}
           </div>
-
-          {/* Logout Close Button */}
           <button
             onClick={onClose}
-            className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/10 hover:border-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+            className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
           >
             <LogOut className="h-3.5 w-3.5" />
-            <span>{isStandalone ? (lang === 'bn' ? 'লগআউট' : 'Logout') : (lang === 'bn' ? 'বন্ধ করুন' : 'Close Dashboard')}</span>
+            <span>{isStandalone ? 'Logout' : 'Exit Admin'}</span>
           </button>
         </div>
       </div>
@@ -2438,7 +2634,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             const isTabActive = activeSubTab === tab.id;
             return (
               <button
-                key={tab.id}
+                key={`mobile-admin-tab-${tab.id}`}
                 onClick={() => {
                   setActiveSubTab(tab.id);
                   if (tab.id === 'users') {
@@ -2506,127 +2702,172 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
             return (
               <>
+                {/* 2026 AI Command Center Status Ticker Bar */}
+                <div className="bg-slate-950/80 border border-cyan-500/25 backdrop-blur-2xl rounded-2xl p-3 px-4.5 flex flex-wrap items-center justify-between gap-3 shadow-xl shadow-cyan-500/10 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 px-3 py-1 rounded-full text-[9.5px] font-mono font-black text-cyan-300 shadow-sm shadow-cyan-500/20">
+                      <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+                      <span>2026 COMMAND CORE</span>
+                    </div>
+                    <div className="hidden md:flex items-center gap-2 text-[10px] font-mono font-bold text-slate-400">
+                      <span>PING: <strong className="text-emerald-400">12ms</strong></span>
+                      <span>•</span>
+                      <span>FIREBASE: <strong className="text-cyan-400">SYNCED</strong></span>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Command Shortcuts */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab('requests')}
+                      className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-300 px-2.5 py-1 rounded-xl text-[10px] font-mono font-black transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      <Zap className="h-3 w-3 text-amber-400" />
+                      <span>{lang === 'bn' ? 'রিকোয়েস্ট' : 'Requests'} ({pendingRequests.filter(r => r.status === 'Pending').length})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab('support')}
+                      className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 text-blue-300 px-2.5 py-1 rounded-xl text-[10px] font-mono font-black transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      <MessageSquare className="h-3 w-3 text-blue-400" />
+                      <span>{lang === 'bn' ? 'সাপোর্ট চ্যাট' : 'Support Chat'} ({supportTickets.filter(t => t.status === 'Open').length})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab('settings')}
+                      className="bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                    >
+                      <Sparkles className="h-3 w-3 text-amber-400" />
+                      <span>{lang === 'bn' ? 'সেটিংস' : 'Config'}</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Dynamic Grid System Counters Section */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-3">
                   {/* Counter 1: Pending */}
-                  <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 backdrop-blur-md border border-amber-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                  <div className="bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-slate-950 backdrop-blur-md border border-amber-500/20 hover:border-amber-500/40 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-lg shadow-amber-500/5 transition-all">
                     <div>
-                      <span className="text-[9px] font-black tracking-widest text-amber-400 uppercase">
-                        {lang === 'bn' ? 'অপেক্ষমান লেনদেন' : 'Pending Tasks'}
+                      <span className="text-[9px] font-black tracking-widest text-amber-400 font-mono uppercase">
+                        {lang === 'bn' ? 'অপেক্ষমান কাজ' : 'Pending Tasks'}
                       </span>
-                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                      <div className="text-2xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
                         <span>{pendingRequests.filter(r => r.status === 'Pending').length}</span>
-                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'টি' : 'Pnd'}</span>
+                        <span className="text-[9.5px] font-bold text-amber-400/80 font-sans">{lang === 'bn' ? 'টি' : 'Pnd'}</span>
                       </div>
                     </div>
-                    <div className={`p-2 bg-amber-500/15 border border-amber-500/25 rounded-2xl text-amber-400 shrink-0 ${pendingRequests.filter(r => r.status === 'Pending').length > 0 ? "animate-bounce" : ""}`}>
-                      <RefreshCw className="h-4 w-4" />
+                    <div className={`p-2.5 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-400 shrink-0 ${pendingRequests.filter(r => r.status === 'Pending').length > 0 ? "animate-bounce" : ""}`}>
+                      <RefreshCw className="h-4.5 w-4.5" />
                     </div>
                   </div>
 
                   {/* Counter 2: Users */}
-                  <div className="bg-gradient-to-br from-blue-500/10 to-indigo-600/5 backdrop-blur-md border border-blue-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                  <div className="bg-gradient-to-br from-blue-500/10 via-indigo-600/5 to-slate-950 backdrop-blur-md border border-blue-500/20 hover:border-blue-500/40 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-lg shadow-blue-500/5 transition-all">
                     <div>
-                      <span className="text-[9px] font-black tracking-widest text-blue-400 uppercase">
+                      <span className="text-[9px] font-black tracking-widest text-blue-400 font-mono uppercase">
                         {lang === 'bn' ? 'নিবন্ধিত গ্রাহক' : 'Total Clients'}
                       </span>
-                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                      <div className="text-2xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
                         <span>{registeredUsers.length}</span>
-                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'জন' : 'Users'}</span>
+                        <span className="text-[9.5px] font-bold text-blue-400/80 font-sans">{lang === 'bn' ? 'জন' : 'Users'}</span>
                       </div>
                     </div>
-                    <div className="p-2 bg-blue-500/15 border border-blue-500/25 rounded-2xl text-blue-400 shrink-0">
-                      <User className="h-4 w-4" />
+                    <div className="p-2.5 bg-blue-500/15 border border-blue-500/30 rounded-2xl text-blue-400 shrink-0">
+                      <User className="h-4.5 w-4.5" />
                     </div>
                   </div>
 
                   {/* Counter 3: Offers */}
-                  <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-md border border-emerald-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                  <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-600/5 to-slate-950 backdrop-blur-md border border-emerald-500/20 hover:border-emerald-500/40 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-lg shadow-emerald-500/5 transition-all">
                     <div>
-                      <span className="text-[9px] font-black tracking-widest text-emerald-400 uppercase">
+                      <span className="text-[9px] font-black tracking-widest text-emerald-400 font-mono uppercase">
                         {lang === 'bn' ? 'সক্রিয় অফার প্যাক' : 'Active Packages'}
                       </span>
-                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                      <div className="text-2xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
                         <span>{offers.length}</span>
-                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'টি' : 'Packs'}</span>
+                        <span className="text-[9.5px] font-bold text-emerald-400/80 font-sans">{lang === 'bn' ? 'টি' : 'Packs'}</span>
                       </div>
                     </div>
-                    <div className="p-2 bg-emerald-500/15 border border-emerald-500/25 rounded-2xl text-emerald-400 shrink-0">
-                      <Gift className="h-4 w-4" />
+                    <div className="p-2.5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-400 shrink-0">
+                      <Gift className="h-4.5 w-4.5" />
                     </div>
                   </div>
 
                   {/* Counter 4: Billers */}
-                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/5 backdrop-blur-md border border-purple-500/15 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-md">
+                  <div className="bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-slate-950 backdrop-blur-md border border-purple-500/20 hover:border-purple-500/40 p-4 rounded-3xl flex items-center justify-between text-slate-100 group shadow-lg shadow-purple-500/5 transition-all">
                     <div>
-                      <span className="text-[9px] font-black tracking-widest text-purple-400 uppercase">
+                      <span className="text-[9px] font-black tracking-widest text-purple-400 font-mono uppercase">
                         {lang === 'bn' ? 'ইউটিলিটি বিলার্স' : 'System Billers'}
                       </span>
-                      <div className="text-xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
+                      <div className="text-2xl font-black text-white mt-1 font-mono flex items-baseline gap-1">
                         <span>{billers.length}</span>
-                        <span className="text-[9px] font-semibold text-slate-400 capitalize">{lang === 'bn' ? 'টি' : 'Billers'}</span>
+                        <span className="text-[9.5px] font-bold text-purple-400/80 font-sans">{lang === 'bn' ? 'টি' : 'Billers'}</span>
                       </div>
                     </div>
-                    <div className="p-2 bg-purple-500/15 border border-purple-500/25 rounded-2xl text-purple-400 shrink-0 font-bold">
-                      <CreditCard className="h-4 w-4" />
+                    <div className="p-2.5 bg-purple-500/15 border border-purple-500/30 rounded-2xl text-purple-400 shrink-0 font-bold">
+                      <CreditCard className="h-4.5 w-4.5" />
                     </div>
                   </div>
                 </div>
 
                 {/* Real-Time Platform Business Audit & Reserves Metrics */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-2.5">
-                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-3">
+                  <div className="bg-slate-950/60 backdrop-blur-xl border border-white/10 hover:border-emerald-500/30 p-3.5 rounded-2xl flex items-center justify-between text-slate-100 transition-all">
                     <div>
-                      <span className="text-[8px] font-black tracking-wider text-emerald-400 uppercase opacity-90 block">
+                      <span className="text-[8.5px] font-black tracking-wider text-emerald-400 uppercase font-mono block">
                         {lang === 'bn' ? 'আজকের যোগকৃত ফান্ড' : 'Today Added'}
                       </span>
-                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                      <span className="text-sm font-black text-white font-mono mt-0.5 block leading-none">
                         ৳{todayCashIns.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                    <span className="text-[8px] font-black text-emerald-300 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded-lg tracking-wider uppercase font-mono">
                       TODAY
                     </span>
                   </div>
 
-                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                  <div className="bg-slate-950/60 backdrop-blur-xl border border-white/10 hover:border-rose-500/30 p-3.5 rounded-2xl flex items-center justify-between text-slate-100 transition-all">
                     <div>
-                      <span className="text-[8px] font-black tracking-wider text-rose-400 uppercase opacity-90 block">
+                      <span className="text-[8.5px] font-black tracking-wider text-rose-400 uppercase font-mono block">
                         {lang === 'bn' ? 'আজকের বিক্রয়/খরচ' : 'Today Sales'}
                       </span>
-                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                      <span className="text-sm font-black text-white font-mono mt-0.5 block leading-none">
                         ৳{todayDebits.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-[8px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                    <span className="text-[8px] font-black text-rose-300 bg-rose-500/15 border border-rose-500/20 px-2 py-0.5 rounded-lg tracking-wider uppercase font-mono">
                       TODAY
                     </span>
                   </div>
 
-                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                  <div className="bg-slate-950/60 backdrop-blur-xl border border-white/10 hover:border-blue-500/30 p-3.5 rounded-2xl flex items-center justify-between text-slate-100 transition-all">
                     <div>
-                      <span className="text-[8px] font-black tracking-wider text-blue-400 uppercase opacity-90 block">
+                      <span className="text-[8.5px] font-black tracking-wider text-blue-400 uppercase font-mono block">
                         {lang === 'bn' ? 'মোট দেওয়া ফান্ড' : 'Total Added'}
                       </span>
-                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                      <span className="text-sm font-black text-white font-mono mt-0.5 block leading-none">
                         ৳{allTimeAdded.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                    <span className="text-[8px] font-black text-blue-300 bg-blue-500/15 border border-blue-500/20 px-2 py-0.5 rounded-lg tracking-wider uppercase font-mono">
                       ALL
                     </span>
                   </div>
 
-                  <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-3 rounded-2xl flex items-center justify-between text-slate-100">
+                  <div className="bg-slate-950/60 backdrop-blur-xl border border-white/10 hover:border-violet-500/30 p-3.5 rounded-2xl flex items-center justify-between text-slate-100 transition-all">
                     <div>
-                      <span className="text-[8px] font-black tracking-wider text-violet-400 uppercase opacity-90 block">
+                      <span className="text-[8.5px] font-black tracking-wider text-violet-400 uppercase font-mono block">
                         {lang === 'bn' ? 'সর্বমোট ইউজার ব্যালেন্স' : 'Total User Balance'}
                       </span>
-                      <span className="text-xs font-black text-white font-mono mt-0.5 block leading-none">
+                      <span className="text-sm font-black text-white font-mono mt-0.5 block leading-none">
                         ৳{totalUserBalance.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-[8px] font-black text-violet-400 bg-violet-500/10 border border-violet-500/10 px-1 py-0.5 rounded tracking-tighter uppercase font-mono">
+                    <span className="text-[8px] font-black text-violet-300 bg-violet-500/15 border border-violet-500/20 px-2 py-0.5 rounded-lg tracking-wider uppercase font-mono">
                       HELD
                     </span>
                   </div>
@@ -3290,7 +3531,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. Robi 30 GB Pack"
-                        value={offerForm.title}
+                        value={offerForm.title || ''}
                         onChange={(e) => setOfferForm({...offerForm, title: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -3301,7 +3542,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="রবি ৩০ জিবি প্যাক"
-                        value={offerForm.titleBn}
+                        value={offerForm.titleBn || ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           setOfferForm({
@@ -3365,7 +3606,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. 30 Days"
-                        value={offerForm.validity}
+                        value={offerForm.validity || ''}
                         onChange={(e) => setOfferForm({...offerForm, validity: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -3376,7 +3617,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="৩০ দিন"
-                        value={offerForm.validityBn}
+                        value={offerForm.validityBn || ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           setOfferForm({
@@ -3400,7 +3641,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. 30 GB"
-                        value={offerForm.volume}
+                        value={offerForm.volume || ''}
                         onChange={(e) => setOfferForm({...offerForm, volume: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -3411,7 +3652,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="৩০ জিবি"
-                        value={offerForm.volumeBn}
+                        value={offerForm.volumeBn || ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           setOfferForm({
@@ -3434,7 +3675,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       rows={2}
                       required
                       placeholder="Descriptions..."
-                      value={offerForm.description}
+                      value={offerForm.description || ''}
                       onChange={(e) => setOfferForm({...offerForm, description: e.target.value})}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 resize-none"
                     />
@@ -3445,7 +3686,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       rows={2}
                       required
                       placeholder="অফারের বর্ণনা..."
-                      value={offerForm.descriptionBn}
+                      value={offerForm.descriptionBn || ''}
                       onChange={(e) => {
                         const val = e.target.value;
                         setOfferForm({
@@ -3703,7 +3944,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="যেমন: ১০% ইনস্ট্যান্ট ক্যাশব্যাক"
-                        value={bannerForm.title}
+                        value={bannerForm.title || ''}
                         onChange={(e) => setBannerForm({...bannerForm, title: e.target.value})}
                         className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700"
                       />
@@ -3714,7 +3955,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. 10% Instant Cashback"
-                        value={bannerForm.titleEn}
+                        value={bannerForm.titleEn || ''}
                         onChange={(e) => setBannerForm({...bannerForm, titleEn: e.target.value})}
                         className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700"
                       />
@@ -3749,7 +3990,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     <div>
                       <label className="block text-[9.5px] font-black text-slate-400 uppercase">Color theme / styling</label>
                       <select
-                        value={bannerForm.gradient}
+                        value={bannerForm.gradient || ''}
                         onChange={(e) => setBannerForm({...bannerForm, gradient: e.target.value})}
                         className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 cursor-pointer text-[10.5px]"
                       >
@@ -3779,7 +4020,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       rows={2}
                       required
                       placeholder="ব্যানারের সংক্ষিপ্ত বর্ণনা..."
-                      value={bannerForm.desc}
+                      value={bannerForm.desc || ''}
                       onChange={(e) => setBannerForm({...bannerForm, desc: e.target.value})}
                       className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 resize-none placeholder-slate-700"
                     />
@@ -3790,7 +4031,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       rows={2}
                       required
                       placeholder="Promo banner description in or for English..."
-                      value={bannerForm.descEn}
+                      value={bannerForm.descEn || ''}
                       onChange={(e) => setBannerForm({...bannerForm, descEn: e.target.value})}
                       className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 resize-none placeholder-slate-700"
                     />
@@ -3929,7 +4170,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. DESCO (Electricity)"
-                        value={billerForm.name}
+                        value={billerForm.name || ''}
                         onChange={(e) => setBillerForm({...billerForm, name: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -3940,7 +4181,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="ডেসকো (বিদ্যুৎ)"
-                        value={billerForm.nameBn}
+                        value={billerForm.nameBn || ''}
                         onChange={(e) => setBillerForm({...billerForm, nameBn: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -4162,7 +4403,10 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         displayName: '',
                         phone: '',
                         email: '',
-                        balance: 0
+                        balance: 0,
+                        isVip: false,
+                        password: '',
+                        sendEmailNotice: true
                       });
                       setShowUserForm(true);
                     }}
@@ -4218,7 +4462,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. NIHAD BUSINESS POINT"
-                        value={userForm.displayName}
+                        value={userForm.displayName || ''}
                         onChange={(e) => setUserForm({...userForm, displayName: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -4229,7 +4473,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="text" 
                         required
                         placeholder="e.g. 01970250988"
-                        value={userForm.phone}
+                        value={userForm.phone || ''}
                         onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -4238,15 +4482,36 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Email Address (ঐচ্ছিক / Optional Email)</label>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">
+                        {lang === 'bn' ? 'ইমেইল এড্রেস (লগইন তথ্য পাঠানোর জন্য)' : 'Email Address (for sending login credentials)'}
+                      </label>
                       <input 
                         type="email" 
                         placeholder="e.g. user@gmail.com"
-                        value={userForm.email}
+                        value={userForm.email || ''}
                         onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 font-mono"
                       />
                     </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">
+                        {lang === 'bn' ? 'পিন / পাসওয়ার্ড নির্ধারণ করুন' : 'Set PIN / Password'}
+                      </label>
+                      <input 
+                        type="text" 
+                        required={!editingUserId}
+                        placeholder={lang === 'bn' ? 'যেমন: 123456 (কমপক্ষে ৬ অক্ষর/ডিজিট)' : 'e.g. 123456 (min 6 characters)'}
+                        value={userForm.password || ''}
+                        onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500 font-mono"
+                      />
+                      <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">
+                        {lang === 'bn' ? 'কমপক্ষে ৬ ডিজিটের পিন বা অক্ষরের পাসওয়ার্ড লিখুন' : 'Enter 6+ digit PIN or password'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-[9.5px] font-black text-slate-500 uppercase">Initial Wallet Balance (৳)</label>
                       <input 
@@ -4256,6 +4521,21 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         onChange={(e) => setUserForm({...userForm, balance: parseFloat(e.target.value) || 0})}
                         className="w-full bg-slate-50 border border-slate-400 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <div className="flex items-center gap-2 p-2.5 bg-blue-50/80 border border-blue-100 rounded-xl">
+                        <input 
+                          type="checkbox"
+                          id="sendEmailNotice"
+                          checked={userForm.sendEmailNotice}
+                          onChange={(e) => setUserForm({...userForm, sendEmailNotice: e.target.checked})}
+                          className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <label htmlFor="sendEmailNotice" className="text-xs font-bold text-blue-900 flex items-center gap-1.5 cursor-pointer select-none">
+                          <Send className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                          <span>{lang === 'bn' ? 'ইউজারের ইমেইলে ইউজারনেম ও পাসওয়ার্ড পাঠান' : 'Send username & password to email'}</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -4354,7 +4634,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             const isSelected = selectedUser?.uid === userObj.uid;
                             return (
                               <button
-                                key={userObj.uid || userObj.id || `user-item-${idx}`}
+                                key={`${userObj.uid || userObj.id || 'usr'}-${idx}`}
                                 type="button"
                                 onClick={() => {
                                   setSelectedUser(userObj);
@@ -4447,9 +4727,53 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           <p className="text-[11px] font-mono text-slate-400 font-medium truncate">
                             {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
                           </p>
+                          <p className="text-[11px] font-mono text-slate-400 font-medium truncate mt-0.5">
+                            {lang === 'bn' ? 'পিন / পাসওয়ার্ড' : 'PIN / Password'}: <span className="text-amber-300 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[10.5px] font-mono">{selectedUser.pin || selectedUser.password || '••••••'}</span>
+                          </p>
 
-                          {/* Edit / Delete / Suspend / VIP control buttons */}
+                          {/* Edit / Delete / Suspend / VIP / Send Email control buttons */}
                           <div className="flex flex-wrap gap-2 mt-3">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const userEmail = selectedUser.email;
+                                if (!userEmail || !userEmail.includes('@')) {
+                                  alert(lang === 'bn' ? 'ইউজারের কোনো বৈধ ইমেইল এড্রেস পাওয়া যায়নি!' : 'No valid email found for this user!');
+                                  return;
+                                }
+                                const pass = selectedUser.pin || selectedUser.password || '123456';
+                                if (!window.confirm(lang === 'bn' ? `${userEmail} ইমেইলে ইউজারনেম ও পাসওয়ার্ড পাঠাতে চান?` : `Send credentials email to ${userEmail}?`)) return;
+
+                                setLoading(true);
+                                try {
+                                  const res = await fetch('/api/send-user-email', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      email: userEmail,
+                                      phone: selectedUser.phone || '',
+                                      displayName: selectedUser.displayName || 'User',
+                                      password: pass,
+                                      pin: pass
+                                    })
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    alert(lang === 'bn' ? `✅ ${userEmail} ইমেইলে ইউজারনেম ও পাসওয়ার্ড সফলভাবে পাঠানো হয়েছে!` : `✅ Login credentials sent to ${userEmail}!`);
+                                  } else {
+                                    alert(lang === 'bn' ? `⚠️ ইমেইল পাঠাতে সমস্যা: ${data.error}` : `⚠️ Email error: ${data.error}`);
+                                  }
+                                } catch (err: any) {
+                                  alert("Error: " + err.message);
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }}
+                              className="p-1 px-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1"
+                            >
+                              <Send className="h-3.5 w-3.5 text-blue-400" />
+                              <span>{lang === 'bn' ? 'ইমেইল পাসওয়ার্ড পাঠান' : 'Send Credentials Email'}</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleToggleVip(selectedUser.uid, !!selectedUser.isVip)}
@@ -4679,7 +5003,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           </div>
                           <div className="space-y-1 col-span-2">
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{lang === 'bn' ? 'কেওয়াইসি স্ট্যাটাস' : 'KYC Status'}</span>
-                            <div>
+                            <div className="flex items-center gap-2 mt-1">
                               <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
                                 selectedUser.kycStatus === 'verified' ? 'bg-emerald-500/10 text-emerald-400' :
                                 selectedUser.kycStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 animate-pulse' :
@@ -4690,6 +5014,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                  selectedUser.kycStatus === 'pending' ? (lang === 'bn' ? 'পেন্ডিং' : 'Pending Approval') :
                                  selectedUser.kycStatus === 'rejected' ? (lang === 'bn' ? 'প্রত্যাখ্যাত' : 'Rejected') : 'Not Submitted'}
                               </span>
+                              {selectedUser.kycStatus === 'pending' && (
+                                <div className="flex items-center gap-1.5 ml-auto">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveKyc(selectedUser.uid || selectedUser.id)}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9.5px] font-black transition-all cursor-pointer shadow-sm"
+                                  >
+                                    {lang === 'bn' ? 'এপ্রুভ করুন' : 'Approve'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRejectingKycUserId(selectedUser.uid || selectedUser.id)}
+                                    className="px-2.5 py-1 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/20 rounded-lg text-[9.5px] font-black transition-all cursor-pointer"
+                                  >
+                                    {lang === 'bn' ? 'বাতিল' : 'Reject'}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -4895,7 +5237,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={settingsForm.bkashNumber}
+                        value={settingsForm.bkashNumber || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, bkashNumber: e.target.value })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -4908,7 +5250,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={settingsForm.nagadNumber}
+                        value={settingsForm.nagadNumber || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, nagadNumber: e.target.value })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -4921,7 +5263,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={settingsForm.rocketNumber}
+                        value={settingsForm.rocketNumber || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, rocketNumber: e.target.value })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -4976,7 +5318,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={settingsForm.helplineNumber}
+                        value={settingsForm.helplineNumber || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, helplineNumber: e.target.value })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -4989,7 +5331,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={settingsForm.whatsappUrl}
+                        value={settingsForm.whatsappUrl || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, whatsappUrl: e.target.value })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -5020,7 +5362,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       </label>
                       <textarea
                         rows={2}
-                        value={settingsForm.globalNoticeEn}
+                        value={settingsForm.globalNoticeEn || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, globalNoticeEn: e.target.value })}
                         placeholder="Type alert warning or promotional text in English..."
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-medium outline-none focus:border-blue-500 font-semibold"
@@ -5033,7 +5375,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       </label>
                       <textarea
                         rows={2}
-                        value={settingsForm.globalNoticeBn}
+                        value={settingsForm.globalNoticeBn || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, globalNoticeBn: e.target.value })}
                         placeholder="বাংলায় নোটিশ বার্তা লিখুন..."
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-medium outline-none focus:border-blue-500 font-semibold"
@@ -5112,7 +5454,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       const hasUnread = ticket.lastMessageSender === 'user' && ticket.status === 'Open';
                       return (
                         <button
-                          key={ticket.id}
+                          key={`${ticket.id || 'tkt'}-${ticket.createdAt || 'ticket'}`}
                           type="button"
                           onClick={() => {
                             setSelectedTicketId(ticket.id);
@@ -5206,20 +5548,30 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           </div>
                         </div>
 
-                        {/* Toggle Ticket Status */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTicketStatus(activeTicket.id)}
-                          className={`text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                            activeTicket.status === 'Closed'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'
-                          }`}
-                        >
-                          {activeTicket.status === 'Closed' 
-                            ? (lang === 'bn' ? 'টিকিট পুনরায় খুলুন' : 'Re-open Ticket') 
-                            : (lang === 'bn' ? 'টিকিট বন্ধ করুন' : 'Close Ticket')}
-                        </button>
+                        {/* Direct Call & Toggle Ticket Status */}
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`tel:${activeTicket.userName || activeTicket.userEmail?.split('@')[0] || ''}`}
+                            className="p-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10.5px] font-black cursor-pointer transition-colors flex items-center gap-1"
+                            title="Direct Phone Call"
+                          >
+                            <Phone className="h-3.5 w-3.5 text-emerald-400" />
+                            <span>{lang === 'bn' ? 'ইউজারকে কল করুন' : 'Call User'}</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTicketStatus(activeTicket.id)}
+                            className={`text-[10px] font-black px-3 py-2 rounded-xl border transition-all cursor-pointer ${
+                              activeTicket.status === 'Closed'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'
+                            }`}
+                          >
+                            {activeTicket.status === 'Closed' 
+                              ? (lang === 'bn' ? 'টিকিট খুলুন' : 'Re-open Ticket') 
+                              : (lang === 'bn' ? 'টিকিট বন্ধ করুন' : 'Close Ticket')}
+                          </button>
+                        </div>
                       </div>
 
                       {/* Messages body */}
@@ -5236,11 +5588,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         </div>
 
                         {/* Array messages log */}
-                        {activeTicket.messages && activeTicket.messages.map((msg: any) => {
+                        {activeTicket.messages && activeTicket.messages.map((msg: any, idx: number) => {
                           const isAdmin = msg.senderId === 'admin';
                           return (
                             <div 
-                              key={msg.id} 
+                              key={`${msg.id || 'msg'}-${idx}`} 
                               className={`flex flex-col max-w-[80%] ${isAdmin ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                             >
                               <div className={`p-3 rounded-2xl text-[11.5px] font-medium leading-relaxed ${
@@ -5258,8 +5610,27 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         })}
                       </div>
 
+                      {/* Admin Quick Reply Chips */}
+                      <div className="flex flex-wrap gap-1.5 pt-2 pb-1 border-t border-white/5">
+                        {[
+                          lang === 'bn' ? '✅ আপনার সমস্যার সমাধান করা হয়েছে।' : 'Issue has been resolved.',
+                          lang === 'bn' ? '⌛ দয়া করে ৫ মিনিট অপেক্ষা করুন।' : 'Please wait 5 minutes.',
+                          lang === 'bn' ? '🆔 ট্রানজেকশন আইডি প্রদান করুন।' : 'Provide transaction ID.',
+                          lang === 'bn' ? '📞 আপনাকে কল দেওয়া হচ্ছে।' : 'Calling you shortly.'
+                        ].map((chip, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setAdminReplyText(chip)}
+                            className="text-[9.5px] font-bold bg-white/5 hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 border border-white/10 px-2.5 py-1 rounded-full cursor-pointer transition-colors"
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
+
                       {/* Reply form submission */}
-                      <form onSubmit={handleSendAdminReply} className="border-t border-white/5 pt-3.5 flex gap-2">
+                      <form onSubmit={handleSendAdminReply} className="pt-2 flex gap-2">
                         <input
                           type="text"
                           required
@@ -5305,7 +5676,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={productForm.title}
+                        value={productForm.title || ''}
                         onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                       />
@@ -5315,7 +5686,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="text"
                         required
-                        value={productForm.titleBn}
+                        value={productForm.titleBn || ''}
                         onChange={(e) => setProductForm({ ...productForm, titleBn: e.target.value })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                       />
@@ -5348,7 +5719,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'ক্যাটাগরি' : 'Category'}</label>
                       <select
-                        value={productForm.category}
+                        value={productForm.category || ''}
                         onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500 appearance-none cursor-pointer text-slate-300"
                       >
@@ -5366,7 +5737,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     <input
                       type="url"
                       placeholder="https://example.com/product.jpg"
-                      value={productForm.imageUrl}
+                      value={productForm.imageUrl || ''}
                       onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                     />
@@ -5378,7 +5749,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <textarea
                         rows={2}
                         required
-                        value={productForm.description}
+                        value={productForm.description || ''}
                         onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                       />
@@ -5388,7 +5759,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <textarea
                         rows={2}
                         required
-                        value={productForm.descriptionBn}
+                        value={productForm.descriptionBn || ''}
                         onChange={(e) => setProductForm({ ...productForm, descriptionBn: e.target.value })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                       />
@@ -5908,7 +6279,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           type="text"
                           required
                           placeholder="e.g. 01711-223344"
-                          value={simNumForm.number}
+                          value={simNumForm.number || ''}
                           onChange={(e) => {
                             const val = e.target.value;
                             let detectedOp = simNumForm.operator;
@@ -6116,7 +6487,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                               num.operator === 'Banglalink' ? 'bg-orange-500' :
                                               'bg-emerald-600';
                               return (
-                                <tr key={num.id || idx} className="hover:bg-white/5 transition-colors font-semibold text-slate-200">
+                                <tr key={`${num.id || 'sim'}-${idx}`} className="hover:bg-white/5 transition-colors font-semibold text-slate-200">
                                   <td className="py-3 px-4">
                                     <span className={`text-[10px] font-black text-white px-2 py-0.5 rounded-md ${opColor}`}>
                                       {num.operator}
@@ -6278,7 +6649,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {registeredUsers.filter(u => u.kycStatus === 'pending').map((user, index) => (
-                  <div key={`${user.uid || index}-${index}`} className="bg-slate-950 border border-white/5 rounded-3xl p-5 space-y-4">
+                  <div key={`${user.uid || user.id || 'kyc'}-${index}`} className="bg-slate-950 border border-white/5 rounded-3xl p-5 space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-sm">
@@ -6406,13 +6777,13 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <button
-                        onClick={() => setRejectingKycUserId(user.uid)}
+                        onClick={() => setRejectingKycUserId(user.uid || user.id)}
                         className="py-3 bg-rose-600/10 text-rose-500 rounded-2xl text-[10px] font-black border border-rose-500/20 hover:bg-rose-600/20 transition-all cursor-pointer"
                       >
                         {lang === 'bn' ? 'বাতিল করুন' : 'Reject KYC'}
                       </button>
                       <button
-                        onClick={() => handleApproveKyc(user.uid)}
+                        onClick={() => handleApproveKyc(user.uid || user.id)}
                         className="py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-black shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all cursor-pointer"
                       >
                         {lang === 'bn' ? 'এপ্রুভ করুন' : 'Approve KYC'}
@@ -6454,7 +6825,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold text-slate-400 uppercase">Operator</label>
                           <select
-                            value={scratchForm.operator}
+                            value={scratchForm.operator || 'Grameenphone'}
                             onChange={(e) => setScratchForm({...scratchForm, operator: e.target.value})}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
                           >
@@ -6470,7 +6841,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           <input
                             type="number"
                             required
-                            value={scratchForm.price}
+                            value={scratchForm.price ?? 0}
                             onChange={(e) => setScratchForm({...scratchForm, price: Number(e.target.value)})}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
                           />
@@ -6482,7 +6853,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <input
                           type="text"
                           required
-                          value={scratchForm.title}
+                          value={scratchForm.title || ''}
                           onChange={(e) => setScratchForm({...scratchForm, title: e.target.value})}
                           placeholder="e.g. 1 GB + 20 Min or 50 Tk Recharge"
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
@@ -6510,7 +6881,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <input
                           type="text"
                           required
-                          value={scratchForm.pin}
+                          value={scratchForm.pin || ''}
                           onChange={(e) => setScratchForm({...scratchForm, pin: e.target.value})}
                           placeholder="Enter PIN number"
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
@@ -6521,7 +6892,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <label className="text-[10px] font-bold text-slate-400 uppercase">Validity</label>
                         <input
                           type="text"
-                          value={scratchForm.validity}
+                          value={scratchForm.validity || ''}
                           onChange={(e) => setScratchForm({...scratchForm, validity: e.target.value})}
                           placeholder="e.g., ২ দিন"
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
@@ -6532,7 +6903,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <label className="text-[10px] font-bold text-slate-400 uppercase">Dial Code</label>
                         <input
                           type="text"
-                          value={scratchForm.dialCode}
+                          value={scratchForm.dialCode || ''}
                           onChange={(e) => setScratchForm({...scratchForm, dialCode: e.target.value})}
                           placeholder="e.g., *121*PIN#"
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"

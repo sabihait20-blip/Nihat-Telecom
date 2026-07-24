@@ -1388,7 +1388,7 @@ export default function App() {
                       const Icon = srv.icon;
                       return (
                         <button
-                          key={srv.id}
+                          key={`desktop-srv-${srv.id}`}
                           onClick={srv.action}
                           className="bg-white border border-slate-200/60 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 rounded-[2rem] p-7 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[150px] relative overflow-hidden"
                         >
@@ -1573,7 +1573,7 @@ export default function App() {
                     const Icon = srv.icon;
                     return (
                       <motion.button
-                        key={srv.id}
+                        key={`mobile-srv-${srv.id}`}
                         onClick={srv.action}
                         id={`home-service-${srv.id}`}
                         whileHover={{ 
@@ -1779,6 +1779,8 @@ export default function App() {
               lang={lang}
               isOpen={isSupportOpen}
               onClose={() => setIsSupportOpen(false)}
+              helplineNumber={appConfig.helplineNumber}
+              whatsappUrl={appConfig.whatsappUrl}
             />
           )}
 

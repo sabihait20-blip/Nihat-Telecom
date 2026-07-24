@@ -221,9 +221,9 @@ export default function BillPayModal({
 
               {/* Grid directory list in high visual styling */}
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {filteredBillers.map((biller) => (
+                {filteredBillers.map((biller, idx) => (
                   <button
-                    key={biller.id}
+                    key={`${biller.id || 'biller'}-${idx}`}
                     onClick={() => handleBillerTap(biller)}
                     id={`biller-tap-${biller.id}`}
                     className="w-full text-left p-3 rounded-2xl border border-slate-100 hover:border-blue-500 bg-white hover:bg-blue-50/10 flex items-center justify-between transition-all cursor-pointer group"

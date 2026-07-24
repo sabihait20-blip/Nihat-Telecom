@@ -126,9 +126,9 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
       {/* List layout of matching cellular package cards */}
       <div className="space-y-3 pt-1">
         {filteredPackages.length > 0 ? (
-          filteredPackages.map((pkg) => (
+          filteredPackages.map((pkg, idx) => (
             <div
-              key={pkg.id}
+              key={`${pkg.id || 'pack'}-${idx}`}
               className="bg-white border border-slate-100 rounded-[28px] p-5 shadow-sm relative overflow-hidden flex flex-col justify-between hover:border-blue-100 hover:shadow-md transition-all group"
             >
               {/* Operator specific micro logo tab on top-right */}

@@ -308,12 +308,12 @@ export default function ScratchCardModal({ isOpen, onClose, lang, balance, uid, 
                             {localizeOperatorName(op)}
                           </h4>
                           <div className="grid grid-cols-1 gap-4">
-                            {cards.filter(c => c.operator === op).map(card => {
+                            {cards.filter(c => c.operator === op).map((card, idx) => {
                               const parsed = parseTitle(card.title);
                               const colors = getOperatorCardColors(op);
                               return (
                                 <button
-                                  key={card.id}
+                                  key={`${card.id || 'card'}-${idx}`}
                                   onClick={() => setSelectedCard(card)}
                                   className={`w-full text-left rounded-[20px] transition-all relative overflow-hidden group border-2 ${
                                     selectedCard?.id === card.id 
