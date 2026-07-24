@@ -53,6 +53,7 @@ import CashOutCalculatorModal from './components/CashOutCalculatorModal';
 import StorePanel from './components/StorePanel';
 import KYCModal from './components/KYCModal';
 import SimCardModal from './components/SimCardModal';
+import VipMoneyRequestModal from './components/VipMoneyRequestModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -170,6 +171,7 @@ export default function App() {
   const [isCashOutCalcOpen, setIsCashOutCalcOpen] = useState(false);
   const [isKYCOpen, setIsKYCOpen] = useState(false);
   const [isSimOpen, setIsSimOpen] = useState(false);
+  const [isVipMoneyRequestOpen, setIsVipMoneyRequestOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -1450,6 +1452,7 @@ export default function App() {
                     userData={userData}
                     onKYCClick={() => setIsKYCOpen(true)}
                     requireKyc={appConfig.requireKyc}
+                    onVipMoneyRequestClick={() => setIsVipMoneyRequestOpen(true)}
                   />
                 </div>
               )}
@@ -1664,6 +1667,7 @@ export default function App() {
               userData={userData}
               onKYCClick={() => setIsKYCOpen(true)}
               requireKyc={appConfig.requireKyc}
+              onVipMoneyRequestClick={() => setIsVipMoneyRequestOpen(true)}
             />
           )}
         </div>
@@ -1803,6 +1807,16 @@ export default function App() {
               lang={lang}
               onClose={() => setIsKYCOpen(false)}
               onSuccess={() => setIsKYCOpen(false)}
+            />
+          )}
+
+          {/* VIP MONEY REQUEST MODAL */}
+          {isVipMoneyRequestOpen && (
+            <VipMoneyRequestModal
+              lang={lang}
+              isOpen={isVipMoneyRequestOpen}
+              onClose={() => setIsVipMoneyRequestOpen(false)}
+              userData={userData}
             />
           )}
 

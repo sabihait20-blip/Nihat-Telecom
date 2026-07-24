@@ -4,7 +4,7 @@ import {
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
-  Eye, Download
+  Eye, Download, Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -535,7 +535,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     displayName: '',
     phone: '',
     email: '',
-    balance: 0
+    balance: 0,
+    isVip: false
   });
 
   // New States for Advanced Search & Filters
@@ -604,23 +605,41 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const handleApproveKyc = async (userId: string) => {
     if (!window.confirm(lang === 'bn' ? 'আপনি কি এই গ্রাহকের কেওয়াইসি এপ্রুভ করতে চান?' : 'Do you want to approve this user\'s KYC?')) return;
     try {
-      const batch = writeBatch(db);
       const userRef = doc(db, 'users', userId);
       const regUserRef = doc(db, 'registered_users', userId);
       
       const updateData = {
         kycStatus: 'verified',
-        'kycData.verifiedAt': new Date().toISOString()
+        kycData: {
+          verifiedAt: new Date().toISOString(),
+          verifiedBy: 'admin'
+        }
       };
-      
-      batch.update(userRef, updateData);
-      batch.update(regUserRef, updateData);
-      
-      await batch.commit();
+
+      await setDoc(userRef, updateData, { merge: true });
+      await setDoc(regUserRef, updateData, { merge: true });
+
+      // Add user notification
+      try {
+        const notifId = `notif-kyc-${Date.now()}`;
+        const notifRef = doc(db, 'users', userId, 'notifications', notifId);
+        await setDoc(notifRef, {
+          id: notifId,
+          title: 'KYC Verified / কেওয়াইসি অনুমোদিত',
+          titleBn: 'কেওয়াইসি ভেরিফিকেশন সফল হয়েছে 🛡️',
+          desc: 'Your KYC identity verification has been approved by admin.',
+          descBn: 'আপনার অ্যাকাউন্টের কেওয়াইসি পরিচয়পত্র সফলভাবে অনুমোদিত হয়েছে।',
+          time: 'Just now',
+          read: false
+        });
+      } catch (e) {
+        console.error("Notif error:", e);
+      }
+
       alert(lang === 'bn' ? 'কেওয়াইসি সফলভাবে এপ্রুভ করা হয়েছে!' : 'KYC successfully approved!');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error approving KYC:", err);
-      alert('Error: ' + err);
+      alert('Error approving KYC: ' + (err.message || err));
     }
   };
 
@@ -628,25 +647,43 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     e.preventDefault();
     if (!rejectingKycUserId || !kycRejectReason) return;
     try {
-      const batch = writeBatch(db);
       const userRef = doc(db, 'users', rejectingKycUserId);
       const regUserRef = doc(db, 'registered_users', rejectingKycUserId);
       
       const updateData = {
         kycStatus: 'rejected',
-        'kycData.rejectionReason': kycRejectReason
+        kycData: {
+          rejectionReason: kycRejectReason,
+          rejectedAt: new Date().toISOString()
+        }
       };
-      
-      batch.update(userRef, updateData);
-      batch.update(regUserRef, updateData);
-      
-      await batch.commit();
+
+      await setDoc(userRef, updateData, { merge: true });
+      await setDoc(regUserRef, updateData, { merge: true });
+
+      // Send notification
+      try {
+        const notifId = `notif-kycrej-${Date.now()}`;
+        const notifRef = doc(db, 'users', rejectingKycUserId, 'notifications', notifId);
+        await setDoc(notifRef, {
+          id: notifId,
+          title: 'KYC Rejected / কেওয়াইসি প্রত্যাখ্যাত',
+          titleBn: 'কেওয়াইসি আবেদন বাতিল করা হয়েছে',
+          desc: `Your KYC was rejected. Reason: ${kycRejectReason}`,
+          descBn: `আপনার কেওয়াইসি আবেদন প্রত্যাখ্যাত হয়েছে। কারণ: ${kycRejectReason}`,
+          time: 'Just now',
+          read: false
+        });
+      } catch (e) {
+        console.error("Notif error:", e);
+      }
+
       setRejectingKycUserId(null);
       setKycRejectReason('');
       alert(lang === 'bn' ? 'কেওয়াইসি বাতিল করা হয়েছে।' : 'KYC rejected.');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error rejecting KYC:", err);
-      alert('Error: ' + err);
+      alert('Error rejecting KYC: ' + (err.message || err));
     }
   };
   
@@ -2015,6 +2052,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         displayName: userForm.displayName,
         phone: userForm.phone,
         email: userForm.email || (userForm.phone ? `${userForm.phone}@nihad-business-point.com` : `${uid}@nihad-business-point.com`),
+        isVip: userForm.isVip || false,
       };
 
       // Save/update registered_users profile doc
@@ -2042,7 +2080,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         displayName: '',
         phone: '',
         email: '',
-        balance: 0
+        balance: 0,
+        isVip: false
       });
     } catch (err: any) {
       console.error("Error saving user: ", err);
@@ -2069,9 +2108,36 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       displayName: userObj.displayName || '',
       phone: userObj.phone || '',
       email: userObj.email || '',
-      balance: currentBal
+      balance: currentBal,
+      isVip: !!userObj.isVip
     });
     setShowUserForm(true);
+  };
+
+  const handleToggleVip = async (uid: string, currentlyVip: boolean) => {
+    const actionText = currentlyVip ? (lang === 'bn' ? 'VIP থেকে সাধারণ মেম্বার' : 'Remove VIP') : (lang === 'bn' ? 'VIP মেম্বার' : 'Make VIP');
+    if (!window.confirm(lang === 'bn' ? `আপনি কি এই গ্রাহককে ${actionText} করতে চান?` : `Are you sure you want to ${actionText} this user?`)) return;
+
+    setLoading(true);
+    try {
+      const userRef = doc(db, 'users', uid);
+      const regUserRef = doc(db, 'registered_users', uid);
+      const newVip = !currentlyVip;
+
+      await setDoc(userRef, { isVip: newVip }, { merge: true });
+      await setDoc(regUserRef, { isVip: newVip }, { merge: true });
+
+      if (selectedUser && selectedUser.uid === uid) {
+        setSelectedUser({ ...selectedUser, isVip: newVip });
+      }
+
+      alert(lang === 'bn' ? `ব্যবহারকারী সফলভাবে ${newVip ? 'VIP মেম্বার 👑 করা হয়েছে!' : 'সাধারণ মেম্বারে পরিবর্তন করা হয়েছে!'}` : `User VIP status successfully updated!`);
+    } catch (err: any) {
+      console.error("Error toggling VIP status: ", err);
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleToggleUserBan = async (uid: string, currentlyBanned: boolean) => {
@@ -4193,6 +4259,20 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     </div>
                   </div>
 
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                    <input 
+                      type="checkbox"
+                      id="userIsVip"
+                      checked={userForm.isVip}
+                      onChange={(e) => setUserForm({...userForm, isVip: e.target.checked})}
+                      className="h-4 w-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
+                    />
+                    <label htmlFor="userIsVip" className="text-xs font-black text-amber-600 flex items-center gap-1 cursor-pointer">
+                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                      <span>👑 VIP Member Badge (ভিআইপি স্ট্যাটাস প্রদান করুন)</span>
+                    </label>
+                  </div>
+
                   <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
                     <button
                       type="button"
@@ -4346,6 +4426,12 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             <span className="text-[9px] font-black tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/15 rounded px-1.5 py-0.5 uppercase font-mono">
                               {lang === 'bn' ? 'নির্বাচিত ইউজার প্রোফাইল' : 'Selected Customer Profile'}
                             </span>
+                            {selectedUser.isVip && (
+                              <span className="text-[9px] font-black tracking-widest text-amber-300 bg-amber-500/20 border border-amber-400/30 rounded px-1.5 py-0.5 uppercase font-mono flex items-center gap-1">
+                                <Crown className="h-3 w-3 text-amber-400" />
+                                <span>👑 VIP MEMBER</span>
+                              </span>
+                            )}
                             {selectedUser.isBanned && (
                               <span className="text-[9px] font-black tracking-widest text-rose-400 bg-rose-500/15 border border-rose-500/35 rounded px-1.5 py-0.5 uppercase font-mono animate-pulse">
                                 {lang === 'bn' ? 'স্থগিত' : 'Suspended'}
@@ -4362,8 +4448,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                             {lang === 'bn' ? 'মোবাইল/ইমেইল' : 'Contact'}: <span className="text-slate-300 font-mono">{selectedUser.phone || selectedUser.email}</span>
                           </p>
 
-                          {/* Edit / Delete / Suspend control buttons */}
+                          {/* Edit / Delete / Suspend / VIP control buttons */}
                           <div className="flex flex-wrap gap-2 mt-3">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleVip(selectedUser.uid, !!selectedUser.isVip)}
+                              className={`p-1 px-2.5 border text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1 rounded-xl ${
+                                selectedUser.isVip
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-400/40 hover:bg-amber-500/30'
+                                  : 'bg-white/5 text-slate-300 border-white/5 hover:bg-amber-500/20 hover:text-amber-300 hover:border-amber-500/30'
+                              }`}
+                            >
+                              <Crown className="h-3.5 w-3.5 text-amber-400" />
+                              <span>
+                                {selectedUser.isVip
+                                  ? (lang === 'bn' ? 'VIP সরান' : 'Remove VIP')
+                                  : (lang === 'bn' ? 'VIP মেম্বার করুন' : 'Make VIP')}
+                              </span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleEditUser(selectedUser)}

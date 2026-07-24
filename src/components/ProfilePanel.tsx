@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   User, Shield, Phone, BellRing, Info, LogOut, ChevronRight,
-  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift
+  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift, Crown, Coins
 } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
@@ -21,6 +21,7 @@ interface ProfilePanelProps {
   userData?: any;
   onKYCClick?: () => void;
   requireKyc?: boolean;
+  onVipMoneyRequestClick?: () => void;
 }
 
 export default function ProfilePanel({
@@ -35,6 +36,7 @@ export default function ProfilePanel({
   userData,
   onKYCClick,
   requireKyc = true,
+  onVipMoneyRequestClick,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -195,6 +197,54 @@ export default function ProfilePanel({
           <span className="bg-white/10 text-white hover:bg-white/20 transition-all font-bold px-2 py-0.5 rounded-sm select-none">
             ID: {currentUser?.uid ? `FLX-${currentUser.uid.slice(0, 6).toUpperCase()}` : 'FLX-88290'}
           </span>
+        </div>
+      </div>
+
+      {/* VIP Member Badge & VIP Money Request Banner */}
+      <div className={`p-4 rounded-[28px] shadow-lg relative overflow-hidden transition-all border ${
+        userData?.isVip
+          ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 border-amber-300 shadow-amber-500/20'
+          : 'bg-slate-900 text-slate-100 border-white/10'
+      }`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-2xl shadow-md ${
+              userData?.isVip ? 'bg-slate-950 text-amber-400' : 'bg-white/10 text-amber-400'
+            }`}>
+              <Crown className="h-6 w-6 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className="font-extrabold text-xs tracking-tight uppercase flex items-center gap-1">
+                  <span>{userData?.isVip ? (lang === 'bn' ? 'ভিআইপি মেম্বার স্ট্যাটাস 👑' : 'VIP Member Status 👑') : (lang === 'bn' ? 'সাধারণ অ্যাকাউন্ট' : 'Standard Account')}</span>
+                </h4>
+                {userData?.isVip && (
+                  <span className="bg-slate-950 text-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-amber-400/30">
+                    VIP Priority
+                  </span>
+                )}
+              </div>
+              <p className={`text-[10px] font-bold mt-0.5 ${userData?.isVip ? 'text-slate-900/90' : 'text-slate-400'}`}>
+                {userData?.isVip
+                  ? (lang === 'bn' ? 'এডমিনের কাছে সরাসরি মানি রিকুয়েস্ট পাঠানোর সুবিধা রয়েছে।' : 'Exclusive direct VIP money request privileges active.')
+                  : (lang === 'bn' ? 'VIP সদস্য হলে এডমিনের কাছ থেকে জরুরি ক্রেডিট সাপোর্ট পাবেন।' : 'Upgrade to VIP member to send direct credit requests to admin.')}
+              </p>
+            </div>
+          </div>
+
+          {onVipMoneyRequestClick && (
+            <button
+              onClick={onVipMoneyRequestClick}
+              className={`px-3.5 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                userData?.isVip
+                  ? 'bg-slate-950 hover:bg-slate-900 text-amber-400 border border-amber-400/30 shadow-amber-950/40'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/10'
+              }`}
+            >
+              <Coins className="h-3.5 w-3.5 text-amber-400" />
+              <span>{lang === 'bn' ? 'মানি রিকুয়েস্ট' : 'Money Request'}</span>
+            </button>
+          )}
         </div>
       </div>
 

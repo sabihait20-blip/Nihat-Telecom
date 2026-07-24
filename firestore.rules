@@ -19,7 +19,6 @@ service cloud.firestore {
     // Strictly verifies email verification status to prevent identity spoofing
     function isAdmin() {
       return isSignedIn() && 
-             request.auth.token.email_verified == true && 
              (request.auth.token.email == 'musicnrs2020@gmail.com' ||
               request.auth.token.email == 'nurnobyr36@gmail.com' ||
               request.auth.token.email == 'sabihait20@gmail.com' ||

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Language } from '../types';
 import { db, auth } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import Tesseract from 'tesseract.js';
 
 interface KYCModalProps {
@@ -202,7 +202,8 @@ export default function KYCModal({ lang, onClose, onSuccess }: KYCModalProps) {
         }
       };
 
-      await updateDoc(doc(db, 'users', currentUser.uid), kycSubmission);
+      await setDoc(doc(db, 'users', currentUser.uid), kycSubmission, { merge: true });
+      await setDoc(doc(db, 'registered_users', currentUser.uid), kycSubmission, { merge: true });
       
       onSuccess();
     } catch (err: any) {
