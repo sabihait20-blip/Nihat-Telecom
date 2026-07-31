@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShoppingBag, Search, Tag, Info, AlertTriangle, CheckCircle2, 
   ShoppingBag as BagIcon, Clock, ArrowLeft, Send, MapPin, Phone, 
-  User, Check, AlertCircle, ShoppingCart, RefreshCw, X
+  User, Check, AlertCircle, ShoppingCart, RefreshCw, X,
+  Calculator, Barcode, Users, DollarSign, TrendingUp, Printer, FileText, Plus, Trash2, Edit3, ShieldCheck, Package, Layers, PieChart
 } from 'lucide-react';
-import { StoreProduct, StoreOrder, Language } from '../types';
-import { collection, doc, onSnapshot, writeBatch, query, where, getDoc } from 'firebase/firestore';
+import { StoreProduct, StoreOrder, Language, Supplier, Customer, ExpenseRecord, IncomeRecord, POSCartItem } from '../types';
+import { collection, doc, onSnapshot, writeBatch, query, where, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
 interface StorePanelProps {
@@ -18,7 +19,9 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [orders, setOrders] = useState<StoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'browse' | 'orders'>('browse');
+  
+  // Navigation tabs: browse | pos | inventory | suppliers | customers | expenses | reports | orders
+  const [activeTab, setActiveTab] = useState<'browse' | 'pos' | 'inventory' | 'suppliers' | 'customers' | 'expenses' | 'reports' | 'orders'>('browse');
 
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,7 +35,37 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
   const [contactPhone, setContactPhone] = useState('');
   const [orderNote, setOrderNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderSuccess, setOrderSuccess] = useState<string | null>(null); // Order ID on success
+  const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
+
+  // POS Cart State
+  const [posCart, setPosCart] = useState<POSCartItem[]>([]);
+  const [posCustomerName, setPosCustomerName] = useState('');
+  const [posCustomerPhone, setPosCustomerPhone] = useState('');
+  const [posPaymentMethod, setPosPaymentMethod] = useState<'Cash' | 'bKash' | 'Card' | 'Due'>('Cash');
+  const [posPaidAmount, setPosPaidAmount] = useState<number>(0);
+  const [lastInvoice, setLastInvoice] = useState<any | null>(null);
+
+  // Inventory & Management States
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [incomes, setIncomes] = useState<IncomeRecord[]>([]);
+  
+  // Modal states for adding/editing
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<StoreProduct | null>(null);
+  const [productForm, setProductForm] = useState({
+    title: '', titleBn: '', price: 0, stock: 0, description: '', descriptionBn: '', category: 'General', categoryBn: 'সাধারণ'
+  });
+
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ companyName: '', contactPerson: '', phone: '', email: '', address: '', dueAmount: 0 });
+
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerForm, setCustomerForm] = useState({ name: '', phone: '', email: '', address: '', dueAmount: 0, creditLimit: 10000 });
+
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ title: '', category: 'Operational', amount: 0, note: '' });
 
   const currentUser = auth.currentUser;
 
@@ -50,11 +83,10 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       console.error("Error fetching products: ", error);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Real-time subscribe to user's orders
+  // Real-time subscribe to store orders
   useEffect(() => {
     if (!currentUser) return;
     const q = query(collection(db, 'store_orders'), where('userId', '==', currentUser.uid));
@@ -63,27 +95,51 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       snapshot.forEach((docSnap) => {
         ords.push({ id: docSnap.id, ...docSnap.data() } as StoreOrder);
       });
-      // Sort orders by date descending
       ords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setOrders(ords);
     }, (error) => {
       console.error("Error fetching user orders: ", error);
     });
-
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Handle contact phone prefill on checkout modal open
+  // Real-time suppliers & customers & expenses
+  useEffect(() => {
+    const unsubSup = onSnapshot(collection(db, 'suppliers'), (snap) => {
+      const list: Supplier[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...d.data() } as Supplier));
+      setSuppliers(list);
+    }, () => {});
+
+    const unsubCust = onSnapshot(collection(db, 'shop_customers'), (snap) => {
+      const list: Customer[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...d.data() } as Customer));
+      setCustomers(list);
+    }, () => {});
+
+    const unsubExp = onSnapshot(collection(db, 'shop_expenses'), (snap) => {
+      const list: ExpenseRecord[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...d.data() } as ExpenseRecord));
+      setExpenses(list);
+    }, () => {});
+
+    return () => {
+      unsubSup();
+      unsubCust();
+      unsubExp();
+    };
+  }, []);
+
+  // Prefill phone on checkout
   useEffect(() => {
     if (checkoutProduct && currentUser) {
       setContactPhone('');
-      // Attempt to retrieve prefilled phone from user profile
       const userDocRef = doc(db, 'registered_users', currentUser.uid);
       getDoc(userDocRef).then((snap) => {
         if (snap.exists() && snap.data().phone) {
           setContactPhone(snap.data().phone);
         }
-      }).catch(err => console.log("Prefill fetch skipped:", err));
+      }).catch(() => {});
     }
   }, [checkoutProduct, currentUser]);
 
@@ -92,18 +148,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
   const filteredProducts = products.filter(p => {
     const title = p.title || '';
     const titleBn = p.titleBn || '';
-    const desc = p.description || '';
-    const descBn = p.descriptionBn || '';
     const query = searchQuery ? searchQuery.toLowerCase() : '';
-
-    const matchesSearch = 
-      title.toLowerCase().includes(query) ||
-      titleBn.toLowerCase().includes(query) ||
-      desc.toLowerCase().includes(query) ||
-      descBn.toLowerCase().includes(query);
-    
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return title.toLowerCase().includes(query) || titleBn.toLowerCase().includes(query);
   });
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -121,13 +167,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       return;
     }
 
-    if (!deliveryAddress.trim()) {
-      alert(lang === 'bn' ? 'অনুগ্রহ করে ডেলিভারি ঠিকানা লিখুন!' : 'Please enter delivery address!');
-      return;
-    }
-
-    if (!contactPhone.trim()) {
-      alert(lang === 'bn' ? 'অনুগ্রহ করে সচল মোবাইল নম্বর লিখুন!' : 'Please enter contact phone number!');
+    if (!deliveryAddress.trim() || !contactPhone.trim()) {
+      alert(lang === 'bn' ? 'অনুগ্রহ করে ডেলিভারি ঠিকানা এবং ফোন নম্বর লিখুন!' : 'Please enter delivery address and phone number!');
       return;
     }
 
@@ -153,34 +194,16 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       note: orderNote
     };
 
-    // User Notification Object
-    const addedNotifId = `notif-${Date.now()}`;
-    const addedNotif = {
-      id: addedNotifId,
-      title: lang === 'bn' ? 'অর্ডার পেন্ডিং' : 'Order Placed',
-      titleBn: 'অর্ডারটি প্রক্রিয়াধীন',
-      desc: `Your order for ${checkoutProduct.title} (x${quantity}) is placed. Awaiting admin delivery.`,
-      descBn: `আপনার ${checkoutProduct.titleBn} (x${quantity}) অর্ডারের অনুরোধটি সফলভাবে জমা হয়েছে এবং তা অনুমোদনের অপেক্ষায় আছে।`,
-      time: 'Just now',
-      read: false,
-    };
-
-    // Also deduct balance immediately to hold funds, and decrease stock (optional, but we can do it on admin approve, or reserve it here)
-    // To avoid double spend and reserve, let's dock balance immediately
     const batch = writeBatch(db);
     try {
-      // 1. Create the store order document
       batch.set(doc(db, 'store_orders', newOrderId), newOrder);
-
-      // 2. Dock wallet balance immediately
       const newBalanceVal = Math.max(walletBalance - totalCost, 0);
       batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
 
-      // 3. Save order to customer transactions array as dynamic store purchase history
       const txId = `tx-store-${Date.now()}`;
       const storeTx = {
         id: txId,
-        type: 'Voucher', // categorizes cleanly
+        type: 'Voucher',
         amount: totalCost,
         billerName: `Store: ${checkoutProduct.title} (x${quantity})`,
         billerNameBn: `স্টোর: ${checkoutProduct.titleBn} (x${quantity})`,
@@ -193,534 +216,841 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       };
       batch.set(doc(db, 'users', currentUser.uid, 'transactions', txId), storeTx);
 
-      // 4. Set Notification
-      batch.set(doc(db, 'users', currentUser.uid, 'notifications', addedNotifId), addedNotif);
-
-      // We will actually subtract stock when admin approves, so if rejected stock returns, or deduct now? Let's subtract stock now to prevent overselling!
       const finalStock = Math.max(checkoutProduct.stock - quantity, 0);
       batch.update(doc(db, 'products', checkoutProduct.id), { stock: finalStock });
 
       await batch.commit();
-
-      setOrderSuccess(newOrderId);
+      setIsSubmitting(false);
       setCheckoutProduct(null);
-      setSelectedProduct(null);
-      setQuantity(1);
-      setDeliveryAddress('');
-      setOrderNote('');
-    } catch (err) {
+      setOrderSuccess(newOrderId);
+    } catch (err: any) {
       console.error("Order error:", err);
-      alert(lang === 'bn' ? 'অর্ডার দিতে সমস্যা হয়েছে!' : 'Failed to place order. Try again.');
-    } finally {
+      alert(lang === 'bn' ? 'অর্ডার করতে সমস্যা হয়েছে: ' + err.message : 'Error placing order: ' + err.message);
       setIsSubmitting(false);
     }
   };
 
+  // POS Cart Management
+  const addToPosCart = (product: StoreProduct) => {
+    if (product.stock <= 0) {
+      alert(lang === 'bn' ? 'এই প্রোডাক্টটি স্টকে নেই!' : 'Product out of stock!');
+      return;
+    }
+    setPosCart(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        if (existing.quantity >= product.stock) {
+          alert(lang === 'bn' ? 'স্টক লিমিটের বেশি যোগ করা যাবে না!' : 'Cannot exceed available stock!');
+          return prev;
+        }
+        return prev.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { product, quantity: 1, discount: 0 }];
+    });
+  };
+
+  const updatePosQty = (productId: string, delta: number) => {
+    setPosCart(prev => prev.map(item => {
+      if (item.product.id === productId) {
+        const newQty = item.quantity + delta;
+        if (newQty <= 0) return null;
+        if (newQty > item.product.stock) return item;
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }).filter((item): item is POSCartItem => item !== null));
+  };
+
+  const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity) - item.discount, 0);
+
+  const handleCompletePOS = async () => {
+    if (posCart.length === 0) {
+      alert(lang === 'bn' ? 'POS কার্ট খালি রয়েছে!' : 'POS cart is empty!');
+      return;
+    }
+    const invoiceId = `INV-${Date.now()}`;
+    const dateStr = new Date().toISOString();
+    const invoiceData = {
+      id: invoiceId,
+      customerName: posCustomerName || 'Walk-in Customer',
+      customerPhone: posCustomerPhone || 'N/A',
+      items: posCart.map(i => ({ title: i.product.title, price: i.product.price, qty: i.quantity, total: i.product.price * i.quantity - i.discount })),
+      totalAmount: posSubtotal,
+      paymentMethod: posPaymentMethod,
+      date: dateStr,
+      cashier: currentUser?.displayName || currentUser?.email || 'Admin'
+    };
+
+    const batch = writeBatch(db);
+    try {
+      // Reduce stock for items in cart
+      for (const item of posCart) {
+        const newStock = Math.max(item.product.stock - item.quantity, 0);
+        batch.update(doc(db, 'products', item.product.id), { stock: newStock });
+      }
+      // Save invoice
+      batch.set(doc(db, 'shop_invoices', invoiceId), invoiceData);
+      await batch.commit();
+
+      setLastInvoice(invoiceData);
+      setPosCart([]);
+      setPosCustomerName('');
+      setPosCustomerPhone('');
+      alert(lang === 'bn' ? `বিক্রি সফল হয়েছে! ইনভয়েস আইডি: ${invoiceId}` : `Sale completed successfully! Invoice: ${invoiceId}`);
+    } catch (err: any) {
+      console.error("POS Checkout error:", err);
+      alert('Error completing sale: ' + err.message);
+    }
+  };
+
+  // Inventory Save Product
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const prodId = editingProduct ? editingProduct.id : `prod-${Date.now()}`;
+    const productData = {
+      title: productForm.title,
+      titleBn: productForm.titleBn || productForm.title,
+      price: Number(productForm.price),
+      stock: Number(productForm.stock),
+      description: productForm.description,
+      descriptionBn: productForm.descriptionBn || productForm.description,
+      category: productForm.category,
+      categoryBn: productForm.categoryBn
+    };
+
+    try {
+      await setDoc(doc(db, 'products', prodId), productData, { merge: true });
+      setShowProductModal(false);
+      setEditingProduct(null);
+      setProductForm({ title: '', titleBn: '', price: 0, stock: 0, description: '', descriptionBn: '', category: 'General', categoryBn: 'সাধারণ' });
+      alert(lang === 'bn' ? 'প্রোডাক্ট সফলভাবে সংরক্ষণ করা হয়েছে!' : 'Product saved successfully!');
+    } catch (err: any) {
+      alert('Error saving product: ' + err.message);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (window.confirm(lang === 'bn' ? 'আপনি কি এই প্রোডাক্টটি ডিলিট করতে চান?' : 'Are you sure you want to delete this product?')) {
+      await deleteDoc(doc(db, 'products', id));
+    }
+  };
+
+  // Save Supplier
+  const handleSaveSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const supId = `sup-${Date.now()}`;
+    await setDoc(doc(db, 'suppliers', supId), supplierForm);
+    setShowSupplierModal(false);
+    setSupplierForm({ companyName: '', contactPerson: '', phone: '', email: '', address: '', dueAmount: 0 });
+  };
+
+  // Save Customer
+  const handleSaveCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const custId = `cust-${Date.now()}`;
+    await setDoc(doc(db, 'shop_customers', custId), customerForm);
+    setShowCustomerModal(false);
+    setCustomerForm({ name: '', phone: '', email: '', address: '', dueAmount: 0, creditLimit: 10000 });
+  };
+
+  // Save Expense
+  const handleSaveExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const expId = `exp-${Date.now()}`;
+    const expData = {
+      ...expenseForm,
+      id: expId,
+      amount: Number(expenseForm.amount),
+      date: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'shop_expenses', expId), expData);
+    setShowExpenseModal(false);
+    setExpenseForm({ title: '', category: 'Operational', amount: 0, note: '' });
+  };
+
+  const totalStoreSalesValue = orders.filter(o => o.status === 'Approved').reduce((s, o) => s + o.totalPrice, 0);
+  const totalStockValue = products.reduce((s, p) => s + (p.price * p.stock), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-28 pt-4 select-none scrollbar-none max-w-md mx-auto w-full" id="store-panel-container">
-      {/* Tab switching */}
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl mb-5" id="store-tabs">
-        <button
-          onClick={() => { setActiveTab('browse'); setOrderSuccess(null); }}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === 'browse' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'
-          }`}
-          id="store-tab-browse"
-        >
-          <ShoppingBag className="h-4 w-4" />
-          <span>{lang === 'bn' ? 'প্রোডাক্ট স্টোর' : 'Product Store'}</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('orders'); setOrderSuccess(null); }}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
-            activeTab === 'orders' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'
-          }`}
-          id="store-tab-orders"
-        >
-          <Clock className="h-4 w-4" />
-          <span>{lang === 'bn' ? 'আমার অর্ডারসমূহ' : 'My Orders'}</span>
-          {orders.filter(o => o.status === 'Pending').length > 0 && (
-            <span className="absolute top-1.5 right-2 w-2 h-2 bg-indigo-600 rounded-full animate-ping" />
-          )}
-        </button>
+    <div className="space-y-6 pb-24 max-w-7xl mx-auto px-4 sm:px-6">
+      {/* A2Z Shop Management Top Header & Navigation Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="bg-indigo-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider">
+                {lang === 'bn' ? 'এটুজেড শপ ও পিওএস সিস্টেম' : 'A2Z Shop & POS System'}
+              </span>
+              <span className="text-xs text-indigo-300 font-semibold">PC & Mobile Responsive</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black mt-2 tracking-tight">
+              {lang === 'bn' ? 'স্মার্ট শপ ম্যানেজমেন্ট ও পিওএস' : 'A2Z Smart Shop & POS Management'}
+            </h1>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl">
+              {lang === 'bn' ? 'আপনার দোকানের স্টক, পিওএস বিলিং, সাপ্লায়ার, কাস্টমার এবং দৈনিক হিসাব রাখুন অত্যন্ত সহজে।' : 'Manage inventory, POS quick billing, suppliers, customers, expenses, and invoices in one seamless platform.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
+              <p className="text-[10px] text-indigo-200 font-bold uppercase">{lang === 'bn' ? 'মোট স্টক ভ্যালু' : 'Total Stock Value'}</p>
+              <p className="text-base font-black text-white">৳{totalStockValue.toLocaleString()}</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
+              <p className="text-[10px] text-emerald-300 font-bold uppercase">{lang === 'bn' ? 'মোট প্রোডাক্ট' : 'Total Products'}</p>
+              <p className="text-base font-black text-white">{products.length}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Navigation Menu */}
+        <div className="flex items-center gap-2 overflow-x-auto mt-6 pt-4 border-t border-white/10 scrollbar-none">
+          {[
+            { id: 'browse', label: lang === 'bn' ? 'অনলাইন শপ' : 'Online Shop', icon: ShoppingBag },
+            { id: 'pos', label: lang === 'bn' ? 'POS টার্মিনাল' : 'POS Terminal', icon: Calculator },
+            { id: 'inventory', label: lang === 'bn' ? 'স্টক ও প্রোডাক্ট' : 'Inventory', icon: Package },
+            { id: 'suppliers', label: lang === 'bn' ? 'সাপ্লায়ার্স' : 'Suppliers', icon: Users },
+            { id: 'customers', label: lang === 'bn' ? 'কাস্টমার্স' : 'Customers', icon: User },
+            { id: 'expenses', label: lang === 'bn' ? 'খরচ ও আয়' : 'Expenses', icon: DollarSign },
+            { id: 'reports', label: lang === 'bn' ? 'রিপোর্টস' : 'Reports', icon: TrendingUp },
+            { id: 'orders', label: lang === 'bn' ? 'আমার অর্ডার' : 'My Orders', icon: Clock },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                  isActive 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'browse' ? (
-          <motion.div
-            key="browse"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
-          >
-            {/* Header info */}
-            <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 rounded-3xl p-5 text-white shadow-lg flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-black tracking-tight flex items-center gap-1.5">
-                  <BagIcon className="h-5 w-5" />
-                  {lang === 'bn' ? 'NIHAD BUSINESS POINT মেগা স্টোর' : 'NIHAD BUSINESS POINT Mega Store'}
-                </h2>
-                <p className="text-[11px] text-white/80 font-bold mt-1">
-                  {lang === 'bn' ? 'ডিজিটাল ও ফিজিক্যাল লাইফস্টাইল গুডস' : 'Premium Digital & Physical Lifestyle Goods'}
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-black uppercase text-blue-100 bg-white/10 px-2.5 py-1 rounded-full border border-white/15">
-                  {lang === 'bn' ? 'ব্যালেন্স' : 'Balance'}
-                </span>
-                <p className="text-lg font-black mt-1">৳{walletBalance.toLocaleString()}</p>
-              </div>
+      {/* TAB 1: BROWSE ONLINE SHOP */}
+      {activeTab === 'browse' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={lang === 'bn' ? 'প্রোডাক্ট খুঁজুন...' : 'Search store products...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border-none rounded-2xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500/20"
+              />
             </div>
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto scrollbar-none">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-2 rounded-2xl text-xs font-black cursor-pointer transition-all whitespace-nowrap ${
+                    selectedCategory === cat ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
 
-            {/* Search and Filters */}
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-slate-400" />
+          {loading ? (
+            <div className="text-center py-20">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
+              <p className="text-xs text-slate-400 mt-2 font-semibold">{lang === 'bn' ? 'প্রোডাক্ট লোড হচ্ছে...' : 'Loading products...'}</p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm space-y-3">
+              <ShoppingBag className="h-12 w-12 text-slate-300 mx-auto" />
+              <p className="text-sm font-bold text-slate-600">{lang === 'bn' ? 'কোনো প্রোডাক্ট পাওয়া যায়নি' : 'No products found'}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {filteredProducts.map(product => (
+                <motion.div
+                  key={product.id}
+                  whileHover={{ y: -4 }}
+                  className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between group"
+                >
+                  <div>
+                    <div className="aspect-video bg-gradient-to-br from-indigo-50 to-slate-100 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <ShoppingBag className="h-10 w-10 text-indigo-400" />
+                      )}
+                      <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-black ${
+                        product.stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">{product.category || 'General'}</span>
+                    <h3 className="text-sm font-black text-slate-900 mt-1 line-clamp-1">{lang === 'bn' ? product.titleBn : product.title}</h3>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{lang === 'bn' ? product.descriptionBn : product.description}</p>
+                  </div>
+                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
+                      <p className="text-base font-black text-indigo-600">৳{product.price.toLocaleString()}</p>
+                    </div>
+                    <button
+                      onClick={() => setCheckoutProduct(product)}
+                      disabled={product.stock <= 0}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer active:scale-95 shadow-sm shadow-indigo-500/10 flex items-center gap-1.5"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" />
+                      <span>{lang === 'bn' ? 'অর্ডার করুন' : 'Buy Now'}</span>
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: POS TERMINAL */}
+      {activeTab === 'pos' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Product Picker */}
+          <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Calculator className="h-5 w-5 text-indigo-600" />
+                <span>{lang === 'bn' ? 'POS প্রোডাক্ট ক্যাটালগ' : 'POS Product Catalog'}</span>
+              </h3>
+              <div className="relative w-48">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder={lang === 'bn' ? 'প্রোডাক্ট অনুসন্ধান করুন...' : 'Search products...'}
+                  placeholder="Scan / Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-100 border-none rounded-2xl py-3 pl-11 pr-4 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 rounded-xl text-xs font-semibold border-none"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1">
+              {filteredProducts.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => addToPosCart(p)}
+                  className="bg-slate-50 hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-200 p-3 rounded-2xl cursor-pointer transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <p className="text-xs font-black text-slate-800 line-clamp-1">{p.title}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Stock: {p.stock}</p>
+                  </div>
+                  <div className="mt-3 flex justify-between items-center">
+                    <span className="text-xs font-black text-indigo-600">৳{p.price}</span>
+                    <span className="bg-indigo-600 text-white p-1.5 rounded-xl text-xs"><Plus className="h-3 w-3" /></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* POS Cart & Checkout */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2 mb-4">
+                <ShoppingCart className="h-5 w-5 text-indigo-600" />
+                <span>{lang === 'bn' ? 'বর্তমান কার্ট (POS)' : 'Current POS Cart'}</span>
+              </h3>
+
+              <div className="space-y-3 mb-4">
+                <input
+                  type="text"
+                  placeholder={lang === 'bn' ? 'গ্রাহকের নাম (ঐচ্ছিক)' : 'Customer Name (Optional)'}
+                  value={posCustomerName}
+                  onChange={(e) => setPosCustomerName(e.target.value)}
+                  className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-xs font-semibold"
+                />
+                <input
+                  type="tel"
+                  placeholder={lang === 'bn' ? 'গ্রাহকের ফোন নম্বর' : 'Customer Phone Number'}
+                  value={posCustomerPhone}
+                  onChange={(e) => setPosCustomerPhone(e.target.value)}
+                  className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-xs font-semibold"
                 />
               </div>
 
-              {/* Category selector */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] font-black tracking-tight border transition-all cursor-pointer ${
-                      selectedCategory === cat 
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' 
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {cat === 'All' ? (lang === 'bn' ? 'সব প্রোডাক্ট' : 'All') : cat}
-                  </button>
-                ))}
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {posCart.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-8">{lang === 'bn' ? 'কার্ট খালি আছে' : 'Cart is empty'}</p>
+                ) : (
+                  posCart.map(item => (
+                    <div key={item.product.id} className="bg-slate-50 p-3 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 line-clamp-1">{item.product.title}</p>
+                        <p className="text-[10px] text-indigo-600 font-semibold">৳{item.product.price} × {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => updatePosQty(item.product.id, -1)} className="w-6 h-6 bg-white rounded-lg shadow-sm font-bold text-xs flex items-center justify-center">-</button>
+                        <span className="text-xs font-black w-5 text-center">{item.quantity}</span>
+                        <button onClick={() => updatePosQty(item.product.id, 1)} className="w-6 h-6 bg-white rounded-lg shadow-sm font-bold text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
-            {/* Products grid */}
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-                <RefreshCw className="h-7 w-7 animate-spin text-indigo-600" />
-                <p className="text-xs font-bold">{lang === 'bn' ? 'প্রোডাক্ট লোড হচ্ছে...' : 'Loading products...'}</p>
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-600">
+                <span>{lang === 'bn' ? 'পেমেন্ট মাধ্যম:' : 'Payment Method:'}</span>
+                <select
+                  value={posPaymentMethod}
+                  onChange={(e: any) => setPosPaymentMethod(e.target.value)}
+                  className="bg-slate-50 rounded-xl px-3 py-1.5 text-xs font-black border-none"
+                >
+                  <option value="Cash">Cash (নগদ)</option>
+                  <option value="bKash">bKash / Nagad</option>
+                  <option value="Card">Card</option>
+                  <option value="Due">Due Sale (বাকি)</option>
+                </select>
               </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-2 border border-dashed border-slate-200 rounded-3xl bg-slate-50 text-slate-400">
-                <ShoppingBag className="h-10 w-10 text-slate-300" />
-                <p className="text-xs font-bold">{lang === 'bn' ? 'কোন প্রোডাক্ট পাওয়া যায়নি!' : 'No products found!'}</p>
+
+              <div className="flex justify-between items-center text-base font-black text-slate-900 bg-indigo-50 p-3 rounded-2xl">
+                <span>{lang === 'bn' ? 'সর্বমোট প্রদেয়:' : 'Total Payable:'}</span>
+                <span className="text-indigo-600">৳{posSubtotal.toLocaleString()}</span>
               </div>
+
+              <button
+                onClick={handleCompletePOS}
+                disabled={posCart.length === 0}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-indigo-500/10 cursor-pointer active:scale-95"
+              >
+                <Printer className="h-4 w-4" />
+                <span>{lang === 'bn' ? 'বিল ও প্রিন্ট করুন' : 'Complete & Print Invoice'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: INVENTORY & STOCK */}
+      {activeTab === 'inventory' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Package className="h-5 w-5 text-indigo-600" />
+              <span>{lang === 'bn' ? 'স্টক ও প্রোডাক্ট ইনভেন্টরি' : 'Stock & Product Inventory'}</span>
+            </h3>
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                setProductForm({ title: '', titleBn: '', price: 0, stock: 0, description: '', descriptionBn: '', category: 'General', categoryBn: 'সাধারণ' });
+                setShowProductModal(true);
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{lang === 'bn' ? 'নতুন প্রোডাক্ট যোগ করুন' : 'Add New Product'}</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] uppercase font-black text-slate-400">
+                  <th className="py-3 px-4">{lang === 'bn' ? 'প্রোডাক্টের নাম' : 'Product Name'}</th>
+                  <th className="py-3 px-4">{lang === 'bn' ? 'ক্যাটাগরি' : 'Category'}</th>
+                  <th className="py-3 px-4">{lang === 'bn' ? 'মূল্য' : 'Price'}</th>
+                  <th className="py-3 px-4">{lang === 'bn' ? 'স্টক' : 'Stock'}</th>
+                  <th className="py-3 px-4 text-right">{lang === 'bn' ? 'অ্যাকশন' : 'Actions'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                {products.map(p => (
+                  <tr key={p.id} className="hover:bg-slate-50/50">
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{p.title}</td>
+                    <td className="py-3.5 px-4"><span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full text-[10px] font-black">{p.category || 'General'}</span></td>
+                    <td className="py-3.5 px-4 font-mono font-black text-indigo-600">৳{p.price.toLocaleString()}</td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${p.stock > 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {p.stock} units
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingProduct(p);
+                          setProductForm({ title: p.title, titleBn: p.titleBn || '', price: p.price, stock: p.stock, description: p.description || '', descriptionBn: p.descriptionBn || '', category: p.category || 'General', categoryBn: p.categoryBn || 'সাধারণ' });
+                          setShowProductModal(true);
+                        }}
+                        className="p-2 bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-600 rounded-xl inline-flex items-center justify-center cursor-pointer"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(p.id)}
+                        className="p-2 bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 rounded-xl inline-flex items-center justify-center cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: SUPPLIERS */}
+      {activeTab === 'suppliers' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Users className="h-5 w-5 text-indigo-600" />
+              <span>{lang === 'bn' ? 'সাপ্লায়ার ম্যানেজমেন্ট' : 'Supplier Management'}</span>
+            </h3>
+            <button
+              onClick={() => setShowSupplierModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{lang === 'bn' ? 'সাপ্লায়ার যোগ করুন' : 'Add Supplier'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {suppliers.length === 0 ? (
+              <p className="text-xs text-slate-400 py-8 text-center col-span-full">{lang === 'bn' ? 'কোনো সাপ্লায়ার নেই' : 'No suppliers added yet'}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-3" id="products-grid">
-                {filteredProducts.map((product, idx) => {
-                  const outOfStock = product.stock <= 0;
-                  return (
-                    <motion.div
-                      key={`${product.id || 'prod'}-${idx}`}
-                      onClick={() => !outOfStock && setSelectedProduct(product)}
-                      whileTap={!outOfStock ? { scale: 0.98 } : undefined}
-                      className={`bg-white border border-slate-100 rounded-3xl p-3 shadow-sm hover:shadow-md transition-all flex flex-col justify-between cursor-pointer relative group overflow-hidden ${
-                        outOfStock ? 'opacity-65 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      {/* Out of stock label */}
-                      {outOfStock && (
-                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center z-10">
-                          <span className="bg-rose-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow">
-                            {lang === 'bn' ? 'স্টক শেষ' : 'Out of Stock'}
-                          </span>
-                        </div>
-                      )}
-
-                      <div>
-                        {/* Image placeholder or real image */}
-                        <div className="aspect-square w-full rounded-2xl bg-gradient-to-tr from-slate-50 to-indigo-50/20 border border-slate-100 flex items-center justify-center overflow-hidden mb-2.5 relative">
-                          {product.imageUrl ? (
-                            <img
-                              src={product.imageUrl}
-                              alt={product.title}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                            />
-                          ) : (
-                            <ShoppingBag className="h-8 w-8 text-indigo-500/30" />
-                          )}
-                          <span className="absolute top-2 left-2 bg-indigo-100 text-indigo-600 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded-full">
-                            {product.category}
-                          </span>
-                        </div>
-
-                        {/* Text details */}
-                        <h3 className="text-xs font-black text-slate-800 line-clamp-1">
-                          {lang === 'bn' ? product.titleBn : product.title}
-                        </h3>
-                        <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">
-                          {lang === 'bn' ? product.descriptionBn : product.description}
-                        </p>
-                      </div>
-
-                      {/* Pricing and buy block */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                        <div>
-                          <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
-                          <p className="text-sm font-black text-indigo-600">৳{product.price.toLocaleString()}</p>
-                        </div>
-                        <span className="text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full font-bold">
-                          {lang === 'bn' ? `স্টক: ${product.stock}` : `${product.stock} In Stock`}
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+              suppliers.map(s => (
+                <div key={s.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                  <h4 className="text-sm font-black text-slate-900">{s.companyName}</h4>
+                  <p className="text-xs text-slate-500 font-semibold">Contact: {s.contactPerson} ({s.phone})</p>
+                  <p className="text-xs text-slate-400">Email: {s.email || 'N/A'}</p>
+                  <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Due Balance</span>
+                    <span className="text-xs font-black text-rose-600">৳{s.dueAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))
             )}
-          </motion.div>
-        ) : (
-          /* User's Order history list */
-          <motion.div
-            key="orders"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-3"
-          >
-            {orders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-3 border border-dashed border-slate-200 rounded-3xl bg-slate-50 text-slate-400">
-                <Clock className="h-10 w-10 text-slate-300" />
-                <div className="text-center">
-                  <p className="text-xs font-black text-slate-500">{lang === 'bn' ? 'কোন পূর্ববর্তী অর্ডার পাওয়া যায়নি!' : 'No previous orders found!'}</p>
-                  <p className="text-[10px] text-slate-400 mt-1 px-4">{lang === 'bn' ? 'আপনার কেনা পণ্যের সকল হিস্ট্রি এখানে দেখানো হবে।' : 'All of your product purchases will show up right here.'}</p>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: CUSTOMERS */}
+      {activeTab === 'customers' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <User className="h-5 w-5 text-indigo-600" />
+              <span>{lang === 'bn' ? 'কাস্টমার লেজার ও খাতা' : 'Customer Ledger & Accounts'}</span>
+            </h3>
+            <button
+              onClick={() => setShowCustomerModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{lang === 'bn' ? 'কাস্টমার যোগ করুন' : 'Add Customer'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {customers.length === 0 ? (
+              <p className="text-xs text-slate-400 py-8 text-center col-span-full">{lang === 'bn' ? 'কোনো কাস্টমার নেই' : 'No customers added yet'}</p>
+            ) : (
+              customers.map(c => (
+                <div key={c.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                  <h4 className="text-sm font-black text-slate-900">{c.name}</h4>
+                  <p className="text-xs text-slate-500 font-semibold">Phone: {c.phone}</p>
+                  <p className="text-xs text-slate-400">Address: {c.address || 'N/A'}</p>
+                  <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Due Balance</span>
+                    <span className="text-xs font-black text-rose-600">৳{c.dueAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: EXPENSES & INCOME */}
+      {activeTab === 'expenses' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-indigo-600" />
+              <span>{lang === 'bn' ? 'দোকানের খরচ ও আয় ব্যবস্থাপনা' : 'Shop Expenses & Income Management'}</span>
+            </h3>
+            <button
+              onClick={() => setShowExpenseModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{lang === 'bn' ? 'খরচ যোগ করুন' : 'Add Expense'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-indigo-50 p-4 rounded-2xl">
+              <p className="text-[10px] font-bold text-indigo-600 uppercase">{lang === 'bn' ? 'মোট খরচ' : 'Total Expenses'}</p>
+              <p className="text-xl font-black text-indigo-900 mt-1">৳{totalExpenses.toLocaleString()}</p>
+            </div>
+            <div className="bg-emerald-50 p-4 rounded-2xl">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase">{lang === 'bn' ? 'মোট বিক্রয় আয়' : 'Total Sales Revenue'}</p>
+              <p className="text-xl font-black text-emerald-900 mt-1">৳{totalStoreSalesValue.toLocaleString()}</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-2xl">
+              <p className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'bn' ? 'নীট লাভ' : 'Net Cashflow'}</p>
+              <p className="text-xl font-black text-slate-900 mt-1">৳{(totalStoreSalesValue - totalExpenses).toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] uppercase font-black text-slate-400">
+                  <th className="py-3 px-4">{lang === 'bn' ? 'বিবরণ' : 'Description'}</th>
+                  <th className="py-3 px-4">{lang === 'bn' ? 'ক্যাটাগরি' : 'Category'}</th>
+                  <th className="py-3 px-4">{lang === 'bn' ? 'পরিমাণ' : 'Amount'}</th>
+                  <th className="py-3 px-4">{lang === 'bn' ? 'তারিখ' : 'Date'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                {expenses.map(e => (
+                  <tr key={e.id}>
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{e.title}</td>
+                    <td className="py-3.5 px-4"><span className="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-full text-[10px] font-black">{e.category}</span></td>
+                    <td className="py-3.5 px-4 font-mono font-black text-rose-600">৳{e.amount.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-slate-400">{new Date(e.date).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: REPORTS */}
+      {activeTab === 'reports' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+          <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-indigo-600" />
+            <span>{lang === 'bn' ? 'দোকানের মাসিক ও দৈনিক রিপোর্ট' : 'Shop Financial & Sales Reports'}</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">{lang === 'bn' ? 'বিক্রি ও ইনভেন্টরি সারাংশ' : 'Sales & Inventory Summary'}</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white p-3 rounded-2xl shadow-sm">
+                  <span>{lang === 'bn' ? 'অনুমোদিত মোট অর্ডার' : 'Approved Orders'}</span>
+                  <span className="font-black text-indigo-600">{orders.filter(o => o.status === 'Approved').length}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white p-3 rounded-2xl shadow-sm">
+                  <span>{lang === 'bn' ? 'মোট স্টক ভ্যালু' : 'Total Stock Valuation'}</span>
+                  <span className="font-black text-emerald-600">৳{totalStockValue.toLocaleString()}</span>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">{lang === 'bn' ? 'লাভ ও ক্ষতি হিসাব' : 'Profit & Loss Statement'}</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white p-3 rounded-2xl shadow-sm">
+                  <span>{lang === 'bn' ? 'মোট আয়' : 'Total Revenue'}</span>
+                  <span className="font-black text-emerald-600">৳{totalStoreSalesValue.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white p-3 rounded-2xl shadow-sm">
+                  <span>{lang === 'bn' ? 'মোট খরচ' : 'Total Expenses'}</span>
+                  <span className="font-black text-rose-600">৳{totalExpenses.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: MY ORDERS */}
+      {activeTab === 'orders' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+          <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-indigo-600" />
+            <span>{lang === 'bn' ? 'আমার শপ অর্ডার ইতিহাস' : 'My Store Order History'}</span>
+          </h3>
+
+          <div className="space-y-3">
+            {orders.length === 0 ? (
+              <p className="text-xs text-slate-400 py-12 text-center">{lang === 'bn' ? 'কোনো অর্ডার করা হয়নি' : 'No store orders placed yet'}</p>
             ) : (
-              orders.map((order, idx) => {
-                const isPending = order.status === 'Pending';
-                const isApproved = order.status === 'Approved';
-                const isRejected = order.status === 'Rejected';
-
-                return (
-                  <div
-                    key={`${order.id || 'order'}-${idx}`}
-                    className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden"
-                  >
-                    {/* Status accent indicator */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                      isApproved ? 'bg-emerald-500' : isRejected ? 'bg-rose-500' : 'bg-amber-500'
-                    }`} />
-
-                    <div className="flex justify-between items-start pl-1.5">
-                      <div>
-                        <h4 className="text-xs font-black text-slate-800">
-                          {lang === 'bn' ? order.productTitleBn : order.productTitle}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1">
-                          ID: {order.id} | {new Date(order.date).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      <span className={`text-[9px] font-black px-2.5 py-1 rounded-full border uppercase tracking-wider ${
-                        isApproved ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                        isRejected ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                        'bg-amber-50 text-amber-600 border-amber-100'
-                      }`}>
-                        {order.status === 'Pending' ? (lang === 'bn' ? 'অপেক্ষমান' : 'Pending') :
-                         order.status === 'Approved' ? (lang === 'bn' ? 'ডেলিভার্ড' : 'Delivered') :
-                         (lang === 'bn' ? 'প্রত্যাখ্যাত' : 'Rejected')}
-                      </span>
-                    </div>
-
-                    {/* Order particulars */}
-                    <div className="bg-slate-50 rounded-2xl p-3 space-y-1.5 text-[11px] font-bold text-slate-600 pl-4">
-                      <div className="flex justify-between">
-                        <span>{lang === 'bn' ? 'পরিমাণ:' : 'Quantity:'}</span>
-                        <span className="text-slate-800">x{order.quantity}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{lang === 'bn' ? 'একক মূল্য:' : 'Unit Price:'}</span>
-                        <span className="text-slate-800">৳{order.price.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between pt-1 border-t border-slate-200 text-xs font-black">
-                        <span className="text-slate-700">{lang === 'bn' ? 'মোট পেমেন্ট:' : 'Total Amount:'}</span>
-                        <span className="text-indigo-600">৳{order.totalPrice.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {/* Delivery updates and notes */}
-                    {order.deliveryAddress && (
-                      <div className="pl-1.5 text-[10px] text-slate-400 space-y-1">
-                        <p className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-                          <span><strong>{lang === 'bn' ? 'ঠিকানা:' : 'Addr:'}</strong> {order.deliveryAddress}</span>
-                        </p>
-                        {order.note && (
-                          <p>
-                            <strong>{lang === 'bn' ? 'নোট:' : 'Memo:'}</strong> {order.note}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Admin comments / Rejection explanations */}
-                    {isRejected && order.rejectionReason && (
-                      <div className="mt-1 p-3 bg-rose-50 border border-rose-100/40 rounded-2xl text-rose-700 text-[11px] font-semibold flex items-start gap-1.5 pl-4">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
-                        <div>
-                          <p className="font-bold">{lang === 'bn' ? 'অপ্রত্যাশিত বাধার কারণ:' : 'Reason for rejection:'}</p>
-                          <p className="opacity-90">{order.rejectionReason}</p>
-                        </div>
-                      </div>
-                    )}
+              orders.map(order => (
+                <div key={order.id} className="bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                      order.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
+                      order.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {order.status}
+                    </span>
+                    <h4 className="text-sm font-black text-slate-900 mt-2">{lang === 'bn' ? order.productTitleBn : order.productTitle}</h4>
+                    <p className="text-xs text-slate-500">Qty: {order.quantity} | Total: ৳{order.totalPrice.toLocaleString()}</p>
                   </div>
-                );
-              })
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold">{new Date(order.date).toLocaleDateString()}</p>
+                    <p className="text-xs font-mono font-bold text-slate-600">{order.id}</p>
+                  </div>
+                </div>
+              ))
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
-      {/* Product Detail Modal */}
+      {/* CHECKOUT MODAL */}
       <AnimatePresence>
-        {selectedProduct && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <span className="bg-indigo-100 text-indigo-600 text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full">
-                  {selectedProduct.category}
-                </span>
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="p-2 hover:bg-slate-100 rounded-full cursor-pointer transition-all active:scale-90"
-                >
-                  <X className="h-5 w-5 text-slate-500" />
-                </button>
+        {checkoutProduct && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-base font-black text-slate-900">{lang === 'bn' ? 'প্রোডাক্ট অর্ডার কনফার্ম করুন' : 'Confirm Product Order'}</h3>
+                <button onClick={() => setCheckoutProduct(null)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full cursor-pointer"><X className="h-4 w-4" /></button>
               </div>
 
-              {/* Product Image */}
-              <div className="aspect-video w-full rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden mb-4">
-                {selectedProduct.imageUrl ? (
-                  <img
-                    src={selectedProduct.imageUrl}
-                    alt={selectedProduct.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
+              <form onSubmit={handlePlaceOrder} className="space-y-4">
+                <div className="bg-slate-50 p-4 rounded-2xl flex items-center gap-3">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center font-black text-indigo-600">
+                    <ShoppingBag className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900">{lang === 'bn' ? checkoutProduct.titleBn : checkoutProduct.title}</h4>
+                    <p className="text-xs font-bold text-indigo-600">৳{checkoutProduct.price} / unit</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'পরিমাণ (Quantity)' : 'Quantity'}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={checkoutProduct.stock}
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full bg-slate-100 rounded-xl p-3 text-xs font-bold border-none"
                   />
-                ) : (
-                  <ShoppingBag className="h-12 w-12 text-indigo-500/20" />
-                )}
-              </div>
+                </div>
 
-              <h3 className="text-lg font-black text-slate-900">
-                {lang === 'bn' ? selectedProduct.titleBn : selectedProduct.title}
-              </h3>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'ডেলিভারি ঠিকানা' : 'Delivery Address'}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={lang === 'bn' ? 'আপনার ঠিকানা লিখুন...' : 'Enter delivery address...'}
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
+                  />
+                </div>
 
-              <div className="flex items-center justify-between mt-2.5 pb-3 border-b border-slate-100">
-                <span className="text-xl font-black text-indigo-600">৳{selectedProduct.price.toLocaleString()}</span>
-                <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full font-black">
-                  {lang === 'bn' ? `স্টক আছে: ${selectedProduct.stock} টি` : `${selectedProduct.stock} items remaining`}
-                </span>
-              </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'মোবাইল নম্বর' : 'Phone Number'}</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="01XXXXXXXXX"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
+                  />
+                </div>
 
-              {/* Description */}
-              <div className="py-4 space-y-1">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                  {lang === 'bn' ? 'পণ্য বিবরণ' : 'Product Details'}
-                </h4>
-                <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                  {lang === 'bn' ? selectedProduct.descriptionBn : selectedProduct.description}
-                </p>
-              </div>
-
-              {/* Checkout CTA */}
-              <button
-                onClick={() => {
-                  setCheckoutProduct(selectedProduct);
-                  setQuantity(1);
-                }}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-indigo-500/20 active:scale-95"
-              >
-                <ShoppingCart className="h-4.5 w-4.5" />
-                <span>{lang === 'bn' ? 'অর্ডার করুন' : 'Purchase Now'}</span>
-              </button>
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Total Payable</p>
+                    <p className="text-base font-black text-indigo-600">৳{(checkoutProduct.price * quantity).toLocaleString()}</p>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || walletBalance < (checkoutProduct.price * quantity)}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl text-xs font-black shadow-md cursor-pointer active:scale-95"
+                  >
+                    {isSubmitting ? 'Processing...' : 'Confirm Order'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Checkout Form Modal */}
+      {/* ADD/EDIT PRODUCT MODAL */}
       <AnimatePresence>
-        {checkoutProduct && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                  <ShoppingCart className="h-4.5 w-4.5 text-indigo-600" />
-                  {lang === 'bn' ? 'অর্ডার নিশ্চিতকরণ' : 'Confirm Purchase Order'}
-                </h3>
-                <button
-                  onClick={() => setCheckoutProduct(null)}
-                  className="p-2 hover:bg-slate-100 rounded-full cursor-pointer transition-all active:scale-90"
-                >
-                  <X className="h-5 w-5 text-slate-500" />
-                </button>
+        {showProductModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-base font-black text-slate-900">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
+                <button onClick={() => setShowProductModal(false)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full cursor-pointer"><X className="h-4 w-4" /></button>
               </div>
 
-              {/* Checkout Summary info */}
-              <div className="bg-slate-50 rounded-2xl p-4 flex gap-3 mb-4">
-                <div className="h-14 w-14 rounded-xl bg-white border border-slate-100 shrink-0 overflow-hidden flex items-center justify-center">
-                  {checkoutProduct.imageUrl ? (
-                    <img src={checkoutProduct.imageUrl} alt={checkoutProduct.title} referrerPolicy="no-referrer" className="object-cover w-full h-full" />
-                  ) : (
-                    <ShoppingBag className="h-6 w-6 text-indigo-500/30" />
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-800">
-                    {lang === 'bn' ? checkoutProduct.titleBn : checkoutProduct.title}
-                  </h4>
-                  <p className="text-xs font-black text-indigo-600 mt-1">৳{checkoutProduct.price.toLocaleString()}</p>
-                </div>
-              </div>
-
-              <form onSubmit={handlePlaceOrder} className="space-y-4">
-                {/* Quantity adjustor */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                    {lang === 'bn' ? 'পরিমাণ (পিস):' : 'Quantity (Units):'}
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={quantity <= 1}
-                      onClick={() => setQuantity(q => q - 1)}
-                      className="h-10 w-10 bg-slate-100 text-slate-600 rounded-xl font-bold flex items-center justify-center cursor-pointer hover:bg-slate-200 transition-all active:scale-90 disabled:opacity-50"
-                    >
-                      -
-                    </button>
-                    <span className="text-sm font-black text-slate-800 w-8 text-center">{quantity}</span>
-                    <button
-                      type="button"
-                      disabled={quantity >= checkoutProduct.stock}
-                      onClick={() => setQuantity(q => q + 1)}
-                      className="h-10 w-10 bg-slate-100 text-slate-600 rounded-xl font-bold flex items-center justify-center cursor-pointer hover:bg-slate-200 transition-all active:scale-90 disabled:opacity-50"
-                    >
-                      +
-                    </button>
-                    <span className="text-[10px] text-slate-400 font-bold ml-1">
-                      {lang === 'bn' ? `(সর্বোচ্চ ${checkoutProduct.stock} পিস)` : `(Max ${checkoutProduct.stock} items)`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Delivery details */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5 text-indigo-600" />
-                    {lang === 'bn' ? 'ডেলিভারি ঠিকানা:' : 'Delivery Address:'}
-                  </label>
-                  <textarea
-                    required
-                    rows={2}
-                    placeholder={lang === 'bn' ? 'আপনার পূর্ণ ঠিকানা এবং থানা/জেলা লিখুন...' : 'Enter full physical address or digital profile email...'}
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-2xl p-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
-                  />
-                </div>
-
-                {/* Contact phone */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                    <Phone className="h-3.5 w-3.5 text-indigo-600" />
-                    {lang === 'bn' ? 'সচল মোবাইল নম্বর:' : 'Contact Mobile Number:'}
-                  </label>
+              <form onSubmit={handleSaveProduct} className="space-y-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Product Title (English)"
+                  value={productForm.title}
+                  onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
+                  className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
+                />
+                <input
+                  type="text"
+                  placeholder="প্রোডাক্টের নাম (বাংলা)"
+                  value={productForm.titleBn}
+                  onChange={(e) => setProductForm({ ...productForm, titleBn: e.target.value })}
+                  className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
+                />
+                <div className="grid grid-cols-2 gap-3">
                   <input
-                    type="tel"
+                    type="number"
                     required
-                    placeholder={lang === 'bn' ? 'যেমন: 01xxxxxxxxx' : 'e.g., 01xxxxxxxxx'}
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-2xl py-3 px-4 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                    placeholder="Price (৳)"
+                    value={productForm.price || ''}
+                    onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
+                    className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
                   />
-                </div>
-
-                {/* Order Notes */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                    {lang === 'bn' ? 'অতিরিক্ত তথ্য (ঐচ্ছিক):' : 'Additional Information (Optional):'}
-                  </label>
                   <input
-                    type="text"
-                    placeholder={lang === 'bn' ? 'কোনো বিশেষ নির্দেশনা থাকলে লিখুন...' : 'Write extra requests or size/spec limits...'}
-                    value={orderNote}
-                    onChange={(e) => setOrderNote(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-2xl py-3 px-4 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                    type="number"
+                    required
+                    placeholder="Stock Qty"
+                    value={productForm.stock || ''}
+                    onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })}
+                    className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
                   />
                 </div>
-
-                {/* Balance validation indicator */}
-                <div className="border-t border-dashed border-slate-200 pt-3 flex justify-between items-center">
-                  <div>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'সর্বমোট মূল্য' : 'Total Price'}</p>
-                    <p className="text-base font-black text-indigo-600">৳{(checkoutProduct.price * quantity).toLocaleString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'আপনার ব্যালেন্স' : 'Your Balance'}</p>
-                    <p className={`text-xs font-black ${walletBalance >= (checkoutProduct.price * quantity) ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      ৳{walletBalance.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-
-                {walletBalance < (checkoutProduct.price * quantity) && (
-                  <div className="bg-rose-50 border border-rose-100 rounded-2xl p-3 text-rose-700 text-[10px] font-semibold flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                    <span>{lang === 'bn' ? 'অপর্যাপ্ত ওয়ালেট ব্যালেন্স! দয়া করে ব্যালেন্স যোগ করুন।' : 'Insufficient balance in your account! Please add funds.'}</span>
-                  </div>
-                )}
-
-                {/* Submit button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting || walletBalance < (checkoutProduct.price * quantity)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-md shadow-indigo-500/10"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>{lang === 'bn' ? 'অর্ডার প্রসেস হচ্ছে...' : 'Processing Order...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      <span>{lang === 'bn' ? 'অর্ডার প্লেস করুন' : 'Confirm Order placement'}</span>
-                    </>
-                  )}
+                <input
+                  type="text"
+                  placeholder="Category (e.g. Electronics)"
+                  value={productForm.category}
+                  onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                  className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none"
+                />
+                <textarea
+                  placeholder="Description"
+                  value={productForm.description}
+                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                  className="w-full bg-slate-100 rounded-xl p-3 text-xs font-semibold border-none h-20"
+                />
+                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs shadow-md cursor-pointer">
+                  Save Product
                 </button>
               </form>
             </motion.div>
@@ -728,44 +1058,72 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         )}
       </AnimatePresence>
 
-      {/* Order Success Confirmed Modal */}
+      {/* SUPPLIER MODAL */}
+      <AnimatePresence>
+        {showSupplierModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div className="bg-white rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl space-y-4">
+              <h3 className="text-base font-black text-slate-900">Add New Supplier</h3>
+              <form onSubmit={handleSaveSupplier} className="space-y-3">
+                <input type="text" required placeholder="Company Name" value={supplierForm.companyName} onChange={e => setSupplierForm({...supplierForm, companyName: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="text" placeholder="Contact Person" value={supplierForm.contactPerson} onChange={e => setSupplierForm({...supplierForm, contactPerson: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="tel" required placeholder="Phone" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="text" placeholder="Address" value={supplierForm.address} onChange={e => setSupplierForm({...supplierForm, address: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs">Save Supplier</button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CUSTOMER MODAL */}
+      <AnimatePresence>
+        {showCustomerModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div className="bg-white rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl space-y-4">
+              <h3 className="text-base font-black text-slate-900">Add New Customer</h3>
+              <form onSubmit={handleSaveCustomer} className="space-y-3">
+                <input type="text" required placeholder="Customer Name" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="tel" required placeholder="Phone Number" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="text" placeholder="Address" value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs">Save Customer</button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* EXPENSE MODAL */}
+      <AnimatePresence>
+        {showExpenseModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div className="bg-white rounded-[2.5rem] p-6 w-full max-w-md shadow-2xl space-y-4">
+              <h3 className="text-base font-black text-slate-900">Add Shop Expense</h3>
+              <form onSubmit={handleSaveExpense} className="space-y-3">
+                <input type="text" required placeholder="Expense Title (e.g. Electricity Bill)" value={expenseForm.title} onChange={e => setExpenseForm({...expenseForm, title: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="number" required placeholder="Amount (৳)" value={expenseForm.amount || ''} onChange={e => setExpenseForm({...expenseForm, amount: Number(e.target.value)})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="text" placeholder="Category (e.g. Utility, Salary, Rent)" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs">Save Expense</button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ORDER SUCCESS MODAL */}
       <AnimatePresence>
         {orderSuccess && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-[2.5rem] p-6 w-full max-w-sm shadow-2xl text-center space-y-4"
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-[2.5rem] p-6 w-full max-w-sm shadow-2xl text-center space-y-4">
               <div className="mx-auto h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
                 <CheckCircle2 className="h-9 w-9" />
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-900">
-                  {lang === 'bn' ? 'অর্ডার সফলভাবে জমা হয়েছে!' : 'Order Placed Successfully!'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                  {lang === 'bn' ? 'আপনার অর্ডার রিকোয়েস্টটি এডমিনের কাছে পাঠানো হয়েছে। খুব শীঘ্রই এটি ভেরিফাই করে ডেলিভারি দেওয়া হবে।' : 'Your order request has been logged. The administrator will verify and ship your order shortly.'}
-                </p>
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 mt-3 text-left">
-                  <p className="text-[10px] text-slate-400 font-bold">ORDER ID:</p>
-                  <p className="text-xs font-mono font-bold text-slate-700">{orderSuccess}</p>
-                </div>
+                <h3 className="text-base font-black text-slate-900">{lang === 'bn' ? 'অর্ডার সফলভাবে জমা হয়েছে!' : 'Order Placed Successfully!'}</h3>
+                <p className="text-xs text-slate-500 mt-2">{orderSuccess}</p>
               </div>
-              <button
-                onClick={() => {
-                  setOrderSuccess(null);
-                  setActiveTab('orders');
-                }}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black text-xs transition-all cursor-pointer active:scale-95 shadow-sm"
-              >
-                {lang === 'bn' ? 'আমার অর্ডার ট্র্যাক করুন' : 'Track My Order'}
+              <button onClick={() => { setOrderSuccess(null); setActiveTab('orders'); }} className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-black text-xs cursor-pointer">
+                {lang === 'bn' ? 'আমার অর্ডার দেখুন' : 'View My Orders'}
               </button>
             </motion.div>
           </motion.div>

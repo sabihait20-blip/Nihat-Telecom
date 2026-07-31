@@ -7,7 +7,7 @@ import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 import { auth, db } from '../firebase';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 
 interface ProfilePanelProps {
   lang: Language;
@@ -96,14 +96,14 @@ export default function ProfilePanel({
       await updateProfile(currentUser, { photoURL: imageUrl });
 
       // Update Firestore users collection
-      await updateDoc(doc(db, 'users', currentUser.uid), {
+      await setDoc(doc(db, 'users', currentUser.uid), {
         photoURL: imageUrl
-      });
+      }, { merge: true });
 
       // Update registered_users collection (if exists)
-      await updateDoc(doc(db, 'registered_users', currentUser.uid), {
+      await setDoc(doc(db, 'registered_users', currentUser.uid), {
         photoURL: imageUrl
-      }).catch(err => console.log("Non-fatal registered_users sync error:", err));
+      }, { merge: true }).catch(err => console.log("Non-fatal registered_users sync error:", err));
 
     } catch (err) {
       console.error("Profile picture upload error:", err);
@@ -249,25 +249,25 @@ export default function ProfilePanel({
       </div>
 
       {/* KYC Status Banner */}
-      <div className="bg-white border border-slate-100 rounded-[28px] p-4 shadow-sm">
+      <div className="bg-[#131B2E] border border-white/10 rounded-2xl p-4 shadow-xl">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-xl ${
-              kycStatus === 'verified' ? 'bg-emerald-50 text-emerald-600' :
-              kycStatus === 'pending' ? 'bg-amber-50 text-amber-600' :
-              kycStatus === 'rejected' ? 'bg-rose-50 text-rose-600' :
-              'bg-slate-50 text-slate-400'
+              kycStatus === 'verified' ? 'bg-emerald-500/10 text-emerald-400' :
+              kycStatus === 'pending' ? 'bg-amber-500/10 text-amber-400' :
+              kycStatus === 'rejected' ? 'bg-rose-500/10 text-rose-400' :
+              'bg-slate-800 text-slate-400'
             }`}>
               {kycStatus === 'verified' ? <ShieldCheck className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
             </div>
             <div>
-              <h4 className="text-xs font-black text-slate-800 leading-tight">
+              <h4 className="text-xs font-bold text-white leading-tight">
                 {lang === 'bn' ? 'ডিজিটাল কেওয়াইসি' : 'Digital KYC Status'}
               </h4>
               <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${
-                kycStatus === 'verified' ? 'text-emerald-500' :
-                kycStatus === 'pending' ? 'text-amber-500' :
-                kycStatus === 'rejected' ? 'text-rose-500' :
+                kycStatus === 'verified' ? 'text-emerald-400' :
+                kycStatus === 'pending' ? 'text-amber-400' :
+                kycStatus === 'rejected' ? 'text-rose-400' :
                 'text-slate-400'
               }`}>
                 {kycStatus === 'verified' ? (lang === 'bn' ? 'ভেরিফাইড' : 'Verified') :
@@ -281,21 +281,21 @@ export default function ProfilePanel({
           {(kycStatus === 'not_verified' || kycStatus === 'rejected') && (
             <button
               onClick={onKYCClick}
-              className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black transition-all active:scale-95 cursor-pointer shadow-md"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-md shadow-indigo-600/20"
             >
               {lang === 'bn' ? 'ভেরিফাই করুন' : 'Verify Now'}
             </button>
           )}
 
           {kycStatus === 'pending' && (
-            <div className="px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black border border-amber-100 flex items-center gap-1.5">
+            <div className="px-3 py-1.5 bg-amber-500/10 text-amber-300 rounded-lg text-[9px] font-bold border border-amber-500/20 flex items-center gap-1.5">
               <RefreshCw className="h-3 w-3 animate-spin" />
               <span>{lang === 'bn' ? 'যাচাই করা হচ্ছে' : 'Under Review'}</span>
             </div>
           )}
 
           {kycStatus === 'verified' && (
-            <div className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black border border-emerald-100 flex items-center gap-1.5">
+            <div className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-[9px] font-bold border border-emerald-500/20 flex items-center gap-1.5">
               <Check className="h-3 w-3" />
               <span>{lang === 'bn' ? 'সুরক্ষিত' : 'Secured'}</span>
             </div>
@@ -303,38 +303,38 @@ export default function ProfilePanel({
         </div>
         
         {kycStatus === 'rejected' && userData?.kycData?.rejectionReason && (
-          <div className="mt-3 p-2 bg-rose-50 rounded-xl border border-rose-100">
-            <p className="text-[9px] font-bold text-rose-600">
+          <div className="mt-3 p-2 bg-rose-500/10 rounded-xl border border-rose-500/20">
+            <p className="text-[9px] font-bold text-rose-300">
               {lang === 'bn' ? 'বাতিলের কারণ:' : 'Reason:'} {userData.kycData.rejectionReason}
             </p>
           </div>
         )}
 
         {userData?.kycData?.nidFrontUrl && userData?.kycData?.nidBackUrl && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+          <div className="mt-4 pt-4 border-t border-slate-800">
+            <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
               {lang === 'bn' ? 'সাবমিট করা এনআইডি কার্ডসমূহ' : 'Submitted NID Cards'}
             </h5>
             <div className="grid grid-cols-2 gap-2">
-              <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
                 <img 
                   src={userData.kycData.nidFrontUrl} 
                   alt="NID Front" 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
                 />
-                <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
                   {lang === 'bn' ? 'সামনের অংশ' : 'Front'}
                 </span>
               </div>
-              <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
                 <img 
                   src={userData.kycData.nidBackUrl} 
                   alt="NID Back" 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
                 />
-                <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
                   {lang === 'bn' ? 'পিছনের অংশ' : 'Back'}
                 </span>
               </div>
@@ -349,28 +349,28 @@ export default function ProfilePanel({
           {t.accountConfig}
         </h3>
 
-        <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden shadow-sm divide-y divide-slate-100 font-medium">
+        <div className="bg-[#131B2E] border border-white/10 rounded-2xl overflow-hidden shadow-xl divide-y divide-slate-800 font-medium text-white">
           {/* Add Fund / টাকা যোগ করুন button */}
           {onAddFundClick && (
             <button
               onClick={onAddFundClick}
               id="profile-add-fund-btn"
-              className="w-full text-left p-3.5 flex items-center justify-between bg-indigo-50/20 hover:bg-indigo-50/50 transition-colors cursor-pointer group animate-pulse-subtle"
+              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-800/50 transition-colors cursor-pointer group"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
                   <Wallet className="h-4.5 w-4.5" />
                 </div>
                 <div>
-                  <h4 className="text-slate-800 font-bold text-xs">
+                  <h4 className="text-white font-bold text-xs">
                     {lang === 'bn' ? 'অ্যাড ফান্ড (টাকা যোগ করুন)' : 'Add Fund (Deposit)'}
                   </h4>
-                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                     {lang === 'bn' ? 'বিকাশ, রকেট বা নগদ দিয়ে ওয়ালেটে টাকা যোগ করুন' : 'Add balance instantly using bKash, Nagad or Rocket'}
                   </p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="h-4 w-4 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
           )}
 
@@ -378,24 +378,24 @@ export default function ProfilePanel({
           <button
             onClick={onLanguageToggle}
             id="profile-lang-btn"
-            className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
+            className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-800/50 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <div className="p-2 bg-blue-500/10 text-blue-400 rounded-xl">
                 <Globe className="h-4.5 w-4.5" />
               </div>
               <div>
-                <h4 className="text-slate-800 font-bold text-xs">
+                <h4 className="text-white font-bold text-xs">
                   {lang === 'bn' ? 'ভাষা পরিবর্তন (Language)' : 'Change Language'}
                 </h4>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                   {lang === 'bn' ? 'Switch to English' : 'বাংলা ভাষায় পরিবর্তন করুন'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-blue-600 font-bold">
+            <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-bold">
               <span>{lang === 'bn' ? 'English' : 'বাংলা'}</span>
-              <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
 
@@ -404,22 +404,22 @@ export default function ProfilePanel({
             <button
               onClick={onAdminClick}
               id="profile-admin-btn"
-              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
+              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-800/50 transition-colors cursor-pointer group"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-[12px] flex items-center justify-center">
-                  <ShieldCheck className="h-4.5 w-4.5 text-blue-600" />
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center">
+                  <ShieldCheck className="h-4.5 w-4.5 text-emerald-400" />
                 </div>
                 <div>
-                  <h4 className="text-slate-800 font-bold text-xs">
+                  <h4 className="text-white font-bold text-xs">
                     {lang === 'bn' ? 'অ্যাডমিন কন্ট্রোল পোর্টাল' : 'Admin Portal Command'}
                   </h4>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                     {lang === 'bn' ? 'অফার স্লাইড, প্যাক ও পেন্ডিং পেমেন্ট এপ্রুভাল' : 'Edit slider promos, celular packs & approve payments'}
                   </p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
           )}
 
@@ -427,22 +427,22 @@ export default function ProfilePanel({
           <button
             onClick={onNotificationClick}
             id="profile-notify-btn"
-            className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
+            className="w-full text-left p-3.5 flex items-center justify-between hover:bg-slate-800/50 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
                 <BellRing className="h-4.5 w-4.5" />
               </div>
               <div>
-                <h4 className="text-slate-800 font-bold text-xs">
+                <h4 className="text-white font-bold text-xs">
                   {t.notifications}
                 </h4>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                   {lang === 'bn' ? 'আপনার ইনবক্স বার্তা' : 'Check push promotions and offers'}
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-slate-350 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
           </button>
 
           {/* Toggle Push Notifications Switch */}
@@ -464,9 +464,9 @@ export default function ProfilePanel({
               onClick={async () => {
                 if (!currentUser) return;
                 const currentVal = userData?.pushNotificationsEnabled !== false;
-                await updateDoc(doc(db, 'users', currentUser.uid), {
+                await setDoc(doc(db, 'users', currentUser.uid), {
                   pushNotificationsEnabled: !currentVal
-                });
+                }, { merge: true });
               }}
               className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer outline-none ${
                 (userData?.pushNotificationsEnabled !== false) ? 'bg-indigo-600' : 'bg-slate-200'
@@ -499,9 +499,9 @@ export default function ProfilePanel({
               onClick={async () => {
                 if (!currentUser) return;
                 const currentVal = userData?.smsAlertsEnabled === true;
-                await updateDoc(doc(db, 'users', currentUser.uid), {
+                await setDoc(doc(db, 'users', currentUser.uid), {
                   smsAlertsEnabled: !currentVal
-                });
+                }, { merge: true });
               }}
               className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer outline-none ${
                 (userData?.smsAlertsEnabled === true) ? 'bg-emerald-500' : 'bg-slate-200'

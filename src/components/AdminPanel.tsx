@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Tesseract from 'tesseract.js';
 import { 
   X, ShieldCheck, Check, AlertTriangle, Plus, Trash2, Edit2, 
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
-  Eye, Download, Crown, Phone, Zap, PhoneCall, PhoneOff, Mic, MicOff, VolumeX, Image, Play, Pause, Square, Radio
+  Eye, Download, Crown, Phone, Zap, PhoneCall, PhoneOff, Mic, MicOff, VolumeX, Image, Play, Pause, Square, Radio,
+  History, Trophy, TrendingUp, Search, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -380,7 +381,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'user_transactions' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc'>('requests');
   const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(true);
   const [userFilterTab, setUserFilterTab] = useState<'all' | 'verified' | 'pending_kyc' | 'suspended'>('all');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
@@ -571,6 +572,63 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   // Users Management State Helpers
   const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
+
+  // Dynamically calculate live transaction stats and rankings for registered users
+  const userTxStatsMap = useMemo(() => {
+    const stats: Record<string, { count: number; volume: number }> = {};
+
+    pendingRequests.forEach((tx) => {
+      if (tx.userId) {
+        if (!stats[tx.userId]) stats[tx.userId] = { count: 0, volume: 0 };
+        stats[tx.userId].count += 1;
+        if (tx.status === 'Success' || tx.status === 'Approved') {
+          stats[tx.userId].volume += Number(tx.amount) || 0;
+        }
+      }
+    });
+
+    adminOrders.forEach((ord) => {
+      if (ord.userId) {
+        if (!stats[ord.userId]) stats[ord.userId] = { count: 0, volume: 0 };
+        stats[ord.userId].count += 1;
+        if (ord.status === 'Approved' || ord.status === 'Delivered') {
+          stats[ord.userId].volume += Number(ord.totalPrice) || 0;
+        }
+      }
+    });
+
+    adminSimOrders.forEach((sim) => {
+      if (sim.userId) {
+        if (!stats[sim.userId]) stats[sim.userId] = { count: 0, volume: 0 };
+        stats[sim.userId].count += 1;
+        if (sim.status === 'Approved') {
+          stats[sim.userId].volume += Number(sim.totalCost || sim.bookingFee) || 0;
+        }
+      }
+    });
+
+    return stats;
+  }, [pendingRequests, adminOrders, adminSimOrders]);
+
+  // Sort registeredUsers so user with HIGHEST transaction count / volume is at the VERY TOP (#1 TOP LEADER)
+  const sortedRegisteredUsers = useMemo(() => {
+    return [...registeredUsers].map((u) => {
+      const uId = u.uid || u.id;
+      const aggregated = userTxStatsMap[uId] || { count: 0, volume: 0 };
+      const count = Math.max(u.transactionCount || 0, aggregated.count);
+      const volume = Math.max(parseFloat(u.totalTransactionVolume || u.totalGiven || 0), aggregated.volume);
+      return {
+        ...u,
+        calculatedCount: count,
+        calculatedVolume: volume
+      };
+    }).sort((a, b) => {
+      if (b.calculatedCount !== a.calculatedCount) {
+        return b.calculatedCount - a.calculatedCount;
+      }
+      return b.calculatedVolume - a.calculatedVolume;
+    });
+  }, [registeredUsers, userTxStatsMap]);
   const [searchUserQuery, setSearchUserQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [selectedUserBalance, setSelectedUserBalance] = useState<number | null>(null);
@@ -616,6 +674,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [requestSearchQuery, setRequestSearchQuery] = useState('');
   const [requestStatusFilter, setRequestStatusFilter] = useState<string>('All');
   const [requestTypeFilter, setRequestTypeFilter] = useState<string>('All');
+
+  // Master Transaction Audit Log States
+  const [txSearchQuery, setTxSearchQuery] = useState('');
+  const [txCategoryFilter, setTxCategoryFilter] = useState<string>('All');
+  const [txStatusFilter, setTxStatusFilter] = useState<string>('All');
   
   // Support Tickets States
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
@@ -2543,7 +2606,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     try {
       if (editingScratchId) {
         const cardRef = doc(db, 'scratch_cards', editingScratchId);
-        await updateDoc(cardRef, scratchForm);
+        await setDoc(cardRef, scratchForm, { merge: true });
         setEditingScratchId(null);
       } else {
         const id = 'sc-' + Date.now();
@@ -2896,9 +2959,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const newStatus = ticketDoc.status === 'Closed' ? 'Open' : 'Closed';
     
     try {
-      await updateDoc(ticketRef, {
+      await setDoc(ticketRef, {
         status: newStatus
-      });
+      }, { merge: true });
     } catch (err) {
       console.error("Error updating ticket status: ", err);
     }
@@ -2919,6 +2982,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
     // Group 3: System & Users
     { id: 'users' as const, group: 'system', label: labels.users, icon: User, badge: registeredUsers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
+    { id: 'user_transactions' as const, group: 'system', label: lang === 'bn' ? 'ইউজার লেনদেন ও লগ' : 'User Transactions Log', icon: History, badge: pendingRequests.length, badgeColor: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/25' },
     { id: 'billers' as const, group: 'system', label: labels.billers, icon: CreditCard, badge: billers.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
     { id: 'banners' as const, group: 'system', label: labels.banners, icon: Sparkles, badge: banners.length, badgeColor: 'bg-white/5 text-slate-400 border border-white/5' },
     { id: 'settings' as const, group: 'system', label: lang === 'bn' ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, badge: 0, badgeColor: '' },
@@ -5097,6 +5161,82 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 </form>
               )}
 
+              {/* 👑 TOP TRANSACTING USERS PODIUM LEADERBOARD BANNER */}
+              {sortedRegisteredUsers.length > 0 && (
+                <div className="bg-gradient-to-r from-slate-950/90 via-indigo-950/70 to-slate-950/90 border border-amber-500/30 rounded-3xl p-4 shadow-2xl relative overflow-hidden space-y-3">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 rounded-xl shadow-lg shadow-amber-500/20 font-black">
+                        <Trophy className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
+                          <span>🏆 {lang === 'bn' ? 'শীর্ষ ট্রানজেকশনকারী লিডারবোর্ড' : 'Top Transacting Users Leaderboard'}</span>
+                        </h3>
+                        <p className="text-[10px] text-amber-300/80 font-medium">
+                          {lang === 'bn' ? 'সবচেয়ে বেশি ট্রানজেকশন সম্পন্নকারী আইডি অটোমেটিক সবার উপরে আসবে' : 'Ranked automatically by total transaction volume and frequency.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab('user_transactions')}
+                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 rounded-xl text-[10px] font-black transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      <span>{lang === 'bn' ? 'সব ট্রানজেকশন' : 'View All Logs'}</span>
+                    </button>
+                  </div>
+
+                  {/* Top 3 Podium Cards Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    {sortedRegisteredUsers.slice(0, 3).map((topUser, pIdx) => {
+                      const isFirst = pIdx === 0;
+                      const isSecond = pIdx === 1;
+
+                      return (
+                        <div
+                          key={`podium-${topUser.uid || topUser.id}-${pIdx}`}
+                          onClick={() => setSelectedUser(topUser)}
+                          className={`p-3 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                            isFirst
+                              ? 'bg-gradient-to-b from-amber-500/20 via-yellow-500/10 to-slate-950/80 border-amber-400/50 hover:border-amber-400 shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/30'
+                              : isSecond
+                              ? 'bg-gradient-to-b from-slate-400/15 to-slate-950/80 border-slate-400/30 hover:border-slate-300'
+                              : 'bg-gradient-to-b from-amber-700/15 to-slate-950/80 border-amber-700/30 hover:border-amber-600'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full font-mono uppercase tracking-wider ${
+                              isFirst ? 'bg-amber-400 text-slate-950 shadow-sm' : isSecond ? 'bg-slate-300 text-slate-950' : 'bg-amber-700 text-white'
+                            }`}>
+                              {isFirst ? '👑 #1 LEADER' : isSecond ? '🥈 #2 RANK' : '🥉 #3 RANK'}
+                            </span>
+
+                            <span className="text-[10px] font-mono font-black text-amber-300">
+                              ৳{(parseFloat(topUser.balance + '') || 0).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="my-2 space-y-0.5">
+                            <h4 className="text-xs font-black text-white truncate">{topUser.displayName}</h4>
+                            <p className="text-[9.5px] font-mono text-slate-400 truncate">{topUser.phone || topUser.email}</p>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[9px] font-mono pt-1.5 border-t border-white/5">
+                            <span className="text-amber-300 font-black">🔥 {topUser.calculatedCount || 0} টি ট্রানজেকশন</span>
+                            <span className="text-cyan-300 font-black">৳{(topUser.calculatedVolume || 0).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Two-Column Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                 {/* Left Side: Users list */}
@@ -5116,7 +5256,6 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           type="button"
                           onClick={() => {
                             setUserFilterTab(tab.id as any);
-                            // Clear selected user if they don't match the new filter tab to maintain consistent state
                             setSelectedUser(null);
                           }}
                           className={`flex-1 py-1.5 text-[9.5px] font-black tracking-wider rounded-xl uppercase transition-all cursor-pointer text-center ${
@@ -5131,21 +5270,19 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     })}
                   </div>
 
-                  <div className="bg-slate-950/30 border border-white/10 rounded-3xl p-3 max-h-[480px] overflow-y-auto">
-                    {registeredUsers.length === 0 ? (
+                  <div className="bg-slate-950/30 border border-white/10 rounded-3xl p-3 max-h-[520px] overflow-y-auto">
+                    {sortedRegisteredUsers.length === 0 ? (
                       <div className="text-center py-8 text-xs text-slate-400">
                         {lang === 'bn' ? 'কোনো রেজিষ্ট্রেশনকৃত ইউজার পাওয়া যায়নি!' : 'No registered users found yet.'}
                       </div>
                     ) : (
-                      <div className="space-y-1.5">
-                        {registeredUsers
+                      <div className="space-y-2">
+                        {sortedRegisteredUsers
                           .filter((u) => {
-                            // 1. CRM Status Filter Checks
                             if (userFilterTab === 'verified' && u.kycStatus !== 'verified') return false;
                             if (userFilterTab === 'pending_kyc' && u.kycStatus !== 'pending') return false;
                             if (userFilterTab === 'suspended' && !u.isBanned) return false;
 
-                            // 2. Search Text Matches
                             const queryLower = searchUserQuery.toLowerCase().trim();
                             if (!queryLower) return true;
                             return (
@@ -5157,13 +5294,16 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           })
                           .map((userObj, idx) => {
                             const isSelected = selectedUser?.uid === userObj.uid;
+                            const isTopLeader = idx === 0 && (userObj.calculatedCount > 0 || userObj.calculatedVolume > 0);
+                            const isSecond = idx === 1 && (userObj.calculatedCount > 0 || userObj.calculatedVolume > 0);
+                            const isThird = idx === 2 && (userObj.calculatedCount > 0 || userObj.calculatedVolume > 0);
+
                             return (
                               <button
                                 key={`${userObj.uid || userObj.id || 'usr'}-${idx}`}
                                 type="button"
                                 onClick={() => {
                                   setSelectedUser(userObj);
-                                  // Clear input states when switching users
                                   setUserBalanceAdjustValue('');
                                   setUserBalanceAdjustReason('');
                                   setUserBalanceAdjustReasonBn('');
@@ -5172,36 +5312,71 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                                   setCustomNotifDesc('');
                                   setCustomNotifDescBn('');
                                 }}
-                                className={`w-full text-left p-3.5 rounded-2xl transition-all border flex items-center justify-between cursor-pointer ${
+                                className={`w-full text-left p-3.5 rounded-2xl transition-all border flex flex-col gap-2 cursor-pointer relative overflow-hidden group ${
                                   isSelected
-                                    ? 'bg-blue-600 border-transparent text-white shadow-lg shadow-blue-600/10'
-                                    : 'bg-slate-950/20 hover:bg-slate-950/40 border-white/5 text-slate-300 hover:text-white'
+                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-transparent text-white shadow-xl shadow-blue-600/20 ring-1 ring-white/20'
+                                    : isTopLeader
+                                    ? 'bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-slate-950/60 border-amber-500/40 text-slate-200 hover:border-amber-400'
+                                    : 'bg-slate-950/40 hover:bg-slate-900/60 border-white/5 text-slate-300 hover:text-white'
                                 }`}
                               >
-                                <div className="space-y-1 pr-2 truncate flex-1">
-                                  <div className="flex items-center justify-between mr-2">
-                                    <h4 className="text-xs font-black truncate">
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                                    {/* Rank badge */}
+                                    {isTopLeader ? (
+                                      <span className="text-[8.5px] font-black tracking-widest px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 shadow-md font-mono shrink-0 animate-pulse">
+                                        👑 #1 TOP
+                                      </span>
+                                    ) : isSecond ? (
+                                      <span className="text-[8.5px] font-black tracking-widest px-2 py-0.5 rounded-full bg-slate-300 text-slate-950 font-mono shrink-0">
+                                        🥈 #2
+                                      </span>
+                                    ) : isThird ? (
+                                      <span className="text-[8.5px] font-black tracking-widest px-2 py-0.5 rounded-full bg-amber-700 text-white font-mono shrink-0">
+                                        🥉 #3
+                                      </span>
+                                    ) : (
+                                      <span className="text-[8px] font-mono font-bold text-slate-500 bg-white/5 px-1.5 py-0.5 rounded shrink-0">
+                                        #{idx + 1}
+                                      </span>
+                                    )}
+
+                                    <h4 className="text-xs font-black truncate text-white">
                                       {userObj.displayName}
                                     </h4>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-green-500/10 text-green-400'}`}>
-                                      ৳{(parseFloat(userObj.balance + '') || 0).toLocaleString()}
-                                    </span>
                                   </div>
-                                  <div className="flex items-center justify-between mt-1 mr-2">
-                                    <p className={`text-[10px] font-mono truncate ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                                      {userObj.phone ? `📱 ${userObj.phone}` : `✉️ ${userObj.email}`}
-                                    </p>
-                                    <span className={`text-[9px] font-black tracking-wide ${isSelected ? 'text-blue-200' : 'text-emerald-500'}`}>
-                                      IN: ৳{(parseFloat(userObj.totalGiven + '') || 0).toLocaleString()}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <span className={`text-[9px] font-bold block ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
-                                    {lang === 'bn' ? 'শেষ সক্রিয়' : 'Last Active'}
+
+                                  <span className={`text-[10.5px] font-mono font-black px-2 py-0.5 rounded-full shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'}`}>
+                                    ৳{(parseFloat(userObj.balance + '') || 0).toLocaleString()}
                                   </span>
-                                  <span className={`text-[10px] font-semibold block font-mono ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                </div>
+
+                                <div className="flex items-center justify-between w-full text-[10px] font-mono">
+                                  <p className={`truncate ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                                    {userObj.phone ? `📱 ${userObj.phone}` : `✉️ ${userObj.email}`}
+                                  </p>
+                                  <span className={`shrink-0 ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
                                     {userObj.lastActive ? new Date(userObj.lastActive).toLocaleDateString() : 'N/A'}
+                                  </span>
+                                </div>
+
+                                {/* Transaction Count & Total Volume Badge */}
+                                <div className="flex items-center gap-2 pt-1 border-t border-white/5 w-full">
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border font-mono ${
+                                    isSelected
+                                      ? 'bg-white/20 text-white border-white/30'
+                                      : isTopLeader
+                                      ? 'bg-amber-400/20 text-amber-300 border-amber-400/30'
+                                      : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20'
+                                  }`}>
+                                    🔥 {userObj.calculatedCount || 0} টি লেনদেন
+                                  </span>
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border font-mono ${
+                                    isSelected
+                                      ? 'bg-white/20 text-white border-white/30'
+                                      : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
+                                  }`}>
+                                    💰 ৳{(userObj.calculatedVolume || 0).toLocaleString()}
                                   </span>
                                 </div>
                               </button>
@@ -5731,6 +5906,299 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: USER TRANSACTIONS & COMPLETE LEDGER AUDIT */}
+          {activeSubTab === 'user_transactions' && (
+            <div className="space-y-4 text-slate-100 animate-scale-up">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-1">
+                <div>
+                  <span className="text-[10px] font-extrabold text-cyan-400 tracking-widest uppercase font-mono">
+                    SYSTEM-WIDE TRANSACTION AUDIT & HISTORY LOGS
+                  </span>
+                  <p className="text-xs text-slate-400 mt-1 font-semibold">
+                    {lang === 'bn' ? 'সমস্ত ব্যবহারকারীর লেনদেন তালিকা, ক্যাশ-ইন, রিচার্জ, বিল পে ও স্টোর অর্ডারের কেন্দ্রীয় লগ' : 'Central audit ledger of all user deposits, recharges, bill payments, and store purchases.'}
+                  </p>
+                </div>
+
+                {/* Summary Chips */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl text-cyan-300 text-xs font-mono font-black flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5" />
+                    <span>মোট: {pendingRequests.length + adminOrders.length + adminSimOrders.length} টি লেনদেন</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search & Filter Controls Toolbar */}
+              <div className="bg-slate-950/60 border border-white/10 rounded-3xl p-4 space-y-3 backdrop-blur-xl">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                  {/* Search input */}
+                  <div className="md:col-span-5 relative">
+                    <input
+                      type="text"
+                      placeholder={lang === 'bn' ? 'নাম, মোবাইল, ইউজার আইডি বা ট্রানজেকশন আইডি দিয়ে খুঁজুন...' : 'Search name, phone, UID, or TxID...'}
+                      value={txSearchQuery}
+                      onChange={(e) => setTxSearchQuery(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-white rounded-2xl py-2 px-3.5 pl-9 text-xs font-semibold placeholder-slate-500 outline-none focus:border-cyan-500 transition-all font-mono"
+                    />
+                    <Search className="h-4 w-4 text-slate-400 absolute left-3 top-2.5" />
+                    {txSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setTxSearchQuery('')}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Category */}
+                  <div className="md:col-span-4 flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono shrink-0">টাইপ:</span>
+                    <select
+                      value={txCategoryFilter}
+                      onChange={(e) => setTxCategoryFilter(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-white/10 text-white rounded-2xl py-2 px-3 text-xs font-bold outline-none focus:border-cyan-500 font-mono cursor-pointer"
+                    >
+                      <option value="All">{lang === 'bn' ? 'সব লেনদেন (All)' : 'All Types'}</option>
+                      <option value="CashIn">{lang === 'bn' ? 'ক্যাশ ইন / অ্যাড ফান্ড (CashIn)' : 'Add Fund / Deposit'}</option>
+                      <option value="Recharge">{lang === 'bn' ? 'মোবাইল রিচার্জ (Recharge)' : 'Mobile Recharge'}</option>
+                      <option value="Bill">{lang === 'bn' ? 'ইউটিলিটি বিল পে (Bill)' : 'Utility Bill'}</option>
+                      <option value="Transfer">{lang === 'bn' ? 'ব্যালেন্স ট্রান্সফার (Transfer)' : 'Balance Transfer'}</option>
+                      <option value="Voucher">{lang === 'bn' ? 'গেম ভাউচার (Voucher)' : 'Game Voucher'}</option>
+                      <option value="Store">{lang === 'bn' ? 'মেগা স্টোর অর্ডার (Store)' : 'Store Orders'}</option>
+                      <option value="SIM">{lang === 'bn' ? 'সিম কার্ড বুকিং (SIM)' : 'SIM Orders'}</option>
+                    </select>
+                  </div>
+
+                  {/* Filter Status */}
+                  <div className="md:col-span-3 flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono shrink-0">স্ট্যাটাস:</span>
+                    <select
+                      value={txStatusFilter}
+                      onChange={(e) => setTxStatusFilter(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-white/10 text-white rounded-2xl py-2 px-3 text-xs font-bold outline-none focus:border-cyan-500 font-mono cursor-pointer"
+                    >
+                      <option value="All">{lang === 'bn' ? 'সব স্ট্যাটাস (All)' : 'All Status'}</option>
+                      <option value="Success">{lang === 'bn' ? 'সফল (Success / Approved)' : 'Success / Approved'}</option>
+                      <option value="Pending">{lang === 'bn' ? 'অপেক্ষমান (Pending)' : 'Pending'}</option>
+                      <option value="Failed">{lang === 'bn' ? 'বাতিল / ব্যর্থ (Failed / Rejected)' : 'Failed / Rejected'}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Transaction Log Table / List */}
+              <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-4 space-y-2">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-2 text-[10px] font-mono font-black text-slate-400 uppercase px-3 py-2 border-b border-white/5">
+                  <div className="col-span-3">{lang === 'bn' ? 'গ্রাহক তথ্য' : 'Customer'}</div>
+                  <div className="col-span-2">{lang === 'bn' ? 'টাইপ ও তথ্য' : 'Type & Target'}</div>
+                  <div className="col-span-2 text-right">{lang === 'bn' ? 'পরিমাণ (৳)' : 'Amount'}</div>
+                  <div className="col-span-3">{lang === 'bn' ? 'তারিখ ও ট্রানজেকশন আইডি' : 'Date & TxID'}</div>
+                  <div className="col-span-2 text-center">{lang === 'bn' ? 'স্ট্যাটাস ও অ্যাকশন' : 'Status'}</div>
+                </div>
+
+                {/* Filter and map all transactions */}
+                {(() => {
+                  const allTransactions: any[] = [];
+
+                  pendingRequests.forEach((r) => {
+                    allTransactions.push({
+                      id: r.id,
+                      category: r.type || 'Tx',
+                      userName: r.userName || 'Customer',
+                      userPhone: r.userPhone || r.userId || 'N/A',
+                      userId: r.userId,
+                      target: r.targetNumber || r.billerName || r.transferMethod || 'N/A',
+                      amount: r.amount || 0,
+                      txId: r.txId || r.id,
+                      date: r.date || 'N/A',
+                      status: r.status || 'Pending',
+                      rawObj: r,
+                      source: 'admin_requests'
+                    });
+                  });
+
+                  adminOrders.forEach((ord) => {
+                    allTransactions.push({
+                      id: ord.id,
+                      category: 'Store',
+                      userName: ord.customerName || 'Customer',
+                      userPhone: ord.phone || ord.userId || 'N/A',
+                      userId: ord.userId,
+                      target: `${ord.productTitle} (x${ord.quantity})`,
+                      amount: ord.totalPrice || 0,
+                      txId: ord.id,
+                      date: ord.date || 'N/A',
+                      status: ord.status || 'Pending',
+                      rawObj: ord,
+                      source: 'store_orders'
+                    });
+                  });
+
+                  adminSimOrders.forEach((sim) => {
+                    allTransactions.push({
+                      id: sim.id,
+                      category: 'SIM',
+                      userName: sim.customerName || 'Customer',
+                      userPhone: sim.phone || sim.userId || 'N/A',
+                      userId: sim.userId,
+                      target: `${sim.operator} (${sim.chosenNumber || sim.type})`,
+                      amount: sim.totalCost || sim.bookingFee || 0,
+                      txId: sim.id,
+                      date: sim.date || 'N/A',
+                      status: sim.status || 'Pending',
+                      rawObj: sim,
+                      source: 'sim_orders'
+                    });
+                  });
+
+                  allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                  const filtered = allTransactions.filter((item) => {
+                    if (txCategoryFilter !== 'All') {
+                      if (txCategoryFilter === 'CashIn' && item.category !== 'CashIn') return false;
+                      if (txCategoryFilter === 'Recharge' && item.category !== 'Recharge') return false;
+                      if (txCategoryFilter === 'Bill' && item.category !== 'Bill') return false;
+                      if (txCategoryFilter === 'Transfer' && item.category !== 'Transfer') return false;
+                      if (txCategoryFilter === 'Voucher' && item.category !== 'Voucher') return false;
+                      if (txCategoryFilter === 'Store' && item.category !== 'Store') return false;
+                      if (txCategoryFilter === 'SIM' && item.category !== 'SIM') return false;
+                    }
+
+                    if (txStatusFilter !== 'All') {
+                      if (txStatusFilter === 'Success' && item.status !== 'Success' && item.status !== 'Approved') return false;
+                      if (txStatusFilter === 'Pending' && item.status !== 'Pending') return false;
+                      if (txStatusFilter === 'Failed' && item.status !== 'Failed' && item.status !== 'Rejected') return false;
+                    }
+
+                    const q = txSearchQuery.toLowerCase().trim();
+                    if (!q) return true;
+                    return (
+                      item.userName.toLowerCase().includes(q) ||
+                      item.userPhone.toLowerCase().includes(q) ||
+                      item.target.toLowerCase().includes(q) ||
+                      item.txId.toLowerCase().includes(q) ||
+                      (item.userId || '').toLowerCase().includes(q)
+                    );
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-12 text-slate-500 font-bold text-xs border border-dashed border-white/5 rounded-2xl">
+                        {lang === 'bn' ? 'কোনো লেনদেন রেকর্ড পাওয়া যায়নি!' : 'No matching transaction records found.'}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5 max-h-[550px] overflow-y-auto pr-1 scroller-hidden">
+                      {filtered.map((txItem, idx) => {
+                        const isSuccess = txItem.status === 'Success' || txItem.status === 'Approved';
+                        const isFailed = txItem.status === 'Failed' || txItem.status === 'Rejected';
+                        const isPending = txItem.status === 'Pending';
+
+                        return (
+                          <div
+                            key={`all-tx-${txItem.id}-${idx}`}
+                            className="grid grid-cols-12 gap-2 items-center p-3 rounded-2xl bg-slate-950/40 hover:bg-slate-900/60 border border-white/5 transition-all text-xs"
+                          >
+                            {/* Customer */}
+                            <div className="col-span-3 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const matchedUser = registeredUsers.find(u => u.uid === txItem.userId || u.id === txItem.userId);
+                                  if (matchedUser) {
+                                    setSelectedUser(matchedUser);
+                                    setActiveSubTab('users');
+                                  } else {
+                                    alert(`User ID: ${txItem.userId}`);
+                                  }
+                                }}
+                                className="text-left group cursor-pointer truncate max-w-full block"
+                              >
+                                <h4 className="font-extrabold text-white group-hover:text-cyan-300 transition-colors truncate">
+                                  {txItem.userName}
+                                </h4>
+                                <p className="text-[10px] font-mono text-slate-400 group-hover:text-cyan-400 truncate">
+                                  📱 {txItem.userPhone}
+                                </p>
+                              </button>
+                            </div>
+
+                            {/* Type & Target */}
+                            <div className="col-span-2 min-w-0">
+                              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/20 font-mono inline-block">
+                                {txItem.category}
+                              </span>
+                              <p className="text-[10.5px] font-bold text-slate-300 truncate mt-0.5">
+                                {txItem.target}
+                              </p>
+                            </div>
+
+                            {/* Amount */}
+                            <div className="col-span-2 text-right">
+                              <span className={`font-mono font-black text-sm ${
+                                txItem.category === 'CashIn' ? 'text-emerald-400' : 'text-slate-100'
+                              }`}>
+                                ৳{(Number(txItem.amount) || 0).toLocaleString()}
+                              </span>
+                            </div>
+
+                            {/* Date & TxID */}
+                            <div className="col-span-3 min-w-0">
+                              <p className="text-[10px] font-mono font-bold text-slate-300 truncate select-all">
+                                {txItem.txId}
+                              </p>
+                              <p className="text-[9.5px] font-mono text-slate-500 truncate">
+                                {txItem.date}
+                              </p>
+                            </div>
+
+                            {/* Status & Action */}
+                            <div className="col-span-2 text-center flex flex-col items-center justify-center gap-1">
+                              <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono ${
+                                isSuccess ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
+                                isFailed ? 'bg-rose-500/15 text-rose-400 border border-rose-500/25' :
+                                'bg-amber-500/15 text-amber-400 border border-amber-500/25 animate-pulse'
+                              }`}>
+                                {isSuccess ? (lang === 'bn' ? 'সফল' : 'Success') :
+                                 isFailed ? (lang === 'bn' ? 'বাতিল' : 'Failed') :
+                                 (lang === 'bn' ? 'অপেক্ষমান' : 'Pending')}
+                              </span>
+
+                              {isPending && txItem.source === 'admin_requests' && (
+                                <div className="flex gap-1 mt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApprove(txItem.rawObj)}
+                                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-black cursor-pointer shadow-sm"
+                                  >
+                                    এপ্রুভ
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRejectingTx(txItem.rawObj)}
+                                    className="px-2 py-0.5 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/20 rounded-lg text-[9px] font-black cursor-pointer"
+                                  >
+                                    বাতিল
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

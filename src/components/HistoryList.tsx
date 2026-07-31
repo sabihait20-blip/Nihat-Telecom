@@ -33,19 +33,19 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
   const getTxTypeBadgeColor = (type: string) => {
     switch (type) {
       case 'Recharge':
-        return 'bg-blue-50 text-blue-600 border-blue-100/50';
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
       case 'Bill':
-        return 'bg-amber-50 text-amber-600 border-amber-100/50';
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
       case 'CashIn':
-        return 'bg-emerald-50 text-emerald-600 border-emerald-100/50';
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'Transfer':
-        return 'bg-violet-50 text-violet-600 border-violet-100/50';
+        return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
       case 'Voucher':
-        return 'bg-rose-50 text-rose-600 border-rose-100/50';
+        return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
       case 'ScratchCard':
-        return 'bg-orange-50 text-orange-600 border-orange-100/50';
+        return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
       default:
-        return 'bg-slate-50 text-slate-500 border-slate-100';
+        return 'bg-slate-800 text-slate-400 border-slate-700';
     }
   };
 
@@ -53,13 +53,13 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
     switch (status) {
       case 'Success':
       case 'Approved':
-        return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
       case 'Failed':
       case 'Rejected':
-        return 'bg-rose-50 text-rose-600 border-rose-200';
+        return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
       case 'Pending':
       default:
-        return 'bg-amber-50 text-amber-600 border-amber-200';
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
     }
   };
 
@@ -83,11 +83,11 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
   };
 
   return (
-    <div className="space-y-4 px-4 py-2 pb-24">
+    <div className="space-y-4 px-4 py-2 pb-24 text-white">
       {/* Header index with metadata search */}
       <div className="space-y-3">
         <div>
-          <h2 className="text-slate-900 font-extrabold text-base tracking-tight font-display">
+          <h2 className="text-white font-bold text-base tracking-tight font-display">
             {t.transactionHistory}
           </h2>
           <p className="text-xs text-slate-400 font-medium font-sans">
@@ -103,13 +103,13 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={lang === 'bn' ? 'নম্বর, TxID বা বিলার নাম দিয়ে খুঁজুন...' : 'Search mobile numbers, biller name or TxID...'}
-            className="w-full bg-white border border-slate-200 rounded-2xl py-2.5 pl-10 pr-4 text-xs font-semibold outline-none focus:border-blue-500 transition-colors shadow-xs text-slate-800"
+            className="w-full bg-[#131B2E] border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors shadow-sm text-white placeholder:text-slate-500"
           />
         </div>
       </div>
 
       {/* Category horizontal tabs */}
-      <div className="flex gap-2.5 border-b border-slate-100 pb-1 overflow-x-auto scrollbar-none">
+      <div className="flex gap-2.5 border-b border-slate-800 pb-1 overflow-x-auto scrollbar-none">
         {(['All', 'Recharge', 'Bill', 'CashIn', 'Transfer', 'Voucher', 'ScratchCard'] as const).map((type) => {
           const isActive = filter === type;
           let label: string = type;
@@ -133,8 +133,8 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
               id={`history-filter-${type}`}
               className={`pb-2 px-1 text-xs font-bold transition-all relative border-b-2 cursor-pointer whitespace-nowrap ${
                 isActive
-                  ? 'border-blue-600 text-blue-600 font-extrabold'
-                  : 'border-transparent text-slate-400 hover:text-slate-600'
+                  ? 'border-indigo-500 text-indigo-400 font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               {label}
@@ -149,7 +149,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
           filteredTx.map((tx, index) => (
             <div
               key={`${tx.id || index}-${index}`}
-              className="bg-white border border-slate-100/80 rounded-[28px] p-5 flex items-center justify-between shadow-sm hover:border-blue-100/60 hover:shadow-md transition-all"
+              className="bg-[#131B2E] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-xl hover:border-indigo-500/30 transition-all"
             >
               <div className="flex items-center gap-3">
                 {/* Visual Category symbol */}
@@ -159,7 +159,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
 
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <h4 className="text-slate-900 font-extrabold text-xs tracking-tight">
+                    <h4 className="text-white font-bold text-xs tracking-tight">
                       {tx.type === 'Recharge'
                         ? `${lang === 'bn' ? 'মোবাইল রিচার্জ' : 'Mobile Recharge'}`
                         : tx.type === 'Bill'
@@ -180,7 +180,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                   
                   {/* Detailed Target Number/ID Stamps */}
                   {tx.targetNumber && (
-                    <span className="text-[10px] text-slate-500 font-bold block">
+                    <span className="text-[10px] text-slate-300 font-semibold block">
                       {tx.type === 'CashIn' 
                         ? (tx.transferMethod === 'Received from User'
                             ? (lang === 'bn' ? `প্রেরক: ${tx.operator || ''} (${tx.targetNumber})` : `Sender: ${tx.operator || ''} (${tx.targetNumber})`)
@@ -197,17 +197,17 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                     </span>
                   )}
                   {tx.billerName && (
-                    <span className="text-[10px] text-slate-400 font-semibold block">
-                      TxId: <span className="font-mono text-slate-600 font-bold">{tx.txId}</span>
+                    <span className="text-[10px] text-slate-400 font-medium block">
+                      TxId: <span className="font-mono text-slate-300 font-bold">{tx.txId}</span>
                     </span>
                   )}
                   {!tx.billerName && (
-                    <span className="text-[10px] text-slate-400 font-semibold block">
-                      TxId: <span className="font-mono text-slate-600 font-bold">{tx.txId}</span>
+                    <span className="text-[10px] text-slate-400 font-medium block">
+                      TxId: <span className="font-mono text-slate-300 font-bold">{tx.txId}</span>
                     </span>
                   )}
                   {tx.note && (
-                    <span className="text-[10px] text-violet-700 font-bold block bg-violet-50 px-2 py-0.5 rounded-md w-fit mt-0.5">
+                    <span className="text-[10px] text-indigo-300 font-semibold block bg-indigo-500/20 px-2 py-0.5 rounded-md w-fit mt-0.5">
                       💬 {tx.note}
                     </span>
                   )}
@@ -227,15 +227,15 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                     ? (lang === 'bn' ? 'ব্যর্থ' : 'Failed')
                     : (lang === 'bn' ? 'অপেক্ষমান' : 'Pending')}
                 </span>
-                <p className={`font-display font-bold text-sm ${tx.type === 'CashIn' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                <p className={`font-display font-bold text-sm ${tx.type === 'CashIn' ? 'text-emerald-400' : 'text-white'}`}>
                   {tx.type === 'CashIn' ? '+' : '-'}৳{tx.amount.toLocaleString()}
                 </p>
               </div>
             </div>
           ))
         ) : (
-          <div className="text-center py-12 bg-white border border-slate-100 rounded-3xl">
-            <p className="text-slate-500 text-xs font-bold">
+          <div className="text-center py-12 bg-[#131B2E] border border-slate-800 rounded-2xl">
+            <p className="text-slate-400 text-xs font-bold">
               {t.noTransactions}
             </p>
           </div>

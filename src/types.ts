@@ -139,3 +139,68 @@ export interface UserProfile {
     rejectionReason?: string;
   };
 }
+
+export interface Supplier {
+  id: string;
+  companyName: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  address: string;
+  dueAmount: number;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  dueAmount: number;
+  creditLimit: number;
+}
+
+export interface ExpenseRecord {
+  id: string;
+  title: string;
+  category: string;
+  amount: number;
+  date: string;
+  note?: string;
+}
+
+export interface IncomeRecord {
+  id: string;
+  title: string;
+  category: string;
+  amount: number;
+  date: string;
+  note?: string;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  salary: number;
+  joinDate: string;
+  status: 'Active' | 'On Leave' | 'Terminated';
+}
+
+export interface AttendanceRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  checkIn: string;
+  checkOut?: string;
+  status: 'Present' | 'Absent' | 'Late';
+}
+
+export interface POSCartItem {
+  product: StoreProduct;
+  quantity: number;
+  discount: number;
+}
+

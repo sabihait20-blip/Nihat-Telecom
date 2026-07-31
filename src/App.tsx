@@ -245,7 +245,7 @@ export default function App() {
         if (data.displayName !== undefined) updatePayload.displayName = data.displayName;
 
         if (Object.keys(updatePayload).length > 0) {
-          updateDoc(doc(db, 'registered_users', currentUser.uid), updatePayload).catch((err) => {
+          setDoc(doc(db, 'registered_users', currentUser.uid), updatePayload, { merge: true }).catch((err) => {
             console.warn("Failed to sync profile to registered_users: ", err);
           });
         }
@@ -462,7 +462,7 @@ export default function App() {
         if (typeof data.balance === 'number') {
           setBalance(data.balance);
           // Sync balance to registered_users for admin panel
-          updateDoc(doc(db, 'registered_users', currentUser.uid), { balance: data.balance }).catch(() => {});
+          setDoc(doc(db, 'registered_users', currentUser.uid), { balance: data.balance }, { merge: true }).catch(() => {});
         }
       } else {
         // Initialize balance in Firestore
@@ -484,9 +484,9 @@ export default function App() {
         txList.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
       });
       setTransactions(txList);
-      updateDoc(doc(db, 'registered_users', currentUser.uid), {
+      setDoc(doc(db, 'registered_users', currentUser.uid), {
         transactionCount: txList.length
-      }).catch(() => {});
+      }, { merge: true }).catch(() => {});
     });
     return () => unsubscribe();
   }, [currentUser]);
@@ -1223,46 +1223,46 @@ export default function App() {
         )}
 
         {/* 1. STICKY LEFT SIDEBAR */}
-        <aside className="w-[280px] bg-slate-950 text-white flex flex-col justify-between shrink-0 border-r border-slate-800/60 h-screen sticky top-0 p-5 z-20 shadow-2xl relative overflow-hidden">
+        <aside className="w-[280px] bg-[#090D16] text-white flex flex-col justify-between shrink-0 border-r border-slate-800/80 h-screen sticky top-0 p-5 z-20 shadow-2xl relative overflow-hidden">
           {/* Decorative background glows */}
-          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-900/20 to-transparent pointer-events-none" />
+          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-indigo-900/15 to-transparent pointer-events-none" />
           
           <div className="space-y-8 relative z-10">
             {/* App Logo */}
             <div className="flex items-center gap-3.5 px-2">
-              <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 border border-white/10">
+              <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-white/10">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div>
                 <h1 className="text-lg font-black tracking-tight text-white">{t.appName}</h1>
-                <span className="text-[9px] text-blue-400 font-bold tracking-widest uppercase font-mono block">WORKSPACE</span>
+                <span className="text-[9px] text-indigo-400 font-bold tracking-widest uppercase font-mono block">WORKSPACE</span>
               </div>
             </div>
 
             {/* User Wallet Card */}
             {currentUser && (
-              <div className="bg-gradient-to-b from-slate-800/80 to-slate-900/90 backdrop-blur-md border border-slate-700/50 p-5 rounded-3xl shadow-xl space-y-4 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <div className="bg-gradient-to-b from-[#131B2E] to-[#0E1524] backdrop-blur-md border border-indigo-500/20 p-4.5 rounded-2xl shadow-xl space-y-4 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
                 <div className="flex items-center gap-3 relative z-10">
-                  <div className="w-11 h-11 bg-slate-800 rounded-2xl flex items-center justify-center text-sm font-bold border border-slate-600 shadow-inner">
+                  <div className="w-10 h-10 bg-indigo-950/80 rounded-xl flex items-center justify-center text-xs font-bold text-indigo-300 border border-indigo-500/30 shadow-inner">
                     {userInitials}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold text-slate-200 truncate">{userName}</p>
-                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20 inline-block mt-1 uppercase tracking-wider">
+                    <p className="text-[13px] font-bold text-white truncate">{userName}</p>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20 inline-block mt-0.5 uppercase tracking-wider">
                       {t.userStatus}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-700/50 relative z-10">
-                  <span className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase mb-1.5 block">
+                <div className="pt-3 border-t border-slate-800 relative z-10">
+                  <span className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase mb-1 block">
                     {t.currBalance}
                   </span>
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg font-mono font-extrabold text-white tracking-tight">
+                      <span className="text-base font-mono font-black text-white tracking-tight">
                         {formatCurrency(balance)}
                       </span>
                     </div>
@@ -1270,9 +1270,9 @@ export default function App() {
                     <button
                       onClick={() => setIsAddFundOpen(true)}
                       title={lang === 'bn' ? 'টাকা যোগ করুন' : 'Add Fund'}
-                      className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-lg shadow-blue-600/30 active:scale-95 cursor-pointer"
+                      className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30 active:scale-95 cursor-pointer"
                     >
-                      <Plus className="h-4 w-4 stroke-[3]" />
+                      <Plus className="h-4 w-4 stroke-[2.5]" />
                     </button>
                   </div>
                 </div>
@@ -1294,16 +1294,16 @@ export default function App() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[13px] font-bold transition-all cursor-pointer ${
+                    className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[13px] font-bold transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-blue-600/10 text-blue-400 shadow-inner border border-blue-500/20'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                        ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                     }`}
                   >
-                    <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                    <Icon className={`h-4.5 w-4.5 ${isActive ? 'text-indigo-400 stroke-[2.25]' : 'stroke-2'}`} />
                     <span>{tab.label}</span>
                     {isActive && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
                     )}
                   </button>
                 );
@@ -1312,9 +1312,9 @@ export default function App() {
               {currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase().trim()) && (
                 <button
                   onClick={() => setAdminUserViewMode('admin')}
-                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer mt-2 border border-emerald-500/10"
+                  className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer mt-2 border border-emerald-500/20"
                 >
-                  <Sparkles className="h-4.5 w-4.5" />
+                  <Sparkles className="h-4 w-4" />
                   <span>{lang === 'bn' ? 'এডমিন পোর্টাল' : 'Admin Portal'}</span>
                 </button>
               )}
@@ -1322,25 +1322,25 @@ export default function App() {
           </div>
 
           {/* Sidebar Footer Controls */}
-          <div className="space-y-3.5 pt-4 border-t border-slate-800/60 z-20">
+          <div className="space-y-3 pt-4 border-t border-slate-800/80 z-20">
             {/* View Mode Switching Widget */}
             <button
               onClick={() => setViewMode('mobile-mock')}
-              className="w-full py-2.5 px-3 bg-slate-800/40 hover:bg-slate-800 text-slate-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 transition-all border border-slate-750 cursor-pointer"
+              className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 transition-all border border-slate-800 cursor-pointer"
             >
-              <Smartphone className="h-3.5 w-3.5 text-blue-400" />
+              <Smartphone className="h-3.5 w-3.5 text-indigo-400" />
               <span>{lang === 'bn' ? 'মোবাইল স্ক্রীন মোড' : 'Mobile Screen Mock'}</span>
             </button>
 
             {/* Language Selection switch */}
-            <div className="flex items-center justify-between gap-2 bg-slate-850 px-3 py-2 rounded-xl border border-slate-800 text-[11px] font-bold">
+            <div className="flex items-center justify-between gap-2 bg-slate-900/80 px-3 py-2 rounded-xl border border-slate-800 text-[11px] font-bold">
               <span className="text-slate-400 flex items-center gap-1.5">
                 <Globe className="h-3.5 w-3.5 text-slate-400" />
                 {lang === 'bn' ? 'ভাষা / Lang:' : 'Language:'}
               </span>
               <button
                 onClick={handleLanguageToggle}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded-md text-[10px] uppercase font-black cursor-pointer transition-colors"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-0.5 rounded-md text-[10px] uppercase font-black cursor-pointer transition-colors"
               >
                 {lang === 'bn' ? 'English' : 'বাংলা'}
               </button>
@@ -1350,7 +1350,7 @@ export default function App() {
             {currentUser && (
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer border border-rose-500/10"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer border border-rose-500/20"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 <span>{lang === 'bn' ? 'লগআউট করুন' : 'Sign Out'}</span>
@@ -1360,23 +1360,21 @@ export default function App() {
         </aside>
 
         {/* 2. MAIN SCROLLABLE CONTENT AREA */}
-        <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative">
-          {/* Subtle background ambient blur */}
-          <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-blue-400/5 rounded-full blur-[100px] pointer-events-none" />
+        <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#060911] relative text-white">
+          {/* Background ambient blur spots */}
+          <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[300px] bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
           
           {/* Top Bar Navigation */}
-          <header className="bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 text-white px-10 py-5 flex items-center justify-between sticky top-0 z-10 shadow-md border-b border-indigo-700 relative overflow-hidden">
-            {/* Glossy decorative bubble overlay to match mobile header */}
-            <div className="absolute top-0 right-0 h-40 w-40 bg-white/5 rounded-full translate-x-12 -translate-y-12 blur-md pointer-events-none" />
-            
+          <header className="bg-[#0B0F19]/90 backdrop-blur-xl text-white px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-lg border-b border-slate-800/80 relative overflow-hidden">
             <div className="relative z-10">
-              <h2 className="text-white font-black text-[1.35rem] tracking-tight font-display drop-shadow-sm">
+              <h2 className="text-white font-bold text-xl tracking-tight font-display">
                 {activeTab === 'home' && (lang === 'bn' ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard Overview')}
                 {activeTab === 'packages' && t.packages}
                 {activeTab === 'history' && t.history}
                 {activeTab === 'profile' && t.profile}
               </h2>
-              <p className="text-[12px] text-indigo-100 font-medium mt-0.5">
+              <p className="text-[12px] text-slate-400 font-medium mt-0.5">
                 {activeTab === 'home' && (lang === 'bn' ? 'আপনার NIHAD BUSINESS POINT পোর্টালে স্বাগতম' : 'Welcome to your premium NIHAD BUSINESS POINT workspace')}
                 {activeTab === 'packages' && (lang === 'bn' ? 'সেরা অফার ও বান্ডেল চেক করুন' : 'Check out top-tier cellular recharge packages')}
                 {activeTab === 'history' && (lang === 'bn' ? 'সকল মোবাইল রিচার্জ ও বিল বিবরণী' : 'View secure logs and ledgers for references')}
@@ -1386,12 +1384,11 @@ export default function App() {
 
             {/* Toolbar Items */}
             <div className="flex items-center gap-4 relative z-10">
-              {/* Notification icon - White styling to match mobile gradient header */}
               <button
                 onClick={() => setIsNotificationsOpen(true)}
-                className="relative p-2.5 rounded-2xl border border-white/25 bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer shadow-md backdrop-blur-md active:scale-95"
+                className="relative p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-all cursor-pointer shadow-md backdrop-blur-md active:scale-95"
               >
-                <Bell className="h-5 w-5 stroke-[2]" />
+                <Bell className="h-5 w-5 stroke-[2] text-slate-300" />
                 {unreadNotifications && (
                   <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
@@ -1403,23 +1400,23 @@ export default function App() {
           </header>
 
           {/* Dynamic Scrollable Working Space */}
-          <div className="flex-1 overflow-y-auto p-10 relative z-0">
+          <div className="flex-1 overflow-y-auto p-8 relative z-0">
             <div className="max-w-[1400px] mx-auto space-y-8">
 
               {activeTab === 'home' && (
                 <div className="space-y-8">
-                  {/* Dynamic Warning Marquee notice ticker */}
+                  {/* Notice ticker */}
                   {appConfig.showNotice && (
-                    <div id="notice-ticker" className="bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl py-2.5 px-4 flex items-center gap-3 overflow-hidden shadow-sm">
-                      <div className="p-1 px-2 bg-amber-500/15 border border-amber-500/20 text-amber-700 rounded-lg shrink-0 flex items-center justify-center gap-2 font-bold text-[10.5px] tracking-widest uppercase">
+                    <div id="notice-ticker" className="bg-amber-500/10 border border-amber-500/20 rounded-2xl py-2.5 px-4 flex items-center gap-3 overflow-hidden shadow-sm">
+                      <div className="p-1 px-2 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg shrink-0 flex items-center justify-center gap-2 font-bold text-[10.5px] tracking-widest uppercase">
                         <span className="relative flex h-1.5 w-1.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400"></span>
                         </span>
                         <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
                       </div>
                       <div className="flex-1 overflow-hidden relative">
-                        <div className="animate-marquee whitespace-nowrap text-amber-900/80 text-[12px] font-bold font-sans">
+                        <div className="animate-marquee whitespace-nowrap text-amber-200 text-[12px] font-bold font-sans">
                           {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
                         </div>
                       </div>
@@ -1427,7 +1424,7 @@ export default function App() {
                   )}
 
                   {/* Banner promotions on top */}
-                  <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-5 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-5 shadow-xl">
                     <Banners
                       lang={lang}
                       banners={dbBanners}
@@ -1443,14 +1440,14 @@ export default function App() {
                         <button
                           key={`desktop-srv-${srv.id}`}
                           onClick={srv.action}
-                          className="bg-white border border-slate-200/60 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 rounded-[2rem] p-7 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[150px] relative overflow-hidden"
+                          className="bg-[#131B2E]/90 border border-slate-800/80 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1 rounded-2xl p-6 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[140px] relative overflow-hidden"
                         >
-                          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-40 transition-opacity duration-500 ${srv.color}`} />
-                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 shadow-sm ${srv.color}`}>
+                          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-30 transition-opacity duration-500 ${srv.color}`} />
+                          <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 shadow-sm ${srv.color}`}>
                             <Icon className="h-5 w-5 stroke-[2.25]" />
                           </div>
                           <div>
-                            <h3 className="text-[14px] font-black text-slate-800 group-hover:text-blue-600 transition-colors tracking-tight">
+                            <h3 className="text-[14px] font-bold text-white group-hover:text-indigo-300 transition-colors tracking-tight">
                               {srv.title}
                             </h3>
                           </div>
@@ -1464,7 +1461,7 @@ export default function App() {
               )}
 
               {activeTab === 'packages' && (
-                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl">
                   <InternetPacks
                     lang={lang}
                     packages={dbOffers}
@@ -1474,7 +1471,7 @@ export default function App() {
               )}
 
               {activeTab === 'history' && (
-                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl">
                   <HistoryList
                     transactions={transactions}
                     lang={lang}
@@ -1483,7 +1480,7 @@ export default function App() {
               )}
 
               {activeTab === 'store' && (
-                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow flex flex-col h-[700px]">
+                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl flex flex-col h-[700px]">
                   <StorePanel
                     lang={lang}
                     walletBalance={balance}
@@ -1492,7 +1489,7 @@ export default function App() {
               )}
 
               {activeTab === 'profile' && (
-                <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-7 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl">
                   <ProfilePanel
                     lang={lang}
                     onLanguageToggle={handleLanguageToggle}
@@ -1521,8 +1518,8 @@ export default function App() {
 
   if (currentUser && isUserAdmin && adminUserViewMode === 'admin') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-0 select-none font-sans antialiased text-slate-100 w-full">
-        <div className="w-full h-screen bg-slate-950 overflow-hidden relative flex flex-col border-none animate-scale-up">
+      <div className="min-h-screen bg-[#060911] flex items-center justify-center p-0 select-none font-sans antialiased text-slate-100 w-full">
+        <div className="w-full h-screen bg-[#060911] overflow-hidden relative flex flex-col border-none animate-scale-up">
           <AdminPanel
             lang={lang}
             isOpen={true}
@@ -1538,17 +1535,17 @@ export default function App() {
   return (
     <div className={`w-full ${
       viewMode === 'desktop' && isLargeScreen
-        ? 'h-screen overflow-hidden bg-slate-50 text-slate-800'
-        : `min-h-screen ${(!currentUser || viewMode === 'mobile-mock') ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} flex items-center justify-center p-0 md:p-6`
+        ? 'h-screen overflow-hidden bg-[#060911] text-white'
+        : `min-h-screen bg-[#060911] text-white flex items-center justify-center p-0 md:p-6`
     } select-none font-sans antialiased`}>
       
       {/* Dynamic view toggler float pill on computer wide screens */}
       {isLargeScreen && (
-        <div className="fixed top-4 right-4 z-50 flex gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-slate-200/40 animate-fade-in">
+        <div className="fixed top-4 right-4 z-50 flex gap-1.5 bg-[#0D111C]/90 backdrop-blur-md p-1.5 rounded-full shadow-xl border border-slate-800 animate-fade-in">
           <button
             onClick={() => setViewMode('desktop')}
             className={`p-2 rounded-full transition-all cursor-pointer ${
-              viewMode === 'desktop' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+              viewMode === 'desktop' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800'
             }`}
             title={lang === 'bn' ? 'কম্পিউটার ড্যাশবোর্ড' : 'Desktop Dashboard'}
           >
@@ -1557,7 +1554,7 @@ export default function App() {
           <button
             onClick={() => setViewMode('mobile-mock')}
             className={`p-2 rounded-full transition-all cursor-pointer ${
-              viewMode === 'mobile-mock' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+              viewMode === 'mobile-mock' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800'
             }`}
             title={lang === 'bn' ? 'মোবাইল স্ক্রিন' : 'Mobile Simulator'}
           >
@@ -1570,7 +1567,7 @@ export default function App() {
         renderDesktopDashboard()
       ) : (
         /* Smartphone Frame Outer Body container */
-        <div className={`w-full max-w-md ${!currentUser ? 'bg-slate-900 border-slate-800 shadow-slate-950/50 text-slate-100' : 'bg-slate-50 border-slate-200/45 shadow-2xl text-slate-800'} min-h-screen md:min-h-[812px] md:rounded-[3rem] relative overflow-hidden flex flex-col pb-24 border`}>
+        <div className={`w-full max-w-md ${!currentUser ? 'bg-[#0B0F19] border-slate-800/80 shadow-2xl text-slate-100' : 'bg-[#0B0F19] border-slate-800/80 shadow-2xl text-slate-100'} min-h-screen md:min-h-[812px] md:rounded-[2.5rem] relative overflow-hidden flex flex-col pb-24 border`}>
         
         {/* Firebase user login / registration system */}
         <AnimatePresence>
@@ -1619,9 +1616,9 @@ export default function App() {
                 onAddFundClick={() => setIsAddFundOpen(true)}
               />
 
-              {/* Grid block of Fintech Services themed like bKash with macOS dock Magnification */}
-              <div className="px-4 -mt-12 relative z-20">
-                <div className="bg-white border border-slate-100/70 rounded-[32px] p-5 shadow-xl grid grid-cols-4 gap-y-5 gap-x-4">
+              {/* Grid block of Fintech Services themed in Lovable Dark Style */}
+              <div className="px-4 -mt-10 relative z-20">
+                <div className="bg-[#121827]/95 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-xl grid grid-cols-4 gap-y-4 gap-x-3">
                   {gridServices.map((srv) => {
                     const Icon = srv.icon;
                     return (
@@ -1630,11 +1627,10 @@ export default function App() {
                         onClick={srv.action}
                         id={`home-service-${srv.id}`}
                         whileHover={{ 
-                          scale: 1.14, 
-                          y: -5,
-                          boxShadow: '0 10px 20px rgba(226,18,93,0.08)' 
+                          scale: 1.1, 
+                          y: -3,
                         }}
-                        whileTap={{ scale: 0.92 }}
+                        whileTap={{ scale: 0.94 }}
                         transition={{ 
                           type: 'spring', 
                           stiffness: 400, 
@@ -1642,11 +1638,11 @@ export default function App() {
                         }}
                         className="flex flex-col items-center justify-center text-center group cursor-pointer focus:outline-none selection:bg-transparent"
                       >
-                        {/* Circular bKash-style icon base container */}
-                        <div className={`h-14 w-14 rounded-full flex items-center justify-center transition-all duration-300 mb-2 border border-white shadow-xs ${srv.color}`}>
-                          <Icon className="h-6 w-6 stroke-[2.25]" />
+                        {/* Circular icon container */}
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-300 mb-1.5 border border-white/10 shadow-md ${srv.color}`}>
+                          <Icon className="h-5 w-5 stroke-[2.25]" />
                         </div>
-                        <span className="text-[10px] font-black text-slate-700 leading-tight block truncate w-full px-0.5 font-sans">
+                        <span className="text-[10.5px] font-bold text-slate-200 leading-tight block truncate w-full px-0.5 font-sans">
                           {srv.title}
                         </span>
                       </motion.button>
@@ -1664,16 +1660,16 @@ export default function App() {
 
               {/* Dynamic Warning Marquee notice ticker */}
               {appConfig.showNotice && (
-                <div id="notice-ticker" className="mx-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl py-2 px-3.5 flex items-center gap-2.5 overflow-hidden shadow-xs">
-                  <div className="p-1 px-1.5 bg-amber-500/10 border border-amber-500/10 text-amber-600 rounded-lg shrink-0 flex items-center justify-center gap-1 font-bold text-[10px] tracking-wide uppercase">
+                <div id="notice-ticker" className="mx-4 bg-amber-500/10 border border-amber-500/20 rounded-xl py-2 px-3.5 flex items-center gap-2.5 overflow-hidden shadow-sm">
+                  <div className="p-1 px-1.5 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg shrink-0 flex items-center justify-center gap-1 font-bold text-[10px] tracking-wide uppercase">
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400"></span>
                     </span>
                     <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
                   </div>
                   <div className="flex-1 overflow-hidden relative">
-                    <div className="animate-marquee whitespace-nowrap text-slate-700 text-[10.5px] font-bold font-sans">
+                    <div className="animate-marquee whitespace-nowrap text-amber-200 text-[10.5px] font-bold font-sans">
                       {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
                     </div>
                   </div>
