@@ -381,7 +381,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'user_transactions' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc'>('requests');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'user_transactions' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc'>('overview');
   const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(true);
   const [userFilterTab, setUserFilterTab] = useState<'all' | 'verified' | 'pending_kyc' | 'suspended'>('all');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
@@ -2968,6 +2968,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   };
 
   const adminTabsList = [
+    { id: 'overview' as const, group: 'ops', label: lang === 'bn' ? 'ড্যাশবোর্ড ওভারভিউ' : 'Overview & Stats', icon: TrendingUp, badge: 0, badgeColor: '' },
     // Group 1: Operations
     { id: 'requests' as const, group: 'ops', label: labels.requests, icon: Layers, badge: pendingRequests.filter(r => r.status === 'Pending').length, badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' },
     { id: 'support' as const, group: 'ops', label: lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets', icon: MessageSquare, badge: supportTickets.filter(t => t.status === 'Open').length, badgeColor: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' },
@@ -3253,8 +3254,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         {/* Scrollable Workspace panel viewport */}
         <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-6 relative z-10 bg-slate-900/30">
           
-          {/* Dynamic math counters for net system audit */}
-          {(() => {
+          {activeSubTab === 'overview' && (() => {
+            // Dynamic math counters for net system audit
             const totalApprovedVolume = pendingRequests
               .filter(r => r.status === 'Success')
               .reduce((acc, r) => acc + (parseFloat(r.amount + '') || 0), 0);

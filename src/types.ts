@@ -8,6 +8,7 @@ export interface OperatorDetails {
   textColor: string;
   gradient: string;
   prefixes: string[];
+  logoUrl?: string;
 }
 
 export type ConnectionType = 'Prepaid' | 'Postpaid' | 'Skitto';

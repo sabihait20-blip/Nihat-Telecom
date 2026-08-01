@@ -647,6 +647,8 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                         </div>
                         <input
                           type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           maxLength={11}
                           placeholder={lang === 'bn' ? 'সচল মোবাইল নম্বর' : 'Contact Phone'}
                           value={contactPhone}
@@ -662,7 +664,9 @@ export default function SimCardModal({ lang, isOpen, onClose, walletBalance }: S
                           <ShieldCheck className="h-4 w-4" />
                         </div>
                         <input
-                          type="text"
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           maxLength={17}
                           placeholder={lang === 'bn' ? 'এনআইডি (NID) নম্বর' : 'NID Number'}
                           value={nidNumber}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, Wifi, PhoneCall, Gift, Smartphone } from 'lucide-react';
+import { Search, Sparkles, Wifi, PhoneCall, Gift, Smartphone, ArrowLeft, ChevronRight } from 'lucide-react';
 import { RechargePackage, Language, Operator } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 import { POPULAR_PACKAGES } from '../data/mockData';
@@ -11,17 +11,75 @@ interface InternetPacksProps {
 }
 
 export default function InternetPacks({ lang, packages = [], onSelectPackage }: InternetPacksProps) {
-  const [selectedOpFilter, setSelectedOpFilter] = useState<Operator | 'ALL'>('ALL');
+  const [selectedOperator, setSelectedOperator] = useState<Operator | null>(null);
   const [selectedCatFilter, setSelectedCatFilter] = useState<'all' | 'internet' | 'talktime' | 'bundle'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const t = TRANSLATIONS[lang];
-
   const activePackages = packages.length > 0 ? packages : POPULAR_PACKAGES;
 
-  // Filter packages based on Operator, Category, and text query
+  const operatorsList: { id: Operator; name: string; color: string; bg: string; border: string; logoText: string; logoUrl?: string; subtitle: string }[] = [
+    { id: 'GP', name: 'Grameenphone (GP)', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', logoText: 'GP', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRyiCDBLtL9jT33e-HTKAFIcAlBPYeXVdUOD3oYfZNSvg&s', subtitle: lang === 'bn' ? 'সেরা ইন্টারনেট ও মিনিট প্যাক' : 'Best Data & Talktime' },
+    { id: 'Robi', name: 'Robi', color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/30', logoText: 'Robi', logoUrl: 'https://www.pestcontrolbd.com/images/clients/robi.jpg', subtitle: lang === 'bn' ? 'সাশ্রয়ী বান্ডেল ও ইন্টারনেট' : 'Affordable Bundles' },
+    { id: 'Airtel', name: 'Airtel', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30', logoText: 'airtel', logoUrl: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh5Mh4tvDmcjk6p06PpIFJeJSG7jyhKNjR86O2wi99p4LBWVnZXzvJFMhPh5zeuv3WswYBKq31Mr39Vhl4Y2DHjBEl0onYye0GhMkCVMrq4ih70SG6eput1CIUJZz3RsatTjPeGfZ1t8JU/s1600/airtel.jpg', subtitle: lang === 'bn' ? 'ফাস্ট ইন্টারনেট অফার' : 'High Speed Internet' },
+    { id: 'Banglalink', name: 'Banglalink', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30', logoText: 'bl', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ1DItgAvyfRdQcnJff6yXYbEYPMlK5xJqG2kBKQSpLKg&s=10', subtitle: lang === 'bn' ? 'স্পেশাল ইন্টারনেট ড্রাইভ' : 'Special Drive Offers' },
+    { id: 'Teletalk', name: 'Teletalk', color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', logoText: 'Teletalk', logoUrl: 'https://play-lh.googleusercontent.com/ktYMmQ1zZln_WczGHsx0xXtzf-G1Mx8qUJl878-u6iQDGfEdjnWZTIAlpSVLLVgYFNKRgTE0l70nrZxZr6xLcec', subtitle: lang === 'bn' ? 'সরকারি নেটওয়ার্ক অফার' : 'Govt Network Offers' },
+  ];
+
+  // If no operator is selected yet, show Operator Selection grid with logos as requested!
+  if (!selectedOperator) {
+    return (
+      <div className="space-y-4 px-4 py-2 pb-24 text-white">
+        <div className="space-y-1">
+          <h2 className="text-white font-bold text-base tracking-tight font-display">
+            {lang === 'bn' ? 'অপারেটর সিলেক্ট করুন' : 'Select Operator'}
+          </h2>
+          <p className="text-xs text-slate-400 font-medium">
+            {lang === 'bn' ? 'আপনার পছন্দের মোবাইল অপারেটর নির্বাচন করে আজকের সেরা অফারগুলো দেখুন' : 'Choose your mobile operator to browse exclusive packs'}
+          </p>
+        </div>
+
+        {/* Operator Cards Grid with Logos */}
+        <div className="grid grid-cols-1 gap-3 pt-2">
+          {operatorsList.map((op) => {
+            const count = activePackages.filter(p => p.operator === op.id).length;
+            return (
+              <button
+                key={op.id}
+                onClick={() => setSelectedOperator(op.id)}
+                className={`p-4 bg-[#131B2E] hover:bg-slate-800/80 border ${op.border} rounded-2xl flex items-center justify-between transition-all cursor-pointer group shadow-lg active:scale-[0.99]`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`h-12 w-12 rounded-2xl ${op.bg} ${op.color} border ${op.border} flex items-center justify-center font-black font-mono text-base shadow-inner group-hover:scale-105 transition-transform overflow-hidden`}>
+                    {op.logoUrl ? (
+                      <img src={op.logoUrl} alt={op.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      op.logoText
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-white font-bold text-sm group-hover:text-indigo-300 transition-colors">
+                      {op.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      {op.subtitle} • <span className="text-indigo-400 font-bold">{count} {lang === 'bn' ? 'টি প্যাক' : 'Packs'}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="h-8 w-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-500 transition-all">
+                  <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Filter packages for selected operator
   const filteredPackages = activePackages.filter((pkg) => {
-    const matchOp = selectedOpFilter === 'ALL' || pkg.operator === selectedOpFilter;
+    const matchOp = pkg.operator === selectedOperator;
     const matchCat = selectedCatFilter === 'all' || pkg.category === selectedCatFilter;
     
     const textQuery = searchQuery ? searchQuery.toLowerCase() : '';
@@ -39,7 +97,6 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
     return matchOp && matchCat && matchSearch;
   });
 
-  const operatorsList: (Operator | 'ALL')[] = ['ALL', 'GP', 'Robi', 'Airtel', 'Banglalink', 'Teletalk'];
   const categoriesList = [
     { id: 'all' as const, label: lang === 'bn' ? 'সব অফার' : 'All Offers', icon: Smartphone },
     { id: 'internet' as const, label: lang === 'bn' ? 'ইন্টারনেট' : 'Internet', icon: Wifi },
@@ -47,53 +104,37 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
     { id: 'bundle' as const, label: lang === 'bn' ? 'বান্ডেল' : 'Bundles', icon: Gift },
   ];
 
+  const currentOpInfo = operatorsList.find(o => o.id === selectedOperator) || operatorsList[0];
+
   return (
     <div className="space-y-4 px-4 py-2 pb-24 text-white">
-      {/* Header section with search bar */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-white font-bold text-base tracking-tight font-display">
-              {t.availableOffers}
-            </h2>
-            <p className="text-xs text-slate-400 font-medium">
-              {lang === 'bn' ? 'সহজে সেরা ডিল চেক করুন ও রিচার্জ করুন' : 'Find localized voice, data and talktime packages'}
-            </p>
-          </div>
-        </div>
+      {/* Header section with Back button & operator badge */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <button
+          onClick={() => setSelectedOperator(null)}
+          className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-[#131B2E] border border-slate-800 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4 text-indigo-400" />
+          <span>{lang === 'bn' ? 'অন্য অপারেটর' : 'Change Operator'}</span>
+        </button>
 
-        {/* Search bar widget */}
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.searchPack}
-            className="w-full bg-[#131B2E] border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors shadow-sm text-white placeholder:text-slate-500"
-          />
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded-xl text-xs font-black ${currentOpInfo.bg} ${currentOpInfo.color} border ${currentOpInfo.border}`}>
+            {currentOpInfo.name}
+          </span>
         </div>
       </div>
 
-      {/* Operator Horizontal Pill Filters */}
-      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
-        {operatorsList.map((op) => {
-          const isActive = selectedOpFilter === op;
-          return (
-            <button
-              key={op}
-              onClick={() => setSelectedOpFilter(op)}
-              id={`pack-op-filter-${op}`}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-[#131B2E] border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              {op === 'ALL' ? t.allOperators : op}
-            </button>
-          );
-        })}
+      {/* Search bar widget */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t.searchPack}
+          className="w-full bg-[#131B2E] border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors shadow-sm text-white placeholder:text-slate-500"
+        />
       </div>
 
       {/* Category Grid Filter Buttons */}
@@ -105,7 +146,6 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
             <button
               key={cat.id}
               onClick={() => setSelectedCatFilter(cat.id)}
-              id={`pack-cat-filter-${cat.id}`}
               className={`py-2.5 px-1 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                 isActive
                   ? 'border-indigo-500/40 bg-indigo-600/20 text-indigo-300 shadow-sm'
@@ -203,10 +243,17 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
             </div>
           ))
         ) : (
-          <div className="text-center py-10 bg-[#131B2E] border border-slate-800 rounded-2xl">
+          <div className="text-center py-12 bg-[#131B2E] border border-slate-800 rounded-2xl space-y-2">
+            <Smartphone className="h-8 w-8 text-slate-500 mx-auto" />
             <p className="text-slate-400 text-xs font-bold">
-              {lang === 'bn' ? 'কোনো প্যাকেজ পাওয়া যায়নি।' : 'No packages match selected filters.'}
+              {lang === 'bn' ? 'এই অপারেটরের কোনো প্যাকেজ পাওয়া যায়নি।' : 'No packages found for this operator.'}
             </p>
+            <button
+              onClick={() => setSelectedOperator(null)}
+              className="text-xs text-indigo-400 font-bold hover:underline cursor-pointer"
+            >
+              {lang === 'bn' ? 'অন্য অপারেটর নির্বাচন করুন' : 'Select another operator'}
+            </button>
           </div>
         )}
       </div>

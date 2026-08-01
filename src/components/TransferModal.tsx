@@ -297,6 +297,8 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
               </div>
               <input
                 type={method === 'NIHAD BUSINESS POINT Wallet (User)' ? 'text' : 'tel'}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 required
                 value={targetNumber}
                 onChange={(e) => {

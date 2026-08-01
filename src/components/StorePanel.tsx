@@ -1067,7 +1067,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               <form onSubmit={handleSaveSupplier} className="space-y-3">
                 <input type="text" required placeholder="Company Name" value={supplierForm.companyName} onChange={e => setSupplierForm({...supplierForm, companyName: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
                 <input type="text" placeholder="Contact Person" value={supplierForm.contactPerson} onChange={e => setSupplierForm({...supplierForm, contactPerson: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
-                <input type="tel" required placeholder="Phone" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="tel" inputMode="numeric" pattern="[0-9]*" required placeholder="Phone" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value.replace(/\D/g, '')})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
                 <input type="text" placeholder="Address" value={supplierForm.address} onChange={e => setSupplierForm({...supplierForm, address: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
                 <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs">Save Supplier</button>
               </form>
@@ -1084,7 +1084,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               <h3 className="text-base font-black text-slate-900">Add New Customer</h3>
               <form onSubmit={handleSaveCustomer} className="space-y-3">
                 <input type="text" required placeholder="Customer Name" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
-                <input type="tel" required placeholder="Phone Number" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
+                <input type="tel" inputMode="numeric" pattern="[0-9]*" required placeholder="Phone Number" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value.replace(/\D/g, '')})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
                 <input type="text" placeholder="Address" value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value})} className="w-full bg-slate-100 rounded-xl p-3 text-xs border-none" />
                 <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs">Save Customer</button>
               </form>

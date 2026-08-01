@@ -292,7 +292,9 @@ export default function BillPayModal({
                   {t.enterCustId}
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value.replace(/\D/g, ''))}
                   placeholder={t.custNoPlaceholder}

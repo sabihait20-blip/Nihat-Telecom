@@ -9,6 +9,7 @@ export const OPERATORS: Record<string, OperatorDetails> = {
     textColor: 'text-blue-600',
     gradient: 'from-blue-500 to-sky-400',
     prefixes: ['017', '013'],
+    logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRyiCDBLtL9jT33e-HTKAFIcAlBPYeXVdUOD3oYfZNSvg&s',
   },
   Robi: {
     id: 'Robi',
@@ -18,6 +19,7 @@ export const OPERATORS: Record<string, OperatorDetails> = {
     textColor: 'text-orange-500',
     gradient: 'from-orange-500 to-red-400',
     prefixes: ['018'],
+    logoUrl: 'https://www.pestcontrolbd.com/images/clients/robi.jpg',
   },
   Airtel: {
     id: 'Airtel',
@@ -27,6 +29,7 @@ export const OPERATORS: Record<string, OperatorDetails> = {
     textColor: 'text-red-600',
     gradient: 'from-red-600 to-pink-500',
     prefixes: ['016'],
+    logoUrl: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh5Mh4tvDmcjk6p06PpIFJeJSG7jyhKNjR86O2wi99p4LBWVnZXzvJFMhPh5zeuv3WswYBKq31Mr39Vhl4Y2DHjBEl0onYye0GhMkCVMrq4ih70SG6eput1CIUJZz3RsatTjPeGfZ1t8JU/s1600/airtel.jpg',
   },
   Banglalink: {
     id: 'Banglalink',
@@ -36,6 +39,7 @@ export const OPERATORS: Record<string, OperatorDetails> = {
     textColor: 'text-amber-500',
     gradient: 'from-amber-500 to-orange-400',
     prefixes: ['019', '014'],
+    logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ1DItgAvyfRdQcnJff6yXYbEYPMlK5xJqG2kBKQSpLKg&s=10',
   },
   Teletalk: {
     id: 'Teletalk',
@@ -45,6 +49,7 @@ export const OPERATORS: Record<string, OperatorDetails> = {
     textColor: 'text-emerald-600',
     gradient: 'from-emerald-600 to-teal-400',
     prefixes: ['015'],
+    logoUrl: 'https://play-lh.googleusercontent.com/ktYMmQ1zZln_WczGHsx0xXtzf-G1Mx8qUJl878-u6iQDGfEdjnWZTIAlpSVLLVgYFNKRgTE0l70nrZxZr6xLcec',
   },
 };
 
