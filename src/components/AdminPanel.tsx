@@ -521,9 +521,15 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   // Dynamic App Settings State
   const [settingsForm, setSettingsForm] = useState({
-    bkashNumber: '01970250988',
-    nagadNumber: '01970250988',
-    rocketNumber: '019702509883',
+    agentBkashNumber: '01970250988',
+    agentNagadNumber: '01970250988',
+    agentRocketNumber: '019702509883',
+    agentUpayNumber: '01970250988',
+    personalBkashNumber: '01970250988',
+    personalNagadNumber: '01970250988',
+    personalRocketNumber: '019702509883',
+    personalUpayNumber: '01970250988',
+    personalCharge: '1.5% বা প্রতি হাজারে ১৫ টাকা',
     helplineNumber: '01970250988',
     whatsappUrl: 'https://wa.me/8801970250988',
     minAddFund: 100,
@@ -541,9 +547,15 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       if (docSnap.exists()) {
         const data = docSnap.data();
         setSettingsForm({
-          bkashNumber: data.bkashNumber || '01970250988',
-          nagadNumber: data.nagadNumber || '01970250988',
-          rocketNumber: data.rocketNumber || '019702509883',
+          agentBkashNumber: data.agentBkashNumber || data.bkashNumber || '01970250988',
+          agentNagadNumber: data.agentNagadNumber || data.nagadNumber || '01970250988',
+          agentRocketNumber: data.agentRocketNumber || data.rocketNumber || '019702509883',
+          agentUpayNumber: data.agentUpayNumber || data.bkashNumber || '01970250988',
+          personalBkashNumber: data.personalBkashNumber || data.bkashNumber || '01970250988',
+          personalNagadNumber: data.personalNagadNumber || data.nagadNumber || '01970250988',
+          personalRocketNumber: data.personalRocketNumber || data.rocketNumber || '019702509883',
+          personalUpayNumber: data.personalUpayNumber || data.bkashNumber || '01970250988',
+          personalCharge: data.personalCharge || '1.5% বা প্রতি হাজারে ১৫ টাকা',
           helplineNumber: data.helplineNumber || '01970250988',
           whatsappUrl: data.whatsappUrl || 'https://wa.me/8801970250988',
           minAddFund: typeof data.minAddFund === 'number' ? data.minAddFund : 100,
@@ -6792,48 +6804,133 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
               <form onSubmit={handleSaveSettings} className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 space-y-6">
                 
-                {/* Section A: Active Mobile Banking Numbers */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">
-                    1. Active Deposit Numbers (Personal / Send Money)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
-                        bKash Personal Number
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={settingsForm.bkashNumber || ''}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, bkashNumber: e.target.value })}
-                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
-                      />
+                {/* Section A: Active Mobile Banking Numbers (Agent & Personal + Charge) */}
+                <div className="space-y-6">
+                  {/* Agent Numbers */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold text-blue-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono flex items-center justify-between">
+                      <span>1. Agent Deposit Numbers (Cash Out)</span>
+                      <span className="text-[9px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">bKash, Nagad, Rocket, Upay</span>
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Agent bKash
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.agentBkashNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, agentBkashNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Agent Nagad
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.agentNagadNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, agentNagadNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Agent Rocket
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.agentRocketNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, agentRocketNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Agent Upay
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.agentUpayNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, agentUpayNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personal Numbers & Charge */}
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-xs font-bold text-purple-400 border-b border-white/5 pb-2 uppercase tracking-wider font-mono flex items-center justify-between">
+                      <span>2. Personal Deposit Numbers & Charge (Send Money)</span>
+                      <span className="text-[9px] text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">bKash, Nagad, Rocket, Upay</span>
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Personal bKash
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.personalBkashNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, personalBkashNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Personal Nagad
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.personalNagadNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, personalNagadNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Personal Rocket
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.personalRocketNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, personalRocketNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
+                          Personal Upay
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.personalUpayNumber || ''}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, personalUpayNumber: e.target.value })}
+                          className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3 text-xs font-bold font-mono outline-none focus:border-purple-500"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
-                        Nagad Personal Number
+                    <div className="space-y-1 pt-1">
+                      <label className="text-[10px] font-extrabold text-amber-400 uppercase tracking-wider block ml-1 font-mono">
+                        Personal Transfer Charge Note (উদাহরণ: 1.5% বা প্রতি হাজারে ১৫ টাকা)
                       </label>
                       <input
                         type="text"
-                        required
-                        value={settingsForm.nagadNumber || ''}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, nagadNumber: e.target.value })}
-                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block ml-1 font-mono">
-                        Rocket Personal Number
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={settingsForm.rocketNumber || ''}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, rocketNumber: e.target.value })}
-                        className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                        value={settingsForm.personalCharge || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, personalCharge: e.target.value })}
+                        placeholder="1.5% বা প্রতি হাজারে ১৫ টাকা"
+                        className="w-full bg-slate-950 border border-amber-500/30 text-amber-300 rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-amber-500"
                       />
                     </div>
                   </div>

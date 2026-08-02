@@ -3,44 +3,44 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Landmark, Smartphone, Check, ShieldCheck, 
   HelpCircle, Sparkles, Plus, RefreshCw, AlertCircle, ArrowRight,
-  QrCode, Download, Copy, ExternalLink, CheckCircle2
+  UserCheck, Building2, Copy, CheckCircle2
 } from 'lucide-react';
 import { Language } from '../types';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import QRCode from 'qrcode';
 
 interface AddFundModalProps {
   lang: Language;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (amount: number, method: string, trxId: string, senderNumber: string) => void;
+  onSuccess: (amount: number, method: string, trxId: string, senderNumber: string, accountType: string) => void;
 }
 
-type DepositMethod = 'bkash' | 'nagad' | 'rocket';
-type TabType = 'trx' | 'qr';
+type DepositMethod = 'bkash' | 'nagad' | 'rocket' | 'upay';
+type AccountType = 'agent' | 'personal';
 
 export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFundModalProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('qr'); // Default to Dynamic QR as requested
+  const [accountType, setAccountType] = useState<AccountType>('agent');
   const [method, setMethod] = useState<DepositMethod>('bkash');
   const [amountInput, setAmountInput] = useState<string>('500');
   const [senderNumber, setSenderNumber] = useState<string>('');
   const [trxId, setTrxId] = useState<string>('');
-  
-  // QR generation state
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
-  
-  // Checking & validation states
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>('');
   const [showSuccessOverlay, setShowSuccessOverlay] = useState<boolean>(false);
 
-  // Dynamic system settings configuration
   const [settings, setSettings] = useState({
-    bkashNumber: '01970250988',
-    nagadNumber: '01970250988',
-    rocketNumber: '019702509883',
+    agentBkashNumber: '01970250988',
+    agentNagadNumber: '01970250988',
+    agentRocketNumber: '019702509883',
+    agentUpayNumber: '01970250988',
+    personalBkashNumber: '01970250988',
+    personalNagadNumber: '01970250988',
+    personalRocketNumber: '019702509883',
+    personalUpayNumber: '01970250988',
+    personalCharge: '1.5% (প্রতি হাজারে ১৫ টাকা)',
     minAddFund: 100,
     maxAddFund: 25000,
   });
@@ -52,9 +52,15 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
       if (docSnap.exists()) {
         const data = docSnap.data();
         setSettings({
-          bkashNumber: data.bkashNumber || '01970250988',
-          nagadNumber: data.nagadNumber || '01970250988',
-          rocketNumber: data.rocketNumber || '019702509883',
+          agentBkashNumber: data.agentBkashNumber || data.bkashNumber || '01970250988',
+          agentNagadNumber: data.agentNagadNumber || data.nagadNumber || '01970250988',
+          agentRocketNumber: data.agentRocketNumber || data.rocketNumber || '019702509883',
+          agentUpayNumber: data.agentUpayNumber || data.bkashNumber || '01970250988',
+          personalBkashNumber: data.personalBkashNumber || data.bkashNumber || '01970250988',
+          personalNagadNumber: data.personalNagadNumber || data.nagadNumber || '01970250988',
+          personalRocketNumber: data.personalRocketNumber || data.rocketNumber || '019702509883',
+          personalUpayNumber: data.personalUpayNumber || data.bkashNumber || '01970250988',
+          personalCharge: data.personalCharge || '1.5% (প্রতি হাজারে ১৫ টাকা)',
           minAddFund: typeof data.minAddFund === 'number' ? data.minAddFund : 100,
           maxAddFund: typeof data.maxAddFund === 'number' ? data.maxAddFund : 25000,
         });
@@ -65,64 +71,46 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
     return () => unsubscribe();
   }, [isOpen]);
 
-  // Generate Dynamic QR code whenever amount, method, or number changes
-  useEffect(() => {
-    if (!isOpen) return;
-    const amt = parseFloat(amountInput) || 0;
-    const targetNumber = getPersonalNumber(method);
-    const paymentUri = `mfs://${method}?to=${targetNumber}&amount=${amt}&ref=NIBP-${Date.now()}&v=2.0`;
-    
-    const darkColor = method === 'bkash' ? '#e2136e' : method === 'nagad' ? '#ec1c24' : '#8c35b3';
-
-    QRCode.toDataURL(paymentUri, {
-      width: 280,
-      margin: 2,
-      color: {
-        dark: darkColor,
-        light: '#ffffff',
-      }
-    })
-      .then((url) => {
-        setQrDataUrl(url);
-      })
-      .catch((err) => {
-        console.error("QR generation error:", err);
-      });
-  }, [isOpen, method, amountInput, settings]);
-
   if (!isOpen) return null;
 
-  // Localized string packs
   const labels = {
     title: lang === 'bn' ? 'ওয়ালেটে টাকা যোগ করুন' : 'Add Fund to Wallet',
-    subtitle: lang === 'bn' ? 'ডায়নামিক QR কোড স্ক্যান বা সেন্ড মানির মাধ্যমে ব্যালেন্স রিচার্জ করুন' : 'Deposit instantly via Dynamic QR Code or Send Money',
-    selectMethod: lang === 'bn' ? 'মাধ্যমে নির্বাচন করুন' : 'Select Operator',
-    merchantInstr: lang === 'bn' ? 'ডায়নামিক QR কোড পেমেন্ট নির্দেশিকা' : 'Dynamic QR Code Payment Guide',
+    subtitle: lang === 'bn' ? 'এজেন্ট বা পার্সোনাল নম্বরে ক্যাশ আউট/সেন্ড মানি করে পেমেন্ট নিশ্চিত করুন' : 'Deposit via Agent Cash Out or Personal Send Money accounts',
+    selectType: lang === 'bn' ? 'অ্যাকাউন্টের ধরন নির্বাচন করুন' : 'Select Account Type',
+    selectMethod: lang === 'bn' ? 'মাধ্যম নির্বাচন করুন' : 'Select Operator',
     amtLabel: lang === 'bn' ? 'টাকার পরিমাণ (৳)' : 'Enter Amount (৳)',
     senderLabel: lang === 'bn' ? 'যে নম্বর থেকে টাকা পাঠিয়েছেন' : 'Your Sender Number / Account',
-    trxLabel: lang === 'bn' ? 'লেনদেনের ট্রানজেকশন আইডি (TrxID)' : 'Payment Transaction ID (TrxID)',
-    placeholderTrx: lang === 'bn' ? 'যেমন: bK92H7K0L' : 'e.g. BK92H7K0L',
+    trxLabel: lang === 'bn' ? 'ট্রানজেকশন আইডি (TrxID)' : 'Transaction ID (TrxID)',
+    placeholderTrx: lang === 'bn' ? 'যেমন: 9H7K0L' : 'e.g. 9H7K0L',
     placeholderSender: lang === 'bn' ? 'যেমন: 017XXXXXXXX' : 'e.g. 017XXXXXXXX',
     placeholderAmt: lang === 'bn' ? `ন্যূনতম ${settings.minAddFund} টাকা` : `Minimum ৳${settings.minAddFund}`,
     cancel: lang === 'bn' ? 'বাতিল' : 'Cancel',
     submit: lang === 'bn' ? 'পেমেন্ট ভেরিফাই করুন' : 'Verify & Add Fund',
     successTitle: lang === 'bn' ? 'টাকা যোগ সফল হয়েছে!' : 'Fund Added Successfully!',
-    successDesc: lang === 'bn' ? 'আপনার ব্যালেন্স সাথে সাথে আপডেট করা হয়েছে।' : 'Your digital wallet balance has been updated instantly.',
-    fees: lang === 'bn' ? 'সার্ভিস চার্জ: ৳ ০.০০ (ফ্রি)' : 'Service Charge: ৳0.00 (Free)',
-    tabQr: lang === 'bn' ? 'ডায়নামিক QR কোড' : 'Dynamic QR Code',
-    tabTrx: lang === 'bn' ? 'ম্যানুয়াল TrxID' : 'Manual TrxID',
-    scanHint: lang === 'bn' ? 'আপনার মোবাইল ব্যাংকিং অ্যাপ দিয়ে স্ক্যান করুন' : 'Scan with your banking app to pay instantly',
-    copyLink: lang === 'bn' ? 'পেমেন্ট লিংক কপি করুন' : 'Copy Payment Data',
+    successDesc: lang === 'bn' ? 'আপনার ব্যালেন্স সফলভাবে আপডেট করা হয়েছে।' : 'Your digital wallet balance has been updated.',
+    agentLabel: lang === 'bn' ? 'এজেন্ট (Cash Out)' : 'Agent (Cash Out)',
+    personalLabel: lang === 'bn' ? 'পার্সোনাল (Send Money)' : 'Personal (Send Money)',
+    copyNumber: lang === 'bn' ? 'নম্বর কপি করুন' : 'Copy Number',
     copiedText: lang === 'bn' ? 'কপি হয়েছে!' : 'Copied!',
-    simulateScan: lang === 'bn' ? 'সরাসরি পেমেন্ট সম্পন্ন করুন (Simulate Scan)' : 'Simulate Scan & Instant Pay',
   };
 
-  const getPersonalNumber = (m: DepositMethod) => {
-    switch (m) {
-      case 'bkash': return settings.bkashNumber;
-      case 'nagad': return settings.nagadNumber;
-      case 'rocket': return settings.rocketNumber;
-      default: return settings.bkashNumber;
+  const getTargetNumber = () => {
+    if (accountType === 'agent') {
+      switch (method) {
+        case 'bkash': return settings.agentBkashNumber;
+        case 'nagad': return settings.agentNagadNumber;
+        case 'rocket': return settings.agentRocketNumber;
+        case 'upay': return settings.agentUpayNumber;
+        default: return settings.agentBkashNumber;
+      }
+    } else {
+      switch (method) {
+        case 'bkash': return settings.personalBkashNumber;
+        case 'nagad': return settings.personalNagadNumber;
+        case 'rocket': return settings.personalRocketNumber;
+        case 'upay': return settings.personalUpayNumber;
+        default: return settings.personalBkashNumber;
+      }
     }
   };
 
@@ -131,34 +119,14 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
       case 'bkash': return 'bKash';
       case 'nagad': return 'Nagad';
       case 'rocket': return 'Rocket';
+      case 'upay': return 'Upay';
     }
   };
 
-  const handleCopyQrData = () => {
-    const data = `MFS: ${getMethodName(method)} | To: ${getPersonalNumber(method)} | Amount: ৳${amountInput || 0}`;
-    navigator.clipboard.writeText(data);
+  const handleCopyNumber = () => {
+    navigator.clipboard.writeText(getTargetNumber());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleSimulateQrPayment = () => {
-    const amt = parseFloat(amountInput);
-    if (isNaN(amt) || amt < settings.minAddFund) {
-      setValidationError(lang === 'bn' ? `অনুগ্রহ করে কমপক্ষে ${settings.minAddFund} টাকা প্রবেশ করান!` : `Minimum deposit is ৳${settings.minAddFund}.`);
-      setActiveTab('qr');
-      return;
-    }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowSuccessOverlay(true);
-      setTimeout(() => {
-        const dummyTrx = 'QR' + Math.random().toString(36).substring(2, 8).toUpperCase();
-        onSuccess(amt, getMethodName(method), dummyTrx, 'QR-DYNAMIC-PAY');
-        setShowSuccessOverlay(false);
-        onClose();
-      }, 1800);
-    }, 1500);
   };
 
   const handleAddFundSubmit = (e: React.FormEvent) => {
@@ -181,8 +149,8 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
       return;
     }
 
-    if (!trxId.trim() || trxId.length < 6) {
-      setValidationError(lang === 'bn' ? 'সঠিক পেমেন্ট ট্রানজেকশন আইডি (TrxID) দিন!' : 'Please input a valid transaction ID of 6+ characters.');
+    if (!trxId.trim() || trxId.length < 5) {
+      setValidationError(lang === 'bn' ? 'সঠিক পেমেন্ট ট্রানজেকশন আইডি (TrxID) দিন!' : 'Please input a valid transaction ID.');
       return;
     }
 
@@ -193,26 +161,21 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
       setShowSuccessOverlay(true);
       
       setTimeout(() => {
-        onSuccess(amt, getMethodName(method), trxId, senderNumber);
+        const fullMethodName = `${getMethodName(method)} (${accountType === 'agent' ? 'Agent' : 'Personal'})`;
+        onSuccess(amt, fullMethodName, trxId, senderNumber, accountType);
         setShowSuccessOverlay(false);
         setAmountInput('');
         setSenderNumber('');
         setTrxId('');
         onClose();
       }, 2000);
-    }, 1800);
+    }, 1500);
   };
 
   return (
     <div className="absolute inset-0 z-50 flex items-end justify-center">
-      
-      {/* Backdrop overlay blur */}
-      <div 
-        onClick={onClose}
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-      />
+      <div onClick={onClose} className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs cursor-pointer" />
 
-      {/* Modal Slide Drawer */}
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -220,20 +183,18 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
         transition={{ type: 'spring', damping: 24, stiffness: 220 }}
         className="relative bg-white w-full max-h-[92%] rounded-t-[36px] shadow-2xl p-6 border-t border-slate-150 flex flex-col space-y-4 relative z-10 overflow-y-auto"
       >
-        {/* Top drag notch bar */}
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto" />
 
-        {/* Modal Title Row */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 mt-1">
           <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 bg-gradient-to-br from-pink-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md shadow-pink-500/20">
-              <QrCode className="h-5 w-5" />
+            <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/20">
+              <Landmark className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-slate-900 font-black text-sm tracking-tight">{labels.title}</h3>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-extrabold text-[9px] border border-emerald-200 flex items-center gap-1">
-                  <Sparkles className="h-2.5 w-2.5" /> Dynamic QR Active
+                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-extrabold text-[9px] border border-blue-200 uppercase tracking-wide">
+                  {accountType === 'agent' ? labels.agentLabel : labels.personalLabel}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-semibold">{labels.subtitle}</p>
@@ -241,391 +202,251 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer focus:outline-none"
+            className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Tab Switcher: Dynamic QR vs Manual TrxID */}
-        <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl">
-          <button
-            type="button"
-            onClick={() => setActiveTab('qr')}
-            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'qr'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <QrCode className="h-4 w-4 text-pink-600" />
-            <span>{labels.tabQr}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('trx')}
-            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'trx'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <ShieldCheck className="h-4 w-4 text-indigo-600" />
-            <span>{labels.tabTrx}</span>
-          </button>
-        </div>
-
-        {/* Selector Panel block of MFS operators */}
-        <div className="space-y-1.5">
+        {/* Account Type Selector: Agent vs Personal */}
+        <div className="space-y-1">
           <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block ml-1">
-            {labels.selectMethod}
+            {labels.selectType}
           </label>
-          <div className="grid grid-cols-3 gap-2">
-            {/* bKash MFS */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl">
             <button
               type="button"
-              onClick={() => setMethod('bkash')}
-              className={`p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center text-center cursor-pointer transition-all active:scale-95 ${
-                method === 'bkash' 
-                  ? 'border-pink-500 bg-pink-50 text-pink-600 shadow-[0_4px_12px_rgba(236,72,153,0.15)] font-black' 
-                  : 'border-slate-150 hover:border-slate-300 text-slate-500'
+              onClick={() => setAccountType('agent')}
+              className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                accountType === 'agent'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <div className="h-6 w-6 rounded-lg bg-pink-100 flex items-center justify-center text-pink-600 font-black text-xs font-mono mb-1">
-                BK
-              </div>
-              <span className="text-[10px] font-bold">bKash</span>
+              <Building2 className="h-4 w-4" />
+              <span>{labels.agentLabel}</span>
             </button>
-
-            {/* Nagad MFS */}
             <button
               type="button"
-              onClick={() => setMethod('nagad')}
-              className={`p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center text-center cursor-pointer transition-all active:scale-95 ${
-                method === 'nagad' 
-                  ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-[0_4px_12px_rgba(249,115,22,0.15)] font-black' 
-                  : 'border-slate-150 hover:border-slate-300 text-slate-500'
+              onClick={() => setAccountType('personal')}
+              className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                accountType === 'personal'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <div className="h-6 w-6 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs font-mono mb-1">
-                NG
-              </div>
-              <span className="text-[10px] font-bold">Nagad</span>
-            </button>
-
-            {/* Rocket MFS */}
-            <button
-              type="button"
-              onClick={() => setMethod('rocket')}
-              className={`p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center text-center cursor-pointer transition-all active:scale-95 ${
-                method === 'rocket' 
-                  ? 'border-purple-600 bg-purple-50 text-purple-700 shadow-[0_4px_12px_rgba(147,51,234,0.15)] font-black' 
-                  : 'border-slate-150 hover:border-slate-300 text-slate-500'
-              }`}
-            >
-              <div className="h-6 w-6 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs font-mono mb-1">
-                RK
-              </div>
-              <span className="text-[10px] font-bold">Rocket</span>
+              <UserCheck className="h-4 w-4" />
+              <span>{labels.personalLabel}</span>
             </button>
           </div>
         </div>
 
-        {/* TAB 1: DYNAMIC QR CODE VIEW */}
-        {activeTab === 'qr' && (
-          <div className="space-y-4">
-            {/* Amount Input for Dynamic QR generation */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">
-                  {labels.amtLabel}
-                </label>
-                <span className="text-[9.5px] font-extrabold text-indigo-600">{labels.fees}</span>
-              </div>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-extrabold text-xs">
-                  ৳
-                </span>
-                <input
-                  type="number"
-                  required
-                  min="100"
-                  max="25000"
-                  placeholder={labels.placeholderAmt}
-                  value={amountInput}
-                  onChange={(e) => {
-                    setValidationError('');
-                    setAmountInput(e.target.value.replace(/\D/g, ''));
-                  }}
-                  className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-8 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Quick preset amount select tags */}
-            <div className="flex gap-2 justify-start overflow-x-auto pb-1">
-              {['100', '500', '1000', '2000', '5000', '10000'].map((preset) => (
-                <button
-                  type="button"
-                  key={preset}
-                  onClick={() => setAmountInput(preset)}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-extrabold border transition-all cursor-pointer ${
-                    amountInput === preset
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200/40'
-                  }`}
-                >
-                  ৳{preset}
-                </button>
-              ))}
-            </div>
-
-            {/* Dynamic QR Card Display Box */}
-            <div className="bg-gradient-to-b from-slate-50 to-slate-100/60 border border-slate-200 rounded-3xl p-5 flex flex-col items-center text-center shadow-inner relative overflow-hidden">
-              <div className="absolute top-3 right-3">
-                <span className={`px-2.5 py-1 rounded-full text-[9.5px] font-black uppercase tracking-wider text-white shadow-sm ${
-                  method === 'bkash' ? 'bg-pink-600' : method === 'nagad' ? 'bg-orange-600' : 'bg-purple-700'
-                }`}>
-                  {getMethodName(method)} QR
-                </span>
-              </div>
-
-              <div className="mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                  {lang === 'bn' ? 'স্ক্যান করুন পেমেন্টের জন্য' : 'Scan to Pay'}
-                </span>
-                <h4 className="text-base font-black text-slate-900 font-mono">
-                  ৳{amountInput ? parseInt(amountInput).toLocaleString() : '0'}
-                </h4>
-              </div>
-
-              {/* Generated QR Image Frame */}
-              <div className="bg-white p-3 rounded-2xl shadow-md border border-slate-200 my-2 relative group">
-                {qrDataUrl ? (
-                  <img 
-                    src={qrDataUrl} 
-                    alt="Dynamic MFS QR Code" 
-                    className="h-44 w-44 object-contain rounded-xl"
-                  />
-                ) : (
-                  <div className="h-44 w-44 flex items-center justify-center text-slate-400">
-                    <RefreshCw className="h-6 w-6 animate-spin" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2 backdrop-blur-xs">
-                  <a
-                    href={qrDataUrl}
-                    download={`${method}-qr-${amountInput || 100}.png`}
-                    className="p-2.5 bg-white text-slate-800 rounded-xl shadow-lg hover:bg-slate-100 transition-colors"
-                    title="Download QR"
-                  >
-                    <Download className="h-4 w-4" />
-                  </a>
+        {/* Method Selector: bKash, Nagad, Rocket, Upay */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block ml-1">
+            {labels.selectMethod}
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { id: 'bkash', name: 'bKash', color: 'pink', logo: 'https://mohammadalinijhoom.com/wp-content/uploads/2024/07/bKash-Logo.png' },
+              { id: 'nagad', name: 'Nagad', color: 'orange', logo: 'https://play-lh.googleusercontent.com/a4Qhv-EDolTnZlCq5p1ybZRF4J0dHKjDQEYrfOXqjsHvsKX5EXHVc8M0Vbh7Qfsn8LeNBIWdP6pbzHkEPMs3MQ=w600-h300-pc0xffffff-pd' },
+              { id: 'rocket', name: 'Rocket', color: 'purple', logo: 'https://static.vecteezy.com/system/resources/thumbnails/068/706/013/small/rocket-color-logo-mobile-banking-icon-free-png.png' },
+              { id: 'upay', name: 'Upay', color: 'teal', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Upay_logo.svg/250px-Upay_logo.svg.png' },
+            ].map((m) => (
+              <button
+                type="button"
+                key={m.id}
+                onClick={() => setMethod(m.id as DepositMethod)}
+                className={`p-2 rounded-2xl border-2 flex flex-col items-center justify-center text-center cursor-pointer transition-all active:scale-95 ${
+                  method === m.id 
+                    ? `border-${m.color}-500 bg-${m.color}-50 text-${m.color}-700 shadow-sm font-black` 
+                    : 'border-slate-150 hover:border-slate-300 text-slate-500'
+                }`}
+              >
+                <div className="h-8 w-8 rounded-xl bg-white p-1 flex items-center justify-center border border-slate-150 shadow-2xs mb-1 overflow-hidden shrink-0">
+                  <img src={m.logo} alt={m.name} className="h-full w-full object-contain" referrerPolicy="no-referrer" />
                 </div>
-              </div>
+                <span className="text-[10px] font-bold">{m.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-              <div className="text-[11px] text-slate-500 font-medium space-y-0.5 mt-1">
-                <p>
-                  {lang === 'bn' ? 'মার্চেন্ট নম্বর:' : 'Merchant Number:'}{' '}
-                  <strong className="text-slate-900 font-mono">{getPersonalNumber(method)}</strong>
-                </p>
-                <p className="text-[10px] text-emerald-600 font-bold flex items-center justify-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> {labels.scanHint}
-                </p>
-              </div>
-
-              {/* QR Action Toolbar */}
-              <div className="grid grid-cols-2 gap-2 w-full mt-4">
-                <button
-                  type="button"
-                  onClick={handleCopyQrData}
-                  className="py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[11px] font-black border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-blue-600" />}
-                  <span>{copied ? labels.copiedText : labels.copyLink}</span>
-                </button>
-                <a
-                  href={qrDataUrl}
-                  download={`${method}-qr-${amountInput || 100}.png`}
-                  className="py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[11px] font-black border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Download className="h-3.5 w-3.5 text-indigo-600" />
-                  <span>{lang === 'bn' ? 'QR ডাউনলোড' : 'Save QR'}</span>
-                </a>
-              </div>
+        {/* Target Number Display & Copy Box */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 bg-white border border-slate-200 rounded-xl p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
+              <img 
+                src={
+                  method === 'bkash' ? 'https://mohammadalinijhoom.com/wp-content/uploads/2024/07/bKash-Logo.png' :
+                  method === 'nagad' ? 'https://play-lh.googleusercontent.com/a4Qhv-EDolTnZlCq5p1ybZRF4J0dHKjDQEYrfOXqjsHvsKX5EXHVc8M0Vbh7Qfsn8LeNBIWdP6pbzHkEPMs3MQ=w600-h300-pc0xffffff-pd' :
+                  method === 'rocket' ? 'https://static.vecteezy.com/system/resources/thumbnails/068/706/013/small/rocket-color-logo-mobile-banking-icon-free-png.png' :
+                  'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Upay_logo.svg/250px-Upay_logo.svg.png'
+                }
+                alt={getMethodName(method)}
+                className="h-full w-full object-contain"
+                referrerPolicy="no-referrer"
+              />
             </div>
+            <div>
+              <span className="text-[9.5px] font-black text-slate-400 uppercase tracking-wider block">
+                {getMethodName(method)} {accountType === 'agent' ? 'Agent Number' : 'Personal Number'}
+              </span>
+              <span className="text-sm font-black text-slate-900 font-mono tracking-wide">
+                {getTargetNumber()}
+              </span>
+              {accountType === 'personal' && settings.personalCharge && (
+                <p className="text-[9.5px] text-amber-600 font-bold mt-0.5">
+                  {lang === 'bn' ? `চার্জ: ${settings.personalCharge}` : `Charge: ${settings.personalCharge}`}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyNumber}
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            <span>{copied ? labels.copiedText : labels.copyNumber}</span>
+          </button>
+        </div>
 
-            {/* Validation error */}
-            {validationError && (
-              <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-2 text-rose-600 text-[10.5px] font-semibold">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{validationError}</span>
-              </div>
-            )}
+        {/* Manual Deposit Form */}
+        <form onSubmit={handleAddFundSubmit} className="space-y-3.5">
+          {/* Amount input */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block ml-1">
+              {labels.amtLabel}
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-extrabold text-xs">
+                ৳
+              </span>
+              <input
+                type="number"
+                required
+                min={settings.minAddFund}
+                max={settings.maxAddFund}
+                placeholder={labels.placeholderAmt}
+                value={amountInput}
+                onChange={(e) => {
+                  setValidationError('');
+                  setAmountInput(e.target.value.replace(/\D/g, ''));
+                }}
+                className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-8 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
+              />
+            </div>
+          </div>
 
-            {/* Simulate Instant Scan & Pay CTA */}
+          {/* Preset quick buttons */}
+          <div className="flex gap-2 justify-start overflow-x-auto pb-1">
+            {['100', '500', '1000', '2000', '5000', '10000'].map((preset) => (
+              <button
+                type="button"
+                key={preset}
+                onClick={() => setAmountInput(preset)}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-extrabold border transition-all cursor-pointer ${
+                  amountInput === preset
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200/40'
+                }`}
+              >
+                ৳{preset}
+              </button>
+            ))}
+          </div>
+
+          {/* Sender number input */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block ml-1">
+              {labels.senderLabel}
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                <Smartphone className="h-4 w-4" />
+              </span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                required
+                placeholder={labels.placeholderSender}
+                value={senderNumber}
+                onChange={(e) => {
+                  setValidationError('');
+                  setSenderNumber(e.target.value.replace(/\D/g, ''));
+                }}
+                className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-10 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Trx ID input */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block ml-1">
+              {labels.trxLabel}
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                required
+                placeholder={labels.placeholderTrx}
+                value={trxId}
+                onChange={(e) => {
+                  setValidationError('');
+                  setTrxId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                }}
+                className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-10 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all font-mono uppercase"
+              />
+            </div>
+          </div>
+
+          {/* Validation error message */}
+          {validationError && (
+            <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-2 text-rose-600 text-[10.5px] font-semibold">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{validationError}</span>
+            </div>
+          )}
+
+          {/* Form Actions footer */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
             <button
               type="button"
+              onClick={onClose}
+              className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-extrabold transition-all cursor-pointer text-center"
+            >
+              {labels.cancel}
+            </button>
+            <button
+              type="submit"
               disabled={isLoading}
-              onClick={handleSimulateQrPayment}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2"
+              className="py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-800 disabled:to-indigo-800 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-1.5 focus:outline-none"
             >
               {isLoading ? (
                 <>
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span>{lang === 'bn' ? 'পেমেন্ট ভেরিফাই হচ্ছে...' : 'Verifying Payment...'}</span>
+                  <span>{lang === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying...'}</span>
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4 stroke-[3]" />
-                  <span>{labels.simulateScan}</span>
+                  <span>{labels.submit}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </>
               )}
             </button>
           </div>
-        )}
-
-        {/* TAB 2: MANUAL TRxID SUBMISSION VIEW */}
-        {activeTab === 'trx' && (
-          <form onSubmit={handleAddFundSubmit} className="space-y-3.5">
-            {/* Dynamic Payment Instruction Panel */}
-            <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
-                <HelpCircle className="h-4 w-4 text-blue-500" />
-                <span>{labels.merchantInstr}</span>
-              </div>
-              <div className="text-[11px] text-slate-500 space-y-1 leading-relaxed font-medium">
-                <p>
-                  ১. আপনার {getMethodName(method)} অ্যাপে Send Money করুন এই নম্বরে:{' '}
-                  <strong className="text-blue-600 select-all font-mono text-xs">{getPersonalNumber(method)}</strong>
-                </p>
-                <p>
-                  ২. টাকা পাঠানো হয়ে গেলে আপনার ট্রানজেকশন আইডি <strong className="text-slate-900">(TrxID)</strong> এবং আপনার প্রেরক নম্বর নিচে দিন।
-                </p>
-              </div>
-            </div>
-
-            {/* Amount input */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">
-                  {labels.amtLabel}
-                </label>
-                <span className="text-[9.5px] font-extrabold text-indigo-600">{labels.fees}</span>
-              </div>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-extrabold text-xs">
-                  ৳
-                </span>
-                <input
-                  type="number"
-                  required
-                  min="100"
-                  max="25000"
-                  placeholder={labels.placeholderAmt}
-                  value={amountInput}
-                  onChange={(e) => {
-                    setValidationError('');
-                    setAmountInput(e.target.value.replace(/\D/g, ''));
-                  }}
-                  className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-8 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Sender number input */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block ml-1">
-                {labels.senderLabel}
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                  <Smartphone className="h-4 w-4" />
-                </span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
-                  placeholder={labels.placeholderSender}
-                  value={senderNumber}
-                  onChange={(e) => {
-                    setValidationError('');
-                    setSenderNumber(e.target.value.replace(/\D/g, ''));
-                  }}
-                  className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-10 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Trx ID input */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">
-                {labels.trxLabel}
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                  <ShieldCheck className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  required
-                  placeholder={labels.placeholderTrx}
-                  value={trxId}
-                  onChange={(e) => {
-                    setValidationError('');
-                    setTrxId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
-                  }}
-                  className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-10 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all font-mono uppercase"
-                />
-              </div>
-            </div>
-
-            {/* Validation error message */}
-            {validationError && (
-              <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-2 text-rose-600 text-[10.5px] font-semibold">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{validationError}</span>
-              </div>
-            )}
-
-            {/* Form Actions footer */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-extrabold transition-all cursor-pointer text-center"
-              >
-                {labels.cancel}
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-800 disabled:to-indigo-800 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-1.5 focus:outline-none"
-              >
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>{lang === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{labels.submit}</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        )}
+        </form>
       </motion.div>
 
       {/* Success Animation Fullscreen Overlay Drawer */}
       <AnimatePresence>
         {showSuccessOverlay && (
           <div className="absolute inset-0 z-50 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-white text-center">
-            {/* Visual pulsing rings */}
             <div className="relative mb-6 h-28 w-28 flex items-center justify-center">
               <motion.div
                 animate={{ scale: [0.8, 1.4, 0.8], opacity: [0.4, 0, 0.4] }}
@@ -646,22 +467,21 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 w-full max-w-xs flex flex-col space-y-2 text-left font-mono">
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">{lang === 'bn' ? 'জমাকৃত মাধ্যম:' : 'Deposit Via:'}</span>
-                <span className="text-white font-bold">{getMethodName(method)}</span>
+                <span className="text-slate-400">{lang === 'bn' ? 'মাধ্যম:' : 'Method:'}</span>
+                <span className="text-white font-bold">{getMethodName(method)} ({accountType})</span>
               </div>
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">{lang === 'bn' ? 'টাকার পরিমাণ:' : 'Amount Added:'}</span>
+                <span className="text-slate-400">{lang === 'bn' ? 'টাকার পরিমাণ:' : 'Amount:'}</span>
                 <span className="text-emerald-400 font-bold">৳{amountInput}</span>
               </div>
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">{lang === 'bn' ? 'ট্রানজেকশন আইডি:' : 'Method:'}</span>
-                <span className="text-blue-300 font-bold tracking-wider">{activeTab === 'qr' ? 'Dynamic QR Code' : trxId}</span>
+                <span className="text-slate-400">{lang === 'bn' ? 'TrxID:' : 'TrxID:'}</span>
+                <span className="text-blue-300 font-bold tracking-wider">{trxId}</span>
               </div>
             </div>
           </div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }
