@@ -4457,8 +4457,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 >
                   <option value="All">{lang === 'bn' ? 'সকল ক্যাটাগরি' : 'All Categories'}</option>
                   <option value="internet">{lang === 'bn' ? 'ইন্টারনেট (Internet)' : 'Internet Pack'}</option>
-                  <option value="minutes">{lang === 'bn' ? 'টকটাইম (Minutes)' : 'Minutes Pack'}</option>
-                  <option value="combo">{lang === 'bn' ? 'কম্বো (Combo)' : 'Combo Pack'}</option>
+                  <option value="talktime">{lang === 'bn' ? 'টকটাইম (Minutes)' : 'Minutes Pack'}</option>
+                  <option value="bundle">{lang === 'bn' ? 'কম্বো (Bundle)' : 'Bundle Pack'}</option>
                 </select>
               </div>
 
@@ -4475,7 +4475,12 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                     (pkg.descriptionBn || '').toLowerCase().includes(queryLower);
 
                   const matchesOperator = offerOperatorFilter === 'All' || pkg.operator === offerOperatorFilter;
-                  const matchesCategory = offerCategoryFilter === 'All' || pkg.category === offerCategoryFilter;
+                  const matchesCategory = offerCategoryFilter === 'All' || 
+                    pkg.category === offerCategoryFilter ||
+                    (offerCategoryFilter === 'minutes' && (pkg.category === 'talktime' || pkg.category === 'minutes')) ||
+                    (offerCategoryFilter === 'talktime' && (pkg.category === 'talktime' || pkg.category === 'minutes')) ||
+                    (offerCategoryFilter === 'combo' && (pkg.category === 'bundle' || pkg.category === 'combo')) ||
+                    (offerCategoryFilter === 'bundle' && (pkg.category === 'bundle' || pkg.category === 'combo'));
 
                   return matchesSearch && matchesOperator && matchesCategory;
                 });

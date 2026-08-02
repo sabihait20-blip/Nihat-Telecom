@@ -222,8 +222,8 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
                     <div className="flex flex-col items-start gap-1">
                       <span className="bg-[#00B060] text-white text-[9.5px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider">
                         {lang === 'bn' 
-                          ? pkg.category === 'internet' ? 'Internet' : pkg.category === 'talktime' ? 'Bundles' : 'Bundles' 
-                          : pkg.category === 'internet' ? 'Internet' : pkg.category === 'talktime' ? 'Voice' : 'Bundles'}
+                          ? (pkg.category === 'internet' ? 'ইন্টারনেট' : pkg.category === 'talktime' ? 'টকটাইম' : 'বান্ডেল')
+                          : (pkg.category === 'internet' ? 'Internet' : pkg.category === 'talktime' ? 'Voice' : 'Bundle')}
                       </span>
 
                       {/* Coins Stack Icon */}
