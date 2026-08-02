@@ -4,7 +4,8 @@ import {
   ShoppingBag, Search, Tag, Info, AlertTriangle, CheckCircle2, 
   ShoppingBag as BagIcon, Clock, ArrowLeft, Send, MapPin, Phone, 
   User, Check, AlertCircle, ShoppingCart, RefreshCw, X,
-  Calculator, Barcode, Users, DollarSign, TrendingUp, Printer, FileText, Plus, Trash2, Edit3, ShieldCheck, Package, Layers, PieChart
+  Calculator, Barcode, Users, DollarSign, TrendingUp, Printer, FileText, Plus, Trash2, Edit3, ShieldCheck, Package, Layers, PieChart,
+  Minus
 } from 'lucide-react';
 import { StoreProduct, StoreOrder, Language, Supplier, Customer, ExpenseRecord, IncomeRecord, POSCartItem } from '../types';
 import { collection, doc, onSnapshot, writeBatch, query, where, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -36,6 +37,14 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
   const [orderNote, setOrderNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
+
+  // Online Shop Client Cart State
+  const [clientCart, setClientCart] = useState<{ product: StoreProduct; quantity: number }[]>([]);
+  const [showClientCart, setShowClientCart] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState<StoreProduct | null>(null);
+  const [clientCartAddress, setClientCartAddress] = useState('');
+  const [clientCartPhone, setClientCartPhone] = useState('');
+  const [clientCartNote, setClientCartNote] = useState('');
 
   // POS Cart State
   const [posCart, setPosCart] = useState<POSCartItem[]>([]);
@@ -143,14 +152,151 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
     }
   }, [checkoutProduct, currentUser]);
 
+  // Prefill phone on client cart checkout
+  useEffect(() => {
+    if (showClientCart && currentUser) {
+      setClientCartPhone('');
+      const userDocRef = doc(db, 'registered_users', currentUser.uid);
+      getDoc(userDocRef).then((snap) => {
+        if (snap.exists() && snap.data().phone) {
+          setClientCartPhone(snap.data().phone);
+        }
+      }).catch(() => {});
+    }
+  }, [showClientCart, currentUser]);
+
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category || 'Lifestyle').filter((c): c is string => typeof c === 'string' && c.trim() !== '' && c.toLowerCase() !== 'all')))];
 
   const filteredProducts = products.filter(p => {
     const title = p.title || '';
     const titleBn = p.titleBn || '';
-    const query = searchQuery ? searchQuery.toLowerCase() : '';
-    return title.toLowerCase().includes(query) || titleBn.toLowerCase().includes(query);
+    const queryStr = searchQuery ? searchQuery.toLowerCase() : '';
+    const categoryMatch = selectedCategory === 'All' || p.category === selectedCategory;
+    return categoryMatch && (title.toLowerCase().includes(queryStr) || titleBn.toLowerCase().includes(queryStr));
   });
+
+  const addToClientCart = (product: StoreProduct, qty: number = 1) => {
+    if (product.stock <= 0) {
+      alert(lang === 'bn' ? 'দুঃখিত, এই প্রোডাক্টটি আউট অফ স্টক!' : 'Sorry, this product is out of stock!');
+      return;
+    }
+    setClientCart(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        const newQty = existing.quantity + qty;
+        if (newQty > product.stock) {
+          alert(lang === 'bn' ? `দুঃখিত, স্টকে মাত্র ${product.stock} টি প্রোডাক্ট রয়েছে!` : `Sorry, only ${product.stock} units are in stock!`);
+          return prev;
+        }
+        return prev.map(item => item.product.id === product.id ? { ...item, quantity: newQty } : item);
+      }
+      return [...prev, { product, quantity: qty }];
+    });
+  };
+
+  const updateClientCartQty = (productId: string, delta: number) => {
+    setClientCart(prev => prev.map(item => {
+      if (item.product.id === productId) {
+        const newQty = item.quantity + delta;
+        if (newQty <= 0) return null;
+        if (newQty > item.product.stock) {
+          alert(lang === 'bn' ? 'স্টক লিমিটের বেশি যোগ করা যাবে না!' : 'Cannot exceed available stock!');
+          return item;
+        }
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }).filter((item): item is { product: StoreProduct; quantity: number } => item !== null));
+  };
+
+  const handleClientCartCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || clientCart.length === 0) return;
+
+    // Validate quantities & stock
+    for (const item of clientCart) {
+      if (item.product.stock < item.quantity) {
+        alert(lang === 'bn' ? `দুঃখিত, ${item.product.title} এর পর্যাপ্ত স্টক নেই!` : `Sorry, ${item.product.title} has insufficient stock!`);
+        return;
+      }
+    }
+
+    const totalCost = clientCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    if (walletBalance < totalCost) {
+      alert(lang === 'bn' ? 'দুঃখিত, আপনার ওয়ালেট ব্যালেন্স অপর্যাপ্ত!' : 'Sorry, your wallet balance is insufficient!');
+      return;
+    }
+
+    if (!clientCartAddress.trim() || !clientCartPhone.trim()) {
+      alert(lang === 'bn' ? 'ডেলিভারি ঠিকানা ও ফোন নম্বর প্রদান করুন!' : 'Please fill in delivery address and phone number!');
+      return;
+    }
+
+    setIsSubmitting(true);
+    const batch = writeBatch(db);
+    const dateStr = new Date().toISOString();
+
+    try {
+      for (const item of clientCart) {
+        const orderId = `order-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        const subCost = item.product.price * item.quantity;
+
+        const newOrder: StoreOrder = {
+          id: orderId,
+          productId: item.product.id,
+          productTitle: item.product.title,
+          productTitleBn: item.product.titleBn || item.product.title,
+          price: item.product.price,
+          quantity: item.quantity,
+          totalPrice: subCost,
+          date: dateStr,
+          status: 'Pending',
+          userId: currentUser.uid,
+          userEmail: currentUser.email || 'unknown@user.com',
+          userName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Customer',
+          userPhone: clientCartPhone,
+          deliveryAddress: clientCartAddress,
+          note: clientCartNote ? `${clientCartNote} (Cart Order)` : 'Cart Order'
+        };
+
+        batch.set(doc(db, 'store_orders', orderId), newOrder);
+
+        const finalStock = Math.max(item.product.stock - item.quantity, 0);
+        batch.update(doc(db, 'products', item.product.id), { stock: finalStock });
+
+        const txId = `tx-store-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        const storeTx = {
+          id: txId,
+          type: 'Voucher',
+          amount: subCost,
+          billerName: `Store: ${item.product.title} (x${item.quantity})`,
+          billerNameBn: `স্টোর: ${item.product.titleBn || item.product.title} (x${item.quantity})`,
+          date: dateStr,
+          txId: orderId,
+          status: 'Pending',
+          userId: currentUser.uid,
+          userEmail: currentUser.email,
+          note: `Phone: ${clientCartPhone} | Addr: ${clientCartAddress}`
+        };
+        batch.set(doc(db, 'users', currentUser.uid, 'transactions', txId), storeTx);
+      }
+
+      const newBalanceVal = Math.max(walletBalance - totalCost, 0);
+      batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+
+      await batch.commit();
+      setIsSubmitting(false);
+      setClientCart([]);
+      setClientCartAddress('');
+      setClientCartNote('');
+      setShowClientCart(false);
+      setOrderSuccess(`cart-${Date.now()}`);
+    } catch (err: any) {
+      console.error("Cart checkout error:", err);
+      alert(lang === 'bn' ? 'অর্ডার করতে সমস্যা হয়েছে: ' + err.message : 'Error placing order: ' + err.message);
+      setIsSubmitting(false);
+    }
+  };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -439,7 +585,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       {/* TAB 1: BROWSE ONLINE SHOP */}
       {activeTab === 'browse' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/60 border border-white/10 p-4 rounded-[2rem] shadow-xl">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
               <input
@@ -447,7 +593,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 placeholder={lang === 'bn' ? 'প্রোডাক্ট খুঁজুন...' : 'Search store products...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border-none rounded-2xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full pl-11 pr-4 py-2.5 bg-slate-950/50 border border-white/5 rounded-2xl text-xs font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto scrollbar-none">
@@ -456,7 +602,9 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
                   className={`px-4 py-2 rounded-2xl text-xs font-black cursor-pointer transition-all whitespace-nowrap ${
-                    selectedCategory === cat ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                    selectedCategory === cat 
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border-none' 
+                      : 'bg-slate-950/40 hover:bg-slate-950 text-slate-300 border border-white/5'
                   }`}
                 >
                   {cat}
@@ -467,13 +615,13 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
 
           {loading ? (
             <div className="text-center py-20">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-indigo-500" />
               <p className="text-xs text-slate-400 mt-2 font-semibold">{lang === 'bn' ? 'প্রোডাক্ট লোড হচ্ছে...' : 'Loading products...'}</p>
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm space-y-3">
-              <ShoppingBag className="h-12 w-12 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-600">{lang === 'bn' ? 'কোনো প্রোডাক্ট পাওয়া যায়নি' : 'No products found'}</p>
+            <div className="bg-slate-900/40 rounded-[2rem] border border-white/5 p-12 text-center shadow-xl space-y-3">
+              <ShoppingBag className="h-12 w-12 text-slate-600 mx-auto" />
+              <p className="text-sm font-bold text-slate-400">{lang === 'bn' ? 'কোনো প্রোডাক্ট পাওয়া যায়নি' : 'No products found'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -481,42 +629,79 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 <motion.div
                   key={product.id}
                   whileHover={{ y: -4 }}
-                  className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between group"
+                  onClick={() => setViewingProduct(product)}
+                  className="bg-slate-900/40 hover:bg-slate-900/80 border border-white/5 hover:border-white/10 rounded-[2rem] p-5 shadow-xl flex flex-col justify-between group transition-all duration-300 relative overflow-hidden cursor-pointer"
                 >
                   <div>
-                    <div className="aspect-video bg-gradient-to-br from-indigo-50 to-slate-100 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4">
+                    <div className="aspect-video bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-white/5">
                       {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <img 
+                          src={product.imageUrl} 
+                          alt={product.title} 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                        />
                       ) : (
-                        <ShoppingBag className="h-10 w-10 text-indigo-400" />
+                        <ShoppingBag className="h-10 w-10 text-slate-700" />
                       )}
-                      <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-black ${
-                        product.stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                      <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${
+                        product.stock > 0 
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                       }`}>
                         {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
                       </span>
                     </div>
-                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">{product.category || 'General'}</span>
-                    <h3 className="text-sm font-black text-slate-900 mt-1 line-clamp-1">{lang === 'bn' ? product.titleBn : product.title}</h3>
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{lang === 'bn' ? product.descriptionBn : product.description}</p>
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">{product.category || 'General'}</span>
+                    <h3 className="text-sm font-black text-slate-100 mt-1 line-clamp-1">{lang === 'bn' ? product.titleBn : product.title}</h3>
+                    <p className="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">{lang === 'bn' ? product.descriptionBn : product.description}</p>
                   </div>
-                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
-                      <p className="text-base font-black text-indigo-600">৳{product.price.toLocaleString()}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
+                      <p className="text-base font-black text-emerald-400">৳{product.price.toLocaleString()}</p>
                     </div>
-                    <button
-                      onClick={() => setCheckoutProduct(product)}
-                      disabled={product.stock <= 0}
-                      className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer active:scale-95 shadow-sm shadow-indigo-500/10 flex items-center gap-1.5"
-                    >
-                      <ShoppingCart className="h-3.5 w-3.5" />
-                      <span>{lang === 'bn' ? 'অর্ডার করুন' : 'Buy Now'}</span>
-                    </button>
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => addToClientCart(product, 1)}
+                        disabled={product.stock <= 0}
+                        className="bg-white/5 hover:bg-white/10 disabled:opacity-50 text-slate-300 border border-white/5 p-2.5 rounded-2xl transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                        title={lang === 'bn' ? 'কার্টে যোগ করুন' : 'Add to Cart'}
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => { setQuantity(1); setCheckoutProduct(product); }}
+                        disabled={product.stock <= 0}
+                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer active:scale-95 shadow-lg shadow-indigo-600/20 flex items-center gap-1.5"
+                      >
+                        <ShoppingBag className="h-3.5 w-3.5" />
+                        <span>{lang === 'bn' ? 'কিনুন' : 'Buy Now'}</span>
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               ))}
             </div>
+          )}
+
+          {/* Glowing floating Shopping Cart trigger */}
+          {clientCart.length > 0 && (
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={() => setShowClientCart(true)}
+              className="fixed bottom-6 right-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-4 rounded-full shadow-2xl flex items-center gap-3 cursor-pointer border border-emerald-500/20 active:scale-95"
+            >
+              <div className="relative">
+                <ShoppingCart className="h-6 w-6" />
+                <span className="absolute -top-3 -right-3 bg-rose-600 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-emerald-600">
+                  {clientCart.reduce((total, item) => total + item.quantity, 0)}
+                </span>
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'কার্ট দেখুন' : 'View Cart'}</span>
+            </motion.button>
           )}
         </div>
       )}
@@ -916,6 +1101,252 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         </div>
       )}
 
+      {/* PRODUCT DETAILS MODAL */}
+      <AnimatePresence>
+        {viewingProduct && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-6 w-full max-w-2xl shadow-2xl space-y-6 text-white my-8">
+              <div className="flex justify-between items-center pb-4 border-b border-white/5">
+                <div>
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">{viewingProduct.category || 'General'}</span>
+                  <h3 className="text-lg font-black text-slate-100">{lang === 'bn' ? viewingProduct.titleBn : viewingProduct.title}</h3>
+                </div>
+                <button onClick={() => setViewingProduct(null)} className="p-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-full cursor-pointer transition-colors"><X className="h-5 w-5" /></button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="aspect-square bg-slate-950 rounded-3xl flex items-center justify-center overflow-hidden border border-white/5 relative">
+                  {viewingProduct.imageUrl ? (
+                    <img src={viewingProduct.imageUrl} alt={viewingProduct.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                  ) : (
+                    <ShoppingBag className="h-20 w-20 text-slate-800" />
+                  )}
+                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-black uppercase border ${
+                    viewingProduct.stock > 0 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}>
+                    {viewingProduct.stock > 0 ? `${viewingProduct.stock} ${lang === 'bn' ? 'স্টকে আছে' : 'In Stock'}` : (lang === 'bn' ? 'আউট অফ স্টক' : 'Out of Stock')}
+                  </span>
+                </div>
+
+                <div className="flex flex-col justify-between space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">{lang === 'bn' ? 'বিস্তারিত বিবরণ' : 'Product Details'}</h4>
+                      <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-wrap bg-slate-950/40 border border-white/5 p-4 rounded-2xl h-44 overflow-y-auto">
+                        {lang === 'bn' ? (viewingProduct.descriptionBn || viewingProduct.description) : viewingProduct.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs text-slate-500 font-bold uppercase">{lang === 'bn' ? 'মূল্য (প্রতি পিস)' : 'Price per unit'}</span>
+                        <p className="text-2xl font-black text-emerald-400 mt-0.5">৳{viewingProduct.price.toLocaleString()}</p>
+                      </div>
+                      
+                      {/* Quantity Selector for detail page */}
+                      {viewingProduct.stock > 0 && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase block text-right">{lang === 'bn' ? 'পরিমাণ' : 'Quantity'}</span>
+                          <div className="flex items-center gap-2 bg-slate-950/80 border border-white/5 p-1 rounded-2xl">
+                            <button 
+                              type="button"
+                              onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                              className="p-1.5 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white cursor-pointer transition-colors"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="text-xs font-black px-2.5 w-8 text-center">{quantity}</span>
+                            <button 
+                              type="button"
+                              onClick={() => setQuantity(prev => Math.min(viewingProduct.stock, prev + 1))}
+                              className="p-1.5 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white cursor-pointer transition-colors"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/5 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addToClientCart(viewingProduct, quantity);
+                        setViewingProduct(null);
+                      }}
+                      disabled={viewingProduct.stock <= 0}
+                      className="flex-1 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 hover:border-white/20 py-3 rounded-2xl text-xs font-black cursor-pointer active:scale-95 flex items-center justify-center gap-2 transition-all"
+                    >
+                      <ShoppingCart className="h-4 w-4 text-indigo-400" />
+                      <span>{lang === 'bn' ? 'কার্টে রাখুন' : 'Add to Cart'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCheckoutProduct(viewingProduct);
+                        setViewingProduct(null);
+                      }}
+                      disabled={viewingProduct.stock <= 0}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-2xl text-xs font-black cursor-pointer active:scale-95 flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20"
+                    >
+                      <ShoppingBag className="h-4 w-4" />
+                      <span>{lang === 'bn' ? 'সরাসরি অর্ডার' : 'Buy Now'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SHOPPING CART MODAL */}
+      <AnimatePresence>
+        {showClientCart && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-6 w-full max-w-xl shadow-2xl space-y-6 text-white my-8">
+              <div className="flex justify-between items-center pb-4 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-indigo-400" />
+                  <h3 className="text-base font-black text-slate-100">{lang === 'bn' ? 'আমার শপিং কার্ট' : 'Shopping Cart'}</h3>
+                  <span className="bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full text-[10px] font-black">
+                    {clientCart.length} {lang === 'bn' ? 'আইটেম' : 'items'}
+                  </span>
+                </div>
+                <button onClick={() => setShowClientCart(false)} className="p-2 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-full cursor-pointer transition-colors"><X className="h-4.5 w-4.5" /></button>
+              </div>
+
+              {clientCart.length === 0 ? (
+                <div className="text-center py-12 space-y-3">
+                  <ShoppingBag className="h-12 w-12 text-slate-600 mx-auto" />
+                  <p className="text-xs text-slate-400">{lang === 'bn' ? 'আপনার কার্টটি খালি!' : 'Your cart is empty!'}</p>
+                </div>
+              ) : (
+                <form onSubmit={handleClientCartCheckout} className="space-y-6">
+                  {/* Cart Items List */}
+                  <div className="max-h-64 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
+                    {clientCart.map(({ product, quantity }) => (
+                      <div key={product.id} className="bg-slate-950/60 border border-white/5 p-3 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center border border-white/5 overflow-hidden">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                            ) : (
+                              <ShoppingBag className="h-5 w-5 text-indigo-400" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-200 line-clamp-1">{lang === 'bn' ? product.titleBn : product.title}</h4>
+                            <p className="text-[10px] text-emerald-400 font-bold mt-0.5">৳{product.price.toLocaleString()} / unit</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Quantity selector */}
+                          <div className="flex items-center gap-1.5 bg-slate-900 border border-white/5 p-1 rounded-xl">
+                            <button
+                              type="button"
+                              onClick={() => updateClientCartQty(product.id, -1)}
+                              className="p-1 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white cursor-pointer transition-colors"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="text-[11px] font-black w-6 text-center">{quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateClientCartQty(product.id, 1)}
+                              className="p-1 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white cursor-pointer transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+
+                          <div className="text-right min-w-[60px]">
+                            <p className="text-xs font-black text-slate-200">৳{(product.price * quantity).toLocaleString()}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setClientCart(prev => prev.filter(item => item.product.id !== product.id))}
+                            className="p-1.5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Delivery Info */}
+                  <div className="bg-slate-950/40 border border-white/5 p-4 rounded-3xl space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">{lang === 'bn' ? 'ডেলিভারি ও যোগাযোগ তথ্য' : 'Delivery & Contact Information'}</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'ডেলিভারি ঠিকানা' : 'Delivery Address'}</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder={lang === 'bn' ? 'আপনার ঠিকানা লিখুন...' : 'Enter delivery address...'}
+                          value={clientCartAddress}
+                          onChange={(e) => setClientCartAddress(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/5 rounded-xl p-3 text-xs font-semibold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'মোবাইল নম্বর' : 'Phone Number'}</label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="01XXXXXXXXX"
+                          value={clientCartPhone}
+                          onChange={(e) => setClientCartPhone(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/5 rounded-xl p-3 text-xs font-semibold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'অর্ডার নোট (ঐচ্ছিক)' : 'Order Note (Optional)'}</label>
+                      <input
+                        type="text"
+                        placeholder={lang === 'bn' ? 'কোনো বিশেষ অনুরোধ থাকলে লিখুন...' : 'Any special instructions...'}
+                        value={clientCartNote}
+                        onChange={(e) => setClientCartNote(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/5 rounded-xl p-3 text-xs font-semibold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Wallet & checkout details */}
+                  <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'মোট প্রদেয় মূল্য' : 'Total Payable'}</p>
+                      <p className="text-xl font-black text-emerald-400">৳{clientCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0).toLocaleString()}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || walletBalance < clientCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)}
+                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg shadow-indigo-600/20 cursor-pointer active:scale-95 transition-all w-full sm:w-auto text-center"
+                      >
+                        {isSubmitting ? (lang === 'bn' ? 'প্রক্রিয়াকরণ হচ্ছে...' : 'Processing...') : (lang === 'bn' ? 'অর্ডার সম্পন্ন করুন' : 'Confirm Order & Pay')}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* CHECKOUT MODAL */}
       <AnimatePresence>
         {checkoutProduct && (
@@ -1113,16 +1544,16 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       {/* ORDER SUCCESS MODAL */}
       <AnimatePresence>
         {orderSuccess && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-[2.5rem] p-6 w-full max-w-sm shadow-2xl text-center space-y-4">
-              <div className="mx-auto h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-6 w-full max-w-sm shadow-2xl text-center space-y-4 text-white">
+              <div className="mx-auto h-16 w-16 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center justify-center">
                 <CheckCircle2 className="h-9 w-9" />
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-900">{lang === 'bn' ? 'অর্ডার সফলভাবে জমা হয়েছে!' : 'Order Placed Successfully!'}</h3>
-                <p className="text-xs text-slate-500 mt-2">{orderSuccess}</p>
+                <h3 className="text-base font-black text-slate-100">{lang === 'bn' ? 'অর্ডার সফলভাবে জমা হয়েছে!' : 'Order Placed Successfully!'}</h3>
+                <p className="text-xs text-slate-400 mt-2 font-mono">{orderSuccess}</p>
               </div>
-              <button onClick={() => { setOrderSuccess(null); setActiveTab('orders'); }} className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-black text-xs cursor-pointer">
+              <button onClick={() => { setOrderSuccess(null); setActiveTab('orders'); }} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-2xl font-black text-xs cursor-pointer active:scale-95 transition-all">
                 {lang === 'bn' ? 'আমার অর্ডার দেখুন' : 'View My Orders'}
               </button>
             </motion.div>

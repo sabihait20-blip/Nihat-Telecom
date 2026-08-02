@@ -28,11 +28,13 @@ export interface RechargePackage {
   descriptionBn: string;
   isPopular?: boolean;
   imageUrl?: string;
+  regularPrice?: number;
+  discount?: number;
 }
 
 export interface Transaction {
   id: string;
-  type: 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher' | 'ScratchCard';
+  type: 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher' | 'ScratchCard' | 'Fine';
   operator?: Operator;
   targetNumber?: string;
   senderNumber?: string;

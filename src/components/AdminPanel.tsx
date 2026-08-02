@@ -5,7 +5,7 @@ import {
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
   Eye, Download, Crown, Phone, Zap, PhoneCall, PhoneOff, Mic, MicOff, VolumeX, Image, Play, Pause, Square, Radio,
-  History, Trophy, TrendingUp, Search, Filter
+  History, Trophy, TrendingUp, Search, Filter, Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -381,7 +381,13 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'user_transactions' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'user_transactions' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc' | 'fines'>('overview');
+  const [trafficFines, setTrafficFines] = useState<any[]>([]);
+  const [editingFineId, setEditingFineId] = useState<string | null>(null);
+  const [verifyingFineId, setVerifyingFineId] = useState<string | null>(null);
+  const [fineVehicleNo, setFineVehicleNo] = useState('');
+  const [fineAmountInput, setFineAmountInput] = useState('');
+  const [fineGovTxIdInput, setFineGovTxIdInput] = useState('');
   const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState<boolean>(true);
   const [userFilterTab, setUserFilterTab] = useState<'all' | 'verified' | 'pending_kyc' | 'suspended'>('all');
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
@@ -1325,7 +1331,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     description: '',
     descriptionBn: '',
     isPopular: false,
-    imageUrl: ''
+    imageUrl: '',
+    regularPrice: 100,
+    discount: 0
   });
   const [smartText, setSmartText] = useState<string>('');
 
@@ -1609,6 +1617,24 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     return () => unsubscribe();
   }, []);
 
+  // 5g. Listen for Traffic Fines
+  useEffect(() => {
+    const q = collection(db, 'traffic_fines');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id });
+      });
+      // Sort in-memory descending by createdAt
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setTrafficFines(list);
+    }, (error) => {
+      console.error("Error loading traffic fines in admin panel: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // 6. Listen for selected user balance and history on demand
   useEffect(() => {
     if (!selectedUser) {
@@ -1885,7 +1911,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         description: '',
         descriptionBn: '',
         isPopular: false,
-        imageUrl: ''
+        imageUrl: '',
+        regularPrice: 100,
+        discount: 0
       });
     } catch (err) {
       console.error("Error saving offer: ", err);
@@ -1910,7 +1938,9 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
       description: pkg.description || '',
       descriptionBn: pkg.descriptionBn || '',
       isPopular: pkg.isPopular || false,
-      imageUrl: pkg.imageUrl || ''
+      imageUrl: pkg.imageUrl || '',
+      regularPrice: pkg.regularPrice || pkg.price || 0,
+      discount: pkg.discount || 0
     });
     setShowOfferForm(true);
   };
@@ -2971,6 +3001,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     { id: 'overview' as const, group: 'ops', label: lang === 'bn' ? 'ড্যাশবোর্ড ওভারভিউ' : 'Overview & Stats', icon: TrendingUp, badge: 0, badgeColor: '' },
     // Group 1: Operations
     { id: 'requests' as const, group: 'ops', label: labels.requests, icon: Layers, badge: pendingRequests.filter(r => r.status === 'Pending').length, badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' },
+    { id: 'fines' as const, group: 'ops', label: lang === 'bn' ? 'ট্রাফিক ফাইন' : 'Traffic Fines', icon: AlertTriangle, badge: trafficFines.filter(f => f.status === 'Submitted').length, badgeColor: 'bg-rose-500/15 text-rose-400 border border-rose-500/25' },
     { id: 'support' as const, group: 'ops', label: lang === 'bn' ? 'গ্রাহক সাপোর্ট চ্যাট' : 'Support Tickets', icon: MessageSquare, badge: supportTickets.filter(t => t.status === 'Open').length, badgeColor: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' },
     { id: 'kyc' as const, group: 'ops', label: lang === 'bn' ? 'কেওয়াইসি ভেরিফিকেশন' : 'KYC Verification', icon: ShieldCheck, badge: registeredUsers.filter(u => u.kycStatus === 'pending').length, badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' },
     
@@ -4173,15 +4204,68 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <option value="bundle">Bundle</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Connected Reseller Pricing Fields */}
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Price (৳)</label>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Regular Price (৳) [মেয়াদ মূল্য]</label>
+                      <input 
+                        type="number" 
+                        required
+                        min="0"
+                        value={offerForm.regularPrice || ''}
+                        onChange={(e) => {
+                          const reg = parseInt(e.target.value) || 0;
+                          const disc = offerForm.discount || 0;
+                          setOfferForm({
+                            ...offerForm, 
+                            regularPrice: reg, 
+                            price: Math.max(0, reg - disc)
+                          });
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        placeholder="e.g. 1199"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-500 uppercase">Discount/Comm (৳) [কমিশন]</label>
+                      <input 
+                        type="number" 
+                        required
+                        min="0"
+                        value={offerForm.discount || ''}
+                        onChange={(e) => {
+                          const disc = parseInt(e.target.value) || 0;
+                          const reg = offerForm.regularPrice || 0;
+                          setOfferForm({
+                            ...offerForm, 
+                            discount: disc, 
+                            price: Math.max(0, reg - disc)
+                          });
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        placeholder="e.g. 174"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] font-black text-blue-600 uppercase font-bold">Final Price (৳) [অফার মূল্য]</label>
                       <input 
                         type="number" 
                         required
                         min="1"
-                        value={offerForm.price}
-                        onChange={(e) => setOfferForm({...offerForm, price: parseInt(e.target.value) || 0})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
+                        value={offerForm.price || ''}
+                        onChange={(e) => {
+                          const pr = parseInt(e.target.value) || 0;
+                          const reg = offerForm.regularPrice || pr;
+                          setOfferForm({
+                            ...offerForm, 
+                            price: pr, 
+                            discount: Math.max(0, reg - pr)
+                          });
+                        }}
+                        className="w-full bg-blue-50/50 border border-blue-200 text-blue-800 rounded-xl px-3 py-2 text-xs font-black mt-1 outline-none focus:border-blue-500"
+                        placeholder="e.g. 1025"
                       />
                     </div>
                   </div>
@@ -4424,57 +4508,104 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 }
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {filteredOffers.map((pkg, index) => (
-                      <div key={`${pkg.id || index}-${index}`} className="bg-white border border-slate-200/60 p-4 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
-                        <span className="absolute right-0 top-0 text-[8.5px] uppercase font-black bg-slate-150 text-slate-600 px-2 py-0.5 rounded-bl-lg">
-                          {pkg.operator}
-                        </span>
-                        <div className="flex gap-3">
-                          {pkg.imageUrl && (
-                            <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 border border-slate-100/50 shadow-sm relative self-start mt-1">
-                              <img 
-                                src={pkg.imageUrl} 
-                                alt="pkg logo" 
-                                referrerPolicy="no-referrer"
-                                className="h-full w-full object-cover"
-                              />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredOffers.map((pkg, index) => {
+                      const hasDiscount = pkg.discount && pkg.discount > 0;
+                      const discountAmt = pkg.discount || 0;
+                      const regularPrice = pkg.regularPrice || (hasDiscount ? pkg.price + discountAmt : pkg.price);
+                      const finalPrice = pkg.price;
+                      
+                      const OPERATOR_LOGOS: Record<string, string> = {
+                        GP: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRyiCDBLtL9jT33e-HTKAFIcAlBPYeXVdUOD3oYfZNSvg&s',
+                        Robi: 'https://www.pestcontrolbd.com/images/clients/robi.jpg',
+                        Airtel: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh5Mh4tvDmcjk6p06PpIFJeJSG7jyhKNjR86O2wi99p4LBWVnZXzvJFMhPh5zeuv3WswYBKq31Mr39Vhl4Y2DHjBEl0onYye0GhMkCVMrq4ih70SG6eput1CIUJZz3RsatTjPeGfZ1t8JU/s1600/airtel.jpg',
+                        Banglalink: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ1DItgAvyfRdQcnJff6yXYbEYPMlK5xJqG2kBKQSpLKg&s=10',
+                        Teletalk: 'https://play-lh.googleusercontent.com/ktYMmQ1zZln_WczGHsx0xXtzf-G1Mx8qUJl878-u6iQDGfEdjnWZTIAlpSVLLVgYFNKRgTE0l70nrZxZr6xLcec'
+                      };
+                      const logoSrc = pkg.imageUrl || OPERATOR_LOGOS[pkg.operator];
+
+                      return (
+                        <div key={`${pkg.id || index}-${index}`} className="bg-white border border-slate-200/80 rounded-[1.5rem] p-4 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all group text-slate-900">
+                          {/* Discount Ribbon at top-right */}
+                          {hasDiscount && (
+                            <div className="absolute right-0 top-0 bg-[#FF5A00] text-white px-3 py-1 text-[9px] font-black rounded-bl-xl shadow-sm z-10">
+                              discount: ৳{discountAmt}
                             </div>
                           )}
-                          <div className="space-y-1 flex-1 pr-8">
-                            <h4 className="text-xs text-slate-900 font-extrabold leading-tight">
-                              {lang === 'bn' ? pkg.titleBn : pkg.title}
-                            </h4>
-                            <p className="text-[10px] text-slate-400 font-extrabold font-mono uppercase tracking-wide">
-                              {pkg.category} | {lang === 'bn' ? pkg.validityBn : pkg.validity}
-                            </p>
-                            <p className="text-[10.5px] text-slate-500 leading-normal font-semibold">
-                              {lang === 'bn' ? pkg.descriptionBn : pkg.description}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
-                          <span className="text-blue-600 font-extrabold text-sm">৳{pkg.price}</span>
-                          <div className="flex gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleEditOffer(pkg)}
-                              className="p-1 px-2.0 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
-                            >
-                              <Edit2 className="h-3 w-3 shrink-0" />
-                              <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteOffer(pkg.id, lang === 'bn' ? pkg.titleBn : pkg.title)}
-                              className="p-1 px-2.0 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
-                            >
-                              <Trash2 className="h-3 w-3 shrink-0" />
-                              <span>{lang === 'bn' ? 'ডিলিট' : 'Del'}</span>
-                            </button>
+                          <div className="flex gap-4 items-start flex-1 pb-3">
+                            {/* Left side operator logo */}
+                            <div className="h-14 w-14 rounded-2xl overflow-hidden shrink-0 border border-slate-100 bg-slate-50 shadow-inner flex items-center justify-center self-start mt-1 relative">
+                              {logoSrc ? (
+                                <img 
+                                  src={logoSrc} 
+                                  alt={pkg.operator} 
+                                  referrerPolicy="no-referrer"
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <Gift className="h-7 w-7 text-emerald-600" />
+                              )}
+                            </div>
+
+                            {/* Middle Side: details */}
+                            <div className="space-y-1 flex-1 pr-6">
+                              <h4 className="text-[#00B060] font-black text-xs md:text-sm tracking-tight leading-snug">
+                                {lang === 'bn' ? pkg.titleBn : pkg.title}
+                              </h4>
+                              
+                              <div className="text-rose-500 font-extrabold text-[10px] flex items-center gap-1">
+                                <span>price:</span>
+                                <span className="font-mono">{regularPrice}</span>
+                                <span className="text-[9px] text-slate-400 font-medium ml-2">
+                                  • {lang === 'bn' ? pkg.validityBn : pkg.validity}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="bg-[#00B060] text-white text-[8.5px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  {pkg.category}
+                                </span>
+
+                                <div className="flex items-center gap-1 text-emerald-600 mt-1">
+                                  <Coins className="h-4 w-4 fill-emerald-100" />
+                                  {hasDiscount && (
+                                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">
+                                      {lang === 'bn' ? `কমিশন ৳${discountAmt}` : `Comm ৳${discountAmt}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Footer with price & edit/delete buttons */}
+                          <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
+                            <div className="flex flex-col">
+                              <span className="text-[8px] uppercase tracking-wider font-extrabold text-slate-400">{lang === 'bn' ? 'অফার মূল্য' : 'Buying Price'}</span>
+                              <span className="text-emerald-600 font-black text-xs md:text-sm">৳{finalPrice}</span>
+                            </div>
+
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleEditOffer(pkg)}
+                                className="p-1 px-2.5 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border border-slate-150 rounded-xl text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
+                              >
+                                <Edit2 className="h-3 w-3 shrink-0" />
+                                <span>{lang === 'bn' ? 'এডিট' : 'Edit'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOffer(pkg.id, lang === 'bn' ? pkg.titleBn : pkg.title)}
+                                className="p-1 px-2.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-150 rounded-xl text-[10px] font-black transition-colors cursor-pointer flex items-center gap-0.5"
+                              >
+                                <Trash2 className="h-3 w-3 shrink-0" />
+                                <span>{lang === 'bn' ? 'ডিলিট' : 'Del'}</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -4572,7 +4703,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input 
                         type="number" 
                         required
-                        value={bannerForm.prefillAmount}
+                        value={bannerForm.prefillAmount || ''}
                         onChange={(e) => setBannerForm({...bannerForm, prefillAmount: parseInt(e.target.value) || 0})}
                         className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none text-white focus:border-blue-500 placeholder-slate-700 font-mono"
                       />
@@ -5107,7 +5238,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input 
                         type="number" 
                         min="0"
-                        value={userForm.balance}
+                        value={userForm.balance || ''}
                         onChange={(e) => setUserForm({...userForm, balance: parseFloat(e.target.value) || 0})}
                         className="w-full bg-slate-50 border border-slate-400 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-blue-500"
                       />
@@ -6204,6 +6335,444 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
             </div>
           )}
 
+          {/* TAB 5.5: TRAFFIC FINE MANAGEMENT */}
+          {activeSubTab === 'fines' && (
+            <div className="space-y-5 text-slate-100 animate-scale-up">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4 px-1">
+                <div>
+                  <span className="text-[10px] font-extrabold text-rose-400 tracking-widest uppercase font-mono">
+                    TRAFFIC FINE MANAGEMENT
+                  </span>
+                  <p className="text-xs text-slate-400 mt-1 font-semibold">
+                    {lang === 'bn' 
+                      ? 'ইউজারদের পাঠানো ট্রাফিক কেস আইডি যাচাই করে ফাইন চার্জ ও ভেহিকল নম্বর নির্ধারণ করুন।' 
+                      : 'Verify submitted traffic case IDs, set fine amounts, and update vehicle records.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Input edit card if admin is processing a fine */}
+              {editingFineId && (() => {
+                const fine = trafficFines.find(f => f.id === editingFineId);
+                return (
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!fineAmountInput || !fineVehicleNo) return;
+                      try {
+                        const ref = doc(db, 'traffic_fines', editingFineId);
+                        await setDoc(ref, {
+                          fineAmount: parseFloat(fineAmountInput),
+                          vehicleNumber: fineVehicleNo.trim(),
+                          status: 'Awaiting Payment',
+                          updatedAt: new Date().toISOString()
+                        }, { merge: true });
+                        speak('কেস আইডিটি সফলভাবে গ্রহণ করা হয়েছে');
+                        setEditingFineId(null);
+                        setFineAmountInput('');
+                        setFineVehicleNo('');
+                      } catch (err) {
+                        console.error("Error accepting fine: ", err);
+                      }
+                    }}
+                    className="p-5 bg-slate-900 border border-white/10 rounded-3xl space-y-4 animate-slide-in text-slate-100"
+                  >
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <h4 className="text-white font-extrabold text-xs tracking-tight flex items-center gap-1.5 uppercase font-mono">
+                        <AlertTriangle className="h-4 w-4 text-rose-500" />
+                        <span>{lang === 'bn' ? 'ফাইন ও ভেহিকল নম্বর নির্ধারণ করুন' : 'Assign Fine & Vehicle Details'}</span>
+                      </h4>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setEditingFineId(null);
+                          setFineAmountInput('');
+                          setFineVehicleNo('');
+                        }}
+                        className="p-1 rounded-full bg-white/5 text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[9.5px] font-black text-slate-400 uppercase tracking-wider font-mono">Case ID (কেস আইডি)</label>
+                        <input 
+                          type="text" 
+                          disabled
+                          value={fine?.caseId || ''}
+                          className="w-full bg-slate-950 border border-white/5 rounded-xl px-3 py-2 text-xs font-bold mt-1 text-slate-400 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9.5px] font-black text-slate-400 uppercase tracking-wider font-mono">Vehicle Number (ভেহিকল নম্বর)</label>
+                        <input 
+                          type="text" 
+                          required
+                          placeholder="e.g. DHAKA METRO-HA-12-3456"
+                          value={fineVehicleNo}
+                          onChange={(e) => setFineVehicleNo(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-rose-500 text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9.5px] font-black text-slate-400 uppercase tracking-wider font-mono">Fine Amount / Charge (৳)</label>
+                        <input 
+                          type="number" 
+                          required
+                          min="1"
+                          placeholder="e.g. 500"
+                          value={fineAmountInput}
+                          onChange={(e) => setFineAmountInput(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-rose-500 text-white font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-2 border-t border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingFineId(null);
+                          setFineAmountInput('');
+                          setFineVehicleNo('');
+                        }}
+                        className="px-4 py-2 bg-slate-950 hover:bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                      >
+                        {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-lg shadow-rose-500/20 cursor-pointer transition-all"
+                      >
+                        {lang === 'bn' ? 'গ্রহন করুন এবং পাঠান' : 'Accept & Send fine details'}
+                      </button>
+                    </div>
+                  </form>
+                );
+              })()}
+
+              {/* Input payment verification card if admin is verifying payment */}
+              {verifyingFineId && (() => {
+                const fine = trafficFines.find(f => f.id === verifyingFineId);
+                return (
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!fineGovTxIdInput.trim()) return;
+                      try {
+                        const batch = writeBatch(db);
+                        const fineRef = doc(db, 'traffic_fines', verifyingFineId);
+                        
+                        // Update traffic fine status & add transaction details
+                        batch.update(fineRef, {
+                          status: 'Paid',
+                          govTxId: fineGovTxIdInput.trim().toUpperCase(),
+                          updatedAt: new Date().toISOString()
+                        });
+
+                        // If there's an associated transaction document, update its status to Success and txId to Gov TxID
+                        if (fine?.transactionDocId) {
+                          const userTxRef = doc(db, 'users', fine.userId, 'transactions', fine.transactionDocId);
+                          batch.update(userTxRef, {
+                            status: 'Success',
+                            txId: fineGovTxIdInput.trim().toUpperCase(),
+                            details: `Traffic Fine Case ID: ${fine.caseId} (Approved with official TxID)`
+                          });
+
+                          const adminTxRef = doc(db, 'admin_requests', fine.transactionDocId);
+                          batch.update(adminTxRef, {
+                            status: 'Success',
+                            txId: fineGovTxIdInput.trim().toUpperCase(),
+                            details: `Traffic Fine Case ID: ${fine.caseId} (Approved with official TxID)`
+                          });
+                        }
+
+                        // Send user a Success Notification
+                        const notifId = `notif-${Date.now()}`;
+                        const successNotif = {
+                          id: notifId,
+                          title: 'Traffic Fine Payment Approved',
+                          titleBn: 'ট্রাফিক জরিমানা অনুমোদন করা হয়েছে',
+                          desc: `Your payment of ৳${fine?.fineAmount} for Case: ${fine?.caseId} was approved. Gov Transaction ID: ${fineGovTxIdInput.trim().toUpperCase()}`,
+                          descBn: `আপনার কেস নং: ${fine?.caseId} এর ৳${fine?.fineAmount} টাকা পেমেন্ট অনুমোদন করা হয়েছে। ট্রানজেকশন আইডি: ${fineGovTxIdInput.trim().toUpperCase()}`,
+                          time: 'Just now',
+                          read: false,
+                        };
+                        batch.set(doc(db, 'users', fine.userId, 'notifications', notifId), successNotif);
+
+                        await batch.commit();
+                        speak('পেমেন্ট সফলভাবে ভেরিফাই ও এপ্রুভ করা হয়েছে');
+                        setVerifyingFineId(null);
+                        setFineGovTxIdInput('');
+                      } catch (err) {
+                        console.error("Error verifying payment: ", err);
+                      }
+                    }}
+                    className="p-5 bg-slate-900 border border-emerald-500/20 rounded-3xl space-y-4 animate-slide-in text-slate-100"
+                  >
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <h4 className="text-emerald-400 font-extrabold text-xs tracking-tight flex items-center gap-1.5 uppercase font-mono">
+                        <ShieldCheck className="h-4 w-4" />
+                        <span>{lang === 'bn' ? 'অফিশিয়াল ট্রানজেকশন আইডি প্রদান করুন' : 'Provide Government Transaction ID'}</span>
+                      </h4>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setVerifyingFineId(null);
+                          setFineGovTxIdInput('');
+                        }}
+                        className="p-1 rounded-full bg-white/5 text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-[9.5px] font-black text-slate-400 uppercase tracking-wider font-mono">Customer (গ্রাহক)</label>
+                        <p className="text-xs font-bold text-slate-200 mt-1.5">{fine?.userName || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[9.5px] font-black text-slate-400 uppercase tracking-wider font-mono">Case ID (কেস আইডি)</label>
+                        <p className="text-xs font-mono font-bold text-slate-200 mt-1.5">{fine?.caseId || ''}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[9.5px] font-black text-slate-400 uppercase tracking-wider font-mono">Fine Amount (জরিমানা চার্জ)</label>
+                        <p className="text-xs font-mono font-black text-rose-400 mt-1.5">৳{(fine?.fineAmount || 0).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[9.5px] font-black text-emerald-400 uppercase tracking-wider font-mono">Gov Transaction ID (ট্রানজেকশন আইডি) *</label>
+                        <input 
+                          type="text" 
+                          required
+                          placeholder="e.g. TR-FINE-897103"
+                          value={fineGovTxIdInput}
+                          onChange={(e) => setFineGovTxIdInput(e.target.value)}
+                          className="w-full bg-slate-950 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs font-bold mt-1 outline-none focus:border-emerald-500 text-white font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-2 border-t border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerifyingFineId(null);
+                          setFineGovTxIdInput('');
+                        }}
+                        className="px-4 py-2 bg-slate-950 hover:bg-slate-900 border border-white/5 text-slate-300 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                      >
+                        {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-500/20 cursor-pointer transition-all"
+                      >
+                        {lang === 'bn' ? 'পেমেন্ট অনুমোদন ও রসিদ তৈরি করুন' : 'Approve Payment & Generate Receipt'}
+                      </button>
+                    </div>
+                  </form>
+                );
+              })()}
+
+              {/* Fines List Table */}
+              <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-4 space-y-2">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-2 text-[10px] font-mono font-black text-slate-400 uppercase px-3 py-2 border-b border-white/5">
+                  <div className="col-span-3">{lang === 'bn' ? 'গ্রাহক তথ্য' : 'Customer'}</div>
+                  <div className="col-span-2">{lang === 'bn' ? 'কেস আইডি' : 'Case ID'}</div>
+                  <div className="col-span-3">{lang === 'bn' ? 'ভেহিকল ও চার্জ' : 'Vehicle & Fine'}</div>
+                  <div className="col-span-2 text-center">{lang === 'bn' ? 'স্ট্যাটাস' : 'Status'}</div>
+                  <div className="col-span-2 text-center">{lang === 'bn' ? 'অ্যাকশন' : 'Actions'}</div>
+                </div>
+
+                {trafficFines.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500 font-bold text-xs border border-dashed border-white/5 rounded-2xl">
+                    {lang === 'bn' ? 'কোনো ট্রাফিক ফাইন কেস সাবমিট করা হয়নি।' : 'No traffic fine requests submitted yet.'}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 scroller-hidden">
+                    {trafficFines.map((fine, idx) => {
+                      const isSubmitted = fine.status === 'Submitted';
+                      const isAwaiting = fine.status === 'Awaiting Payment';
+                      const isProcessing = fine.status === 'Processing';
+                      const isPaid = fine.status === 'Paid';
+                      const isRejected = fine.status === 'Rejected';
+
+                      return (
+                        <div
+                          key={`fine-row-${fine.id}-${idx}`}
+                          className="grid grid-cols-12 gap-2 items-center p-3.5 rounded-2xl bg-slate-950/40 hover:bg-slate-900/40 border border-white/5 transition-all text-xs"
+                        >
+                          {/* Customer */}
+                          <div className="col-span-3 min-w-0">
+                            <h4 className="font-extrabold text-white truncate">{fine.userName || 'Unknown User'}</h4>
+                            <p className="text-[10px] font-mono text-slate-400 truncate">📱 {fine.userPhone || 'N/A'}</p>
+                          </div>
+
+                          {/* Case ID */}
+                          <div className="col-span-2 min-w-0 font-mono font-bold text-slate-200 select-all">
+                            {fine.caseId}
+                          </div>
+
+                          {/* Vehicle & Fine */}
+                          <div className="col-span-3 min-w-0">
+                            {fine.vehicleNumber ? (
+                              <>
+                                <p className="font-mono font-black text-slate-100 truncate">{fine.vehicleNumber}</p>
+                                <p className="text-[10.5px] text-rose-400 font-bold font-mono mt-0.5">৳{(fine.fineAmount || 0).toLocaleString()}</p>
+                              </>
+                            ) : (
+                              <span className="text-slate-500 italic font-mono text-[10px]">{lang === 'bn' ? 'অপেক্ষমান...' : 'Not assigned yet'}</span>
+                            )}
+                          </div>
+
+                          {/* Status */}
+                          <div className="col-span-2 text-center">
+                            <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider font-mono ${
+                              isPaid ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
+                              isAwaiting ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' :
+                              isProcessing ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20 animate-pulse' :
+                              isRejected ? 'bg-slate-500/15 text-slate-400 border border-white/5' :
+                              'bg-rose-500/15 text-rose-400 border border-rose-500/20 animate-pulse'
+                            }`}>
+                              {isPaid ? (lang === 'bn' ? 'পরিশোধিত' : 'Paid') :
+                               isAwaiting ? (lang === 'bn' ? 'পেমেন্ট বাকি' : 'Awaiting Pay') :
+                               isProcessing ? (lang === 'bn' ? 'পেমেন্ট যাচাই' : 'Verifying Pay') :
+                               isRejected ? (lang === 'bn' ? 'বাতিল' : 'Rejected') :
+                               (lang === 'bn' ? 'নতুন আবেদন' : 'Submitted')}
+                            </span>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="col-span-2 flex items-center justify-center gap-2">
+                            {isSubmitted ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingFineId(fine.id);
+                                    setFineVehicleNo(fine.vehicleNumber || '');
+                                    setFineAmountInput(fine.fineAmount ? fine.fineAmount.toString() : '');
+                                  }}
+                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-black cursor-pointer shadow-md transition-all active:scale-95"
+                                >
+                                  {lang === 'bn' ? 'যাচাই করুন' : 'Process'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (confirm(lang === 'bn' ? 'কেস আবেদনটি বাতিল করতে চান?' : 'Reject this fine case?')) {
+                                      try {
+                                        await setDoc(doc(db, 'traffic_fines', fine.id), {
+                                          status: 'Rejected',
+                                          updatedAt: new Date().toISOString()
+                                        }, { merge: true });
+                                        speak('কেস আইডিটি বাতিল করা হয়েছে');
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }
+                                  }}
+                                  className="px-1.5 py-1 bg-white/5 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-white/5 rounded-lg text-[10px] font-black cursor-pointer transition-all"
+                                >
+                                  {lang === 'bn' ? 'বাতিল' : 'Reject'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (confirm(lang === 'bn' ? 'রেকর্ডটি ডিলিট করতে চান?' : 'Delete this record?')) {
+                                      try {
+                                        await deleteDoc(doc(db, 'traffic_fines', fine.id));
+                                        speak('রেকর্ড ডিলিট করা হয়েছে');
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }
+                                  }}
+                                  className="p-1 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 rounded-lg cursor-pointer transition-all"
+                                  title={lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : isProcessing ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVerifyingFineId(fine.id);
+                                    setFineGovTxIdInput('');
+                                  }}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black cursor-pointer shadow-md transition-all active:scale-95 animate-pulse"
+                                >
+                                  {lang === 'bn' ? 'পেমেন্ট ভেরিফাই' : 'Verify Payment'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (confirm(lang === 'bn' ? 'রেকর্ডটি ডিলিট করতে চান?' : 'Delete this record?')) {
+                                      try {
+                                        await deleteDoc(doc(db, 'traffic_fines', fine.id));
+                                        speak('রেকর্ড ডিলিট করা হয়েছে');
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }
+                                  }}
+                                  className="p-1 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 rounded-lg cursor-pointer transition-all"
+                                  title={lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {(isAwaiting || isRejected || isPaid) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingFineId(fine.id);
+                                      setFineVehicleNo(fine.vehicleNumber || '');
+                                      setFineAmountInput(fine.fineAmount ? fine.fineAmount.toString() : '');
+                                    }}
+                                    className="px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-black cursor-pointer transition-all"
+                                    title={lang === 'bn' ? 'সম্পাদনা' : 'Edit'}
+                                  >
+                                    {lang === 'bn' ? 'এডিট' : 'Edit'}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (confirm(lang === 'bn' ? 'রেকর্ডটি ডিলিট করতে চান?' : 'Delete this record?')) {
+                                      try {
+                                        await deleteDoc(doc(db, 'traffic_fines', fine.id));
+                                        speak('রেকর্ড ডিলিট করা হয়েছে');
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }
+                                  }}
+                                  className="p-1 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 rounded-lg cursor-pointer transition-all"
+                                  title={lang === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 6: SETTINGS MANAGEMENT */}
           {activeSubTab === 'settings' && (
             <div className="space-y-5 text-slate-100 animate-scale-up">
@@ -6278,7 +6847,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="number"
                         required
-                        value={settingsForm.minAddFund}
+                        value={settingsForm.minAddFund || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, minAddFund: parseInt(e.target.value) || 0 })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -6291,7 +6860,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       <input
                         type="number"
                         required
-                        value={settingsForm.maxAddFund}
+                        value={settingsForm.maxAddFund || ''}
                         onChange={(e) => setSettingsForm({ ...settingsForm, maxAddFund: parseInt(e.target.value) || 0 })}
                         className="w-full bg-slate-950 border border-white/10 text-white rounded-2xl py-2.5 px-3.5 text-xs font-bold font-mono outline-none focus:border-blue-500"
                       />
@@ -6791,7 +7360,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="number"
                         required
                         min="0"
-                        value={productForm.price}
+                        value={productForm.price || ''}
                         onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) || 0 })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                       />
@@ -6802,7 +7371,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         type="number"
                         required
                         min="0"
-                        value={productForm.stock}
+                        value={productForm.stock || ''}
                         onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) || 0 })}
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
                       />
@@ -7418,7 +7987,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <input
                           type="number"
                           required
-                          value={simNumForm.fullPrice}
+                          value={simNumForm.fullPrice || ''}
                           onChange={(e) => setSimNumForm({ ...simNumForm, fullPrice: Number(e.target.value) })}
                           className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-mono font-bold"
                         />
@@ -7428,7 +7997,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                         <input
                           type="number"
                           required
-                          value={simNumForm.bookingFee}
+                          value={simNumForm.bookingFee || ''}
                           onChange={(e) => setSimNumForm({ ...simNumForm, bookingFee: Number(e.target.value) })}
                           className="w-full bg-slate-950 border border-white/10 text-white rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 font-mono font-bold"
                         />
@@ -7932,7 +8501,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                           <input
                             type="number"
                             required
-                            value={scratchForm.price ?? 0}
+                            value={scratchForm.price || ''}
                             onChange={(e) => setScratchForm({...scratchForm, price: Number(e.target.value)})}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
                           />

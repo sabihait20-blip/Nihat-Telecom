@@ -54,6 +54,7 @@ import StorePanel from './components/StorePanel';
 import KYCModal from './components/KYCModal';
 import SimCardModal from './components/SimCardModal';
 import VipMoneyRequestModal from './components/VipMoneyRequestModal';
+import TrafficFineModal from './components/TrafficFineModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -172,6 +173,7 @@ export default function App() {
   const [isKYCOpen, setIsKYCOpen] = useState(false);
   const [isSimOpen, setIsSimOpen] = useState(false);
   const [isVipMoneyRequestOpen, setIsVipMoneyRequestOpen] = useState(false);
+  const [isTrafficFineOpen, setIsTrafficFineOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -182,6 +184,154 @@ export default function App() {
   );
   const knownNotifIdsRef = useRef<Set<string>>(new Set());
   const [activeSmsAlert, setActiveSmsAlert] = useState<{ sender: string; body: string; date: string } | null>(null);
+
+  // --- PHONE BACK BUTTON INTERCEPTOR AND MODAL HANDLER ---
+  const isPopStateRef = useRef(false);
+  const lastStateRef = useRef({
+    activeTab,
+    isRechargeOpen,
+    isScratchCardOpen,
+    isBillPayOpen,
+    isAddFundOpen,
+    isTransferOpen,
+    isVoucherOpen,
+    isSupportOpen,
+    isCashOutCalcOpen,
+    isKYCOpen,
+    isSimOpen,
+    isVipMoneyRequestOpen,
+    isTrafficFineOpen,
+    isNotificationsOpen,
+    isAdminOpen
+  });
+
+  // Track state changes and push to browser history stack
+  useEffect(() => {
+    const currentState = {
+      activeTab,
+      isRechargeOpen,
+      isScratchCardOpen,
+      isBillPayOpen,
+      isAddFundOpen,
+      isTransferOpen,
+      isVoucherOpen,
+      isSupportOpen,
+      isCashOutCalcOpen,
+      isKYCOpen,
+      isSimOpen,
+      isVipMoneyRequestOpen,
+      isTrafficFineOpen,
+      isNotificationsOpen,
+      isAdminOpen
+    };
+
+    if (isPopStateRef.current) {
+      // Change was already initiated by browser navigation (popstate),
+      // so we just update the ref and do not push to history.
+      isPopStateRef.current = false;
+      lastStateRef.current = currentState;
+      return;
+    }
+
+    const anyModalOpen = isRechargeOpen || isScratchCardOpen || isBillPayOpen || isAddFundOpen || isTransferOpen || isVoucherOpen || isSupportOpen || isCashOutCalcOpen || isKYCOpen || isSimOpen || isVipMoneyRequestOpen || isTrafficFineOpen || isNotificationsOpen || isAdminOpen;
+    const prevAnyModalOpen = lastStateRef.current.isRechargeOpen || lastStateRef.current.isScratchCardOpen || lastStateRef.current.isBillPayOpen || lastStateRef.current.isAddFundOpen || lastStateRef.current.isTransferOpen || lastStateRef.current.isVoucherOpen || lastStateRef.current.isSupportOpen || lastStateRef.current.isCashOutCalcOpen || lastStateRef.current.isKYCOpen || lastStateRef.current.isSimOpen || lastStateRef.current.isVipMoneyRequestOpen || lastStateRef.current.isTrafficFineOpen || lastStateRef.current.isNotificationsOpen || lastStateRef.current.isAdminOpen;
+
+    const tabChanged = activeTab !== lastStateRef.current.activeTab;
+    const modalOpened = anyModalOpen && !prevAnyModalOpen;
+
+    if (tabChanged || modalOpened) {
+      // Push new state to history stack so browser back button pops this instead of leaving the page
+      window.history.pushState({ ...currentState, isCustomState: true }, '');
+    }
+
+    lastStateRef.current = currentState;
+  }, [
+    activeTab,
+    isRechargeOpen,
+    isScratchCardOpen,
+    isBillPayOpen,
+    isAddFundOpen,
+    isTransferOpen,
+    isVoucherOpen,
+    isSupportOpen,
+    isCashOutCalcOpen,
+    isKYCOpen,
+    isSimOpen,
+    isVipMoneyRequestOpen,
+    isTrafficFineOpen,
+    isNotificationsOpen,
+    isAdminOpen
+  ]);
+
+  // Handle popstate (phone back button or browser back)
+  useEffect(() => {
+    // Set up initial state if not present
+    if (!window.history.state || !window.history.state.isCustomState) {
+      const initialAppState = {
+        activeTab: 'home',
+        isRechargeOpen: false,
+        isScratchCardOpen: false,
+        isBillPayOpen: false,
+        isAddFundOpen: false,
+        isTransferOpen: false,
+        isVoucherOpen: false,
+        isSupportOpen: false,
+        isCashOutCalcOpen: false,
+        isKYCOpen: false,
+        isSimOpen: false,
+        isVipMoneyRequestOpen: false,
+        isTrafficFineOpen: false,
+        isNotificationsOpen: false,
+        isAdminOpen: false,
+        isCustomState: true
+      };
+      window.history.replaceState(initialAppState, '');
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state;
+      isPopStateRef.current = true;
+      if (state && state.isCustomState) {
+        // Sync React states back to the historical state
+        setActiveTab(state.activeTab);
+        setIsRechargeOpen(state.isRechargeOpen);
+        setIsScratchCardOpen(state.isScratchCardOpen);
+        setIsBillPayOpen(state.isBillPayOpen);
+        setIsAddFundOpen(state.isAddFundOpen);
+        setIsTransferOpen(state.isTransferOpen);
+        setIsVoucherOpen(state.isVoucherOpen);
+        setIsSupportOpen(state.isSupportOpen);
+        setIsCashOutCalcOpen(state.isCashOutCalcOpen);
+        setIsKYCOpen(state.isKYCOpen);
+        setIsSimOpen(state.isSimOpen);
+        setIsVipMoneyRequestOpen(state.isVipMoneyRequestOpen);
+        setIsTrafficFineOpen(state.isTrafficFineOpen);
+        setIsNotificationsOpen(state.isNotificationsOpen);
+        setIsAdminOpen(state.isAdminOpen);
+      } else {
+        // Fallback: If state is null/undefined (reaches the absolute beginning)
+        // reset to home and close all modals
+        setActiveTab('home');
+        setIsRechargeOpen(false);
+        setIsScratchCardOpen(false);
+        setIsBillPayOpen(false);
+        setIsAddFundOpen(false);
+        setIsTransferOpen(false);
+        setIsVoucherOpen(false);
+        setIsSupportOpen(false);
+        setIsCashOutCalcOpen(false);
+        setIsKYCOpen(false);
+        setIsSimOpen(false);
+        setIsVipMoneyRequestOpen(false);
+        setIsTrafficFineOpen(false);
+        setIsNotificationsOpen(false);
+        setIsAdminOpen(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const playChimeSound = () => {
     try {
@@ -1132,6 +1282,13 @@ export default function App() {
       action: () => setIsSimOpen(true)
     },
     {
+      id: 'traffic_fine',
+      title: lang === 'bn' ? 'ট্রাফিক ফাইন' : 'Traffic Fine',
+      icon: AlertTriangle,
+      color: 'bg-rose-50 text-rose-600 border border-rose-100/40 shadow-xs shadow-rose-500/2',
+      action: () => setIsTrafficFineOpen(true)
+    },
+    {
       id: 'support',
       title: lang === 'bn' ? 'সাপোর্ট ও চ্যাট' : 'Support & Chat',
       icon: MessageSquare,
@@ -1842,6 +1999,23 @@ export default function App() {
               isOpen={isSimOpen}
               onClose={() => setIsSimOpen(false)}
               walletBalance={balance}
+            />
+          )}
+
+          {/* TRAFFIC FINE SYSTEM MODAL */}
+          {isTrafficFineOpen && (
+            <TrafficFineModal
+              isOpen={isTrafficFineOpen}
+              onClose={() => setIsTrafficFineOpen(false)}
+              lang={lang}
+              currentBalance={balance}
+              userId={currentUser?.uid || ''}
+              userEmail={currentUser?.email || ''}
+              userName={currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User'}
+              onAddFundRedirect={() => {
+                setIsTrafficFineOpen(false);
+                setIsAddFundOpen(true);
+              }}
             />
           )}
 

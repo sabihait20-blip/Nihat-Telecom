@@ -72,18 +72,15 @@ export default function BillPayModal({
 
   if (!isOpen) return null;
 
-  // Custom bill amount generation based on customer ID length or random indices to make it feel "fetched"
-  const fetchMockBill = () => {
-    if (customerId.length >= 6) {
-      const generatedBill = (parseInt(customerId.slice(-3)) || 0) + 180;
-      if (generatedBill > currentBalance) {
-        setLowBalanceRequired(generatedBill);
-        setShowLowBalanceAlert(true);
-        return;
-      }
-      setBillAmount(generatedBill.toString());
-      setStep('pin');
+  const proceedToPin = () => {
+    const numAmt = parseFloat(billAmount);
+    if (isNaN(numAmt) || numAmt <= 0) return;
+    if (numAmt > currentBalance) {
+      setLowBalanceRequired(numAmt);
+      setShowLowBalanceAlert(true);
+      return;
     }
+    setStep('pin');
   };
 
   const handleBillerTap = (biller: BillProvider) => {
@@ -259,7 +256,7 @@ export default function BillPayModal({
             </div>
           )}
 
-          {/* STEP 2: Cust ID Input or balance verify */}
+          {/* STEP 2: Cust ID and Amount Input */}
           {step === 'details' && (
             <div className="space-y-4">
               <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3">
@@ -300,20 +297,57 @@ export default function BillPayModal({
                   placeholder={t.custNoPlaceholder}
                   className="w-full text-slate-900 bg-slate-50 border-2 border-slate-200/60 rounded-2xl py-3 px-4 outline-none font-mono text-base font-bold tracking-widest text-left focus:border-blue-500 transition-colors"
                 />
-                
-                <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
-                  {lang === 'bn'
-                    ? 'আপনার গ্রাহক বিল অ্যাকাউন্টে বকেয়া বিল স্বয়ংক্রিয়ভাবে দেখাবে।'
-                    : 'Your outstanding utility due index will be fetched from this ID code.'}
-                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider">
+                    {t.billAmount || (lang === 'bn' ? 'বিল পরিমাণ (টাকা)' : 'Bill Amount (BDT)')}
+                  </label>
+                  <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2.5 py-0.5 rounded-full">
+                    {lang === 'bn' ? 'ব্যালেন্স: ৳' : 'Balance: ৳'}{currentBalance.toLocaleString()}
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-display text-slate-400 text-xl font-semibold">
+                    ৳
+                  </span>
+                  <input
+                    type="number"
+                    value={billAmount}
+                    onChange={(e) => setBillAmount(e.target.value)}
+                    placeholder="৳১০ - ৳৫0,০০০"
+                    className="w-full text-slate-950 font-display font-bold text-xl bg-slate-50 border-2 border-slate-200/60 rounded-2xl py-3 pl-9 pr-4 outline-none focus:border-blue-500 text-left"
+                    min="10"
+                    max="50000"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Amount Buttons */}
+              <div className="grid grid-cols-5 gap-1.5">
+                {[100, 500, 1000, 2000, 5000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setBillAmount(amt.toString())}
+                    className={`py-2 px-1 text-[11px] font-bold border rounded-xl font-display cursor-pointer transition-all ${
+                      billAmount === amt.toString()
+                        ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-xs'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    ৳{amt}
+                  </button>
+                ))}
               </div>
 
               <button
-                onClick={fetchMockBill}
-                disabled={customerId.length < 6}
-                className="w-full h-11 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl shadow-md cursor-pointer transition-colors mt-2"
+                onClick={proceedToPin}
+                disabled={customerId.length < 4 || !billAmount || parseFloat(billAmount) <= 0}
+                className="w-full h-12 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-2xl shadow-md cursor-pointer transition-colors mt-2"
               >
-                {lang === 'bn' ? 'বিল খুঁজুন' : 'Find Outstanding Bill'}
+                {lang === 'bn' ? 'পরবর্তী ধাপ (পিন দিন)' : 'Proceed to PIN Verification'}
               </button>
             </div>
           )}
