@@ -203,6 +203,69 @@ export default function App() {
   const knownNotifIdsRef = useRef<Set<string>>(new Set());
   const [activeSmsAlert, setActiveSmsAlert] = useState<{ sender: string; body: string; date: string } | null>(null);
 
+  // PWA & Service Worker States
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isPwaInstalled, setIsPwaInstalled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+  });
+
+  // Register PWA Service Worker & capture Install Prompt
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('PWA Service Worker registered:', reg.scope);
+      }).catch((err) => {
+        console.error('Service Worker registration failed:', err);
+      });
+    }
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsPwaInstalled(true);
+      setDeferredInstallPrompt(null);
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission().then((perm) => {
+          setNotificationPermission(perm);
+        });
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      setNotificationPermission(perm);
+    }
+
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice?.outcome === 'accepted') {
+        setIsPwaInstalled(true);
+      }
+      setDeferredInstallPrompt(null);
+    } else {
+      alert(
+        lang === 'bn'
+          ? 'ফোনে PWA অ্যাপ ইনস্টল করতে ব্রাউজারের ৩-ডট (⋮) বা শেয়ার মেনু থেকে "Add to Home Screen" বা "Install App" অপশনে প্রেস করুন এবং নোটিফিকেশন এলাউ করুন।'
+          : 'To install PWA app, open browser menu (⋮) -> "Add to Home Screen" or "Install App" and allow notifications.'
+      );
+    }
+  };
+
   // --- PHONE BACK BUTTON INTERCEPTOR AND MODAL HANDLER ---
   const isPopStateRef = useRef(false);
   const lastStateRef = useRef({
@@ -720,35 +783,60 @@ export default function App() {
               const title = lang === 'bn' ? (notif.titleBn || notif.title) : (notif.title || notif.titleBn);
               const body = lang === 'bn' ? (notif.descBn || notif.desc) : (notif.desc || notif.descBn);
 
-              // 1. Browser Native Push Notification (if allowed and enabled)
+              // 1. Browser Native Push Notification (via Service Worker or Native Web API)
               if (userData?.pushNotificationsEnabled !== false) {
                 if ('Notification' in window && Notification.permission === 'granted') {
                   try {
-                    new Notification(title || 'NIHAD BUSINESS POINT', {
-                      body: body || '',
-                      icon: '/favicon.ico',
-                      tag: notif.id,
-                    });
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                      navigator.serviceWorker.ready.then((reg) => {
+                        (reg as any).showNotification(title || 'NIHAD BUSINESS POINT', {
+                          body: body || '',
+                          icon: '/icon-192.png',
+                          badge: '/icon-192.png',
+                          vibrate: [200, 100, 200, 100, 200, 100, 400],
+                          tag: notif.id,
+                          renotify: true,
+                          data: { url: '/' }
+                        });
+                      }).catch(() => {
+                        new Notification(title || 'NIHAD BUSINESS POINT', {
+                          body: body || '',
+                          icon: '/icon-192.png',
+                          tag: notif.id,
+                        });
+                      });
+                    } else {
+                      new Notification(title || 'NIHAD BUSINESS POINT', {
+                        body: body || '',
+                        icon: '/icon-192.png',
+                        tag: notif.id,
+                      });
+                    }
                   } catch (e) {
                     console.error("Error displaying notification: ", e);
                   }
                 }
               }
 
-              // 2. Automated SMS Alert (if enabled in profile)
-              if (userData?.smsAlertsEnabled === true) {
-                setActiveSmsAlert({
-                  sender: 'NBP-ALERT',
-                  body: body || '',
-                  date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                });
-                playChimeSound();
-                
-                // Clear SMS toast after 6.5 seconds
-                setTimeout(() => {
-                  setActiveSmsAlert(null);
-                }, 6500);
+              // 2. Play Audio Chime Sound & Vibrator
+              playChimeSound();
+              if (typeof window !== 'undefined' && 'navigator' in window && 'vibrate' in navigator) {
+                try {
+                  navigator.vibrate([200, 100, 200, 100, 200]);
+                } catch (ve) {}
               }
+
+              // 3. Automated SMS / Push Alert Toast on Screen
+              setActiveSmsAlert({
+                sender: 'NBP-ALERT',
+                body: `${title ? title + ': ' : ''}${body || ''}`,
+                date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              });
+              
+              // Clear SMS toast after 7 seconds
+              setTimeout(() => {
+                setActiveSmsAlert(null);
+              }, 7000);
             }
             knownNotifIdsRef.current.add(notif.id);
           }
@@ -1791,8 +1879,33 @@ export default function App() {
                 onAddFundClick={() => setIsAddFundOpen(true)}
               />
 
+              {/* PWA Install & Push Notification Banner Banner */}
+              {!isPwaInstalled && (
+                <div className="mx-4 -mt-11 mb-3 relative z-30 p-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-2xl shadow-xl border border-white/20 flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-white/15 border border-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                      <Smartphone className="h-4.5 w-4.5 text-blue-100 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black tracking-tight leading-tight">
+                        {lang === 'bn' ? '📲 অ্যাপ ইন্সটল করুন ও নোটিফিকেশন পান' : '📲 Install App for Real-time Push Alerts'}
+                      </h4>
+                      <p className="text-[10px] text-blue-100/90 font-medium leading-tight mt-0.5">
+                        {lang === 'bn' ? 'ফোনের স্ক্রিনে নোটিফিকেশন পেতে অ্যাপটি সেভ করুন' : 'Tap to add PWA app to phone home screen'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleInstallPwa}
+                    className="px-3 py-1.5 bg-white text-blue-700 hover:bg-blue-50 text-[11px] font-black rounded-xl shadow-md transition-all shrink-0 cursor-pointer active:scale-95 border-0"
+                  >
+                    {lang === 'bn' ? 'ইন্সটল' : 'Install'}
+                  </button>
+                </div>
+              )}
+
               {/* Grid block of Fintech Services themed in Lovable Dark Style */}
-              <div className="px-4 -mt-10 relative z-20">
+              <div className={`px-4 ${!isPwaInstalled ? 'mt-0' : '-mt-10'} relative z-20`}>
                 <div className="bg-[#121827]/95 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-xl grid grid-cols-4 gap-y-4 gap-x-3">
                   {gridServices.map((srv) => {
                     const Icon = srv.icon;
@@ -2093,6 +2206,32 @@ export default function App() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
+
+                {/* PWA App Install Banner */}
+                {!isPwaInstalled && (
+                  <div className="p-3.5 bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-2xl flex flex-col gap-2 shadow-md">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                        <Smartphone className="h-4.5 w-4.5 text-indigo-100" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-black leading-tight">
+                          {lang === 'bn' ? '📲 ফোনে PWA অ্যাপটি ইনস্টল করুন' : '📲 Install App on Phone (PWA)'}
+                        </p>
+                        <p className="text-[10px] text-indigo-100/90 font-medium leading-tight">
+                          {lang === 'bn' ? 'হোম স্ক্রিনে আইকন রাখুন এবং সরাসরি পুশ নোটিফিকেশন পান' : 'Add to home screen & receive real-time push alerts'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleInstallPwa}
+                      className="w-full bg-white text-indigo-700 hover:bg-indigo-50 font-black py-2 px-3 rounded-xl text-xs transition-colors shadow-sm cursor-pointer select-none border-0"
+                    >
+                      {lang === 'bn' ? 'সরাসরি অ্যাপ ইনস্টল করুন' : 'Install PWA App Now'}
+                    </button>
+                  </div>
+                )}
 
                 {('Notification' in window) && notificationPermission !== 'granted' && (
                   <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex flex-col gap-2">
