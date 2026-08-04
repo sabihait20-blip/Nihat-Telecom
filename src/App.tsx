@@ -78,7 +78,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
-  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => !!localStorage.getItem('secure_wallet_pin'));
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => localStorage.getItem('secure_wallet_pin_enabled') === 'true' && !!localStorage.getItem('secure_wallet_pin'));
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [balance, setBalance] = useState<number>(0);
 
@@ -1460,7 +1460,11 @@ export default function App() {
         {!currentUser && !authChecking && (
           <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
             <div className="w-full max-w-sm h-[812px] bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden relative border border-slate-850">
-              <AuthPanel lang={lang} onSuccess={() => setIsAppLocked(true)} />
+              <AuthPanel lang={lang} onSuccess={() => {
+                const isPinEnabled = localStorage.getItem('secure_wallet_pin_enabled') === 'true';
+                const hasPin = !!localStorage.getItem('secure_wallet_pin');
+                setIsAppLocked(isPinEnabled && hasPin);
+              }} />
             </div>
           </div>
         )}
@@ -1865,7 +1869,9 @@ export default function App() {
             <AuthPanel
               lang={lang}
               onSuccess={() => {
-                setIsAppLocked(true);
+                const isPinEnabled = localStorage.getItem('secure_wallet_pin_enabled') === 'true';
+                const hasPin = !!localStorage.getItem('secure_wallet_pin');
+                setIsAppLocked(isPinEnabled && hasPin);
               }}
             />
           )}

@@ -35,9 +35,9 @@ export default function SecureLockModal({ lang, onUnlocked }: SecureLockModalPro
   };
 
   const verifyPin = (enteredPin: string) => {
-    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
+    const savedPin = localStorage.getItem('secure_wallet_pin') || '';
     
-    if (enteredPin === savedPin) {
+    if (enteredPin && enteredPin === savedPin) {
       setIsUnlocked(true);
       setTimeout(() => {
         onUnlocked();

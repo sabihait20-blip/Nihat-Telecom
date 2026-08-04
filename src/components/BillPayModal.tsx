@@ -80,7 +80,12 @@ export default function BillPayModal({
       setShowLowBalanceAlert(true);
       return;
     }
-    setStep('pin');
+    const isPinEnabled = localStorage.getItem('secure_wallet_pin_enabled') === 'true' && !!localStorage.getItem('secure_wallet_pin');
+    if (isPinEnabled) {
+      setStep('pin');
+    } else {
+      setStep('confirm');
+    }
   };
 
   const handleBillerTap = (biller: BillProvider) => {
@@ -89,8 +94,8 @@ export default function BillPayModal({
   };
 
   const handlePinNext = () => {
-    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
-    if (pin === savedPin) {
+    const savedPin = localStorage.getItem('secure_wallet_pin') || '';
+    if (pin && pin === savedPin) {
       setPinError(false);
       setStep('confirm');
     } else {

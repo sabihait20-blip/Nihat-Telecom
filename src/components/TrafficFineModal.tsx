@@ -151,69 +151,78 @@ export default function TrafficFineModal({
     }
   };
 
+  const executePayment = async () => {
+    try {
+      const batch = writeBatch(db);
+      const amount = currentFine.fineAmount;
+      const txId = `tx-${Date.now()}`;
+
+      // Deduct balance from user wallet
+      const balanceDocRef = doc(db, 'users', userId, 'wallet', 'balance_doc');
+      batch.set(balanceDocRef, { balance: Math.max(currentBalance - amount, 0) });
+
+      // Update traffic fine status to 'Processing' (awaiting Admin official TxID input)
+      const fineRef = doc(db, 'traffic_fines', activeFineId!);
+      batch.update(fineRef, { 
+        status: 'Processing', 
+        paidAt: new Date().toISOString(),
+        transactionDocId: txId
+      });
+
+      // Create Transaction record as 'Pending' verification
+      const newTx = {
+        id: txId,
+        type: 'Fine',
+        amount: amount,
+        targetNumber: currentFine.vehicleNumber,
+        senderNumber: currentFine.caseId,
+        txId: 'Awaiting Admin TxID',
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        status: 'Pending',
+        userId: userId,
+        userEmail: userEmail,
+        userName: userName,
+        details: `Traffic Fine Case ID: ${currentFine.caseId} (Awaiting TxID Verification)`
+      };
+
+      batch.set(doc(db, 'users', userId, 'transactions', txId), newTx);
+      batch.set(doc(db, 'admin_requests', txId), newTx);
+
+      // Add Notification
+      const notifId = `notif-${Date.now()}`;
+      const addedNotif = {
+        id: notifId,
+        title: 'Traffic Fine Payment Verifying',
+        titleBn: 'ট্রাফিক ফাইন পেমেন্ট যাচাই করা হচ্ছে',
+        desc: `Your payment of ৳${amount} for Case: ${currentFine.caseId} has been received and is awaiting Admin verification.`,
+        descBn: `আপনার কেস নং: ${currentFine.caseId} এর ৳${amount} টাকা জরিমানা পেমেন্ট গ্রহণ করা হয়েছে এবং এডমিন ভেরিফিকেশনের জন্য অপেক্ষমান।`,
+        time: 'Just now',
+        read: false,
+      };
+      batch.set(doc(db, 'users', userId, 'notifications', notifId), addedNotif);
+
+      await batch.commit();
+      setStep('verifying');
+    } catch (err) {
+      console.error('Error paying traffic fine:', err);
+    }
+  };
+
   const handlePayClick = () => {
-    setStep('pin');
+    const isPinEnabled = localStorage.getItem('secure_wallet_pin_enabled') === 'true' && !!localStorage.getItem('secure_wallet_pin');
+    if (isPinEnabled) {
+      setStep('pin');
+    } else {
+      executePayment();
+    }
   };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
-    if (pin === savedPin) {
+    const savedPin = localStorage.getItem('secure_wallet_pin') || '';
+    if (pin && pin === savedPin) {
       setPinError(false);
-      try {
-        const batch = writeBatch(db);
-        const amount = currentFine.fineAmount;
-        const txId = `tx-${Date.now()}`;
-
-        // Deduct balance from user wallet
-        const balanceDocRef = doc(db, 'users', userId, 'wallet', 'balance_doc');
-        batch.set(balanceDocRef, { balance: Math.max(currentBalance - amount, 0) });
-
-        // Update traffic fine status to 'Processing' (awaiting Admin official TxID input)
-        const fineRef = doc(db, 'traffic_fines', activeFineId!);
-        batch.update(fineRef, { 
-          status: 'Processing', 
-          paidAt: new Date().toISOString(),
-          transactionDocId: txId
-        });
-
-        // Create Transaction record as 'Pending' verification
-        const newTx = {
-          id: txId,
-          type: 'Fine',
-          amount: amount,
-          targetNumber: currentFine.vehicleNumber,
-          senderNumber: currentFine.caseId,
-          txId: 'Awaiting Admin TxID',
-          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          status: 'Pending',
-          userId: userId,
-          userEmail: userEmail,
-          userName: userName,
-          details: `Traffic Fine Case ID: ${currentFine.caseId} (Awaiting TxID Verification)`
-        };
-
-        batch.set(doc(db, 'users', userId, 'transactions', txId), newTx);
-        batch.set(doc(db, 'admin_requests', txId), newTx);
-
-        // Add Notification
-        const notifId = `notif-${Date.now()}`;
-        const addedNotif = {
-          id: notifId,
-          title: 'Traffic Fine Payment Verifying',
-          titleBn: 'ট্রাফিক ফাইন পেমেন্ট যাচাই করা হচ্ছে',
-          desc: `Your payment of ৳${amount} for Case: ${currentFine.caseId} has been received and is awaiting Admin verification.`,
-          descBn: `আপনার কেস নং: ${currentFine.caseId} এর ৳${amount} টাকা জরিমানা পেমেন্ট গ্রহণ করা হয়েছে এবং এডমিন ভেরিফিকেশনের জন্য অপেক্ষমান।`,
-          time: 'Just now',
-          read: false,
-        };
-        batch.set(doc(db, 'users', userId, 'notifications', notifId), addedNotif);
-
-        await batch.commit();
-        setStep('verifying');
-      } catch (err) {
-        console.error('Error paying traffic fine:', err);
-      }
+      await executePayment();
     } else {
       setPinError(true);
       setPin('');

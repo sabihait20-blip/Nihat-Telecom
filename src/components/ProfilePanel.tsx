@@ -56,6 +56,7 @@ export default function ProfilePanel({
   const [newPinInput, setNewPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<string>('');
   const [pinSuccess, setPinSuccess] = useState<string>('');
+  const [isPinEnabled, setIsPinEnabled] = useState<boolean>(() => localStorage.getItem('secure_wallet_pin_enabled') === 'true');
 
   // Profile Upload State
   const [uploadingProfile, setUploadingProfile] = useState(false);
@@ -149,11 +150,13 @@ export default function ProfilePanel({
     setPinError('');
     setPinSuccess('');
 
-    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
+    const savedPin = localStorage.getItem('secure_wallet_pin');
 
-    if (currentPinInput !== savedPin) {
-      setPinError(lang === 'bn' ? 'বর্তমান পিন নম্বরটি সঠিক নয়!' : 'Current PIN is incorrect!');
-      return;
+    if (savedPin) {
+      if (currentPinInput !== savedPin) {
+        setPinError(lang === 'bn' ? 'বর্তমান পিন নম্বরটি সঠিক নয়!' : 'Current PIN is incorrect!');
+        return;
+      }
     }
 
     if (newPinInput.length !== 4 || isNaN(Number(newPinInput))) {
@@ -163,12 +166,17 @@ export default function ProfilePanel({
 
     // Success update
     localStorage.setItem('secure_wallet_pin', newPinInput);
+    localStorage.setItem('secure_wallet_pin_enabled', 'true');
+    setIsPinEnabled(true);
     setPinSuccess(lang === 'bn' ? 'সফলভাবে পিন পরিবর্তন করা হয়েছে!' : 'PIN successfully updated!');
     setCurrentPinInput('');
     setNewPinInput('');
     setTimeout(() => {
       setShowPinModal(false);
       setPinSuccess('');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('storage'));
+      }
     }, 1500);
   };
 
@@ -546,6 +554,56 @@ export default function ProfilePanel({
             </button>
           </div>
 
+          {/* Toggle PIN Lock Option */}
+          <div className="p-3.5 flex items-center justify-between hover:bg-slate-50 border-b border-slate-50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Shield className="h-4.5 w-4.5 text-indigo-600" />
+              </div>
+              <div>
+                <h4 className="text-slate-800 font-bold text-xs">
+                  {lang === 'bn' ? 'ওয়ালেট পিন লক' : 'Wallet PIN Lock'}
+                </h4>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  {lang === 'bn' ? 'সুরক্ষিত পিন লক অন/অফ করুন' : 'Enable/disable secure app lock & confirm PIN'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (isPinEnabled) {
+                  localStorage.setItem('secure_wallet_pin_enabled', 'false');
+                  setIsPinEnabled(false);
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new Event('storage'));
+                  }
+                } else {
+                  const hasPin = !!localStorage.getItem('secure_wallet_pin');
+                  if (!hasPin) {
+                    setPinError('');
+                    setPinSuccess('');
+                    setShowPinModal(true);
+                  } else {
+                    localStorage.setItem('secure_wallet_pin_enabled', 'true');
+                    setIsPinEnabled(true);
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new Event('storage'));
+                    }
+                  }
+                }
+              }}
+              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer outline-none ${
+                isPinEnabled ? 'bg-emerald-500' : 'bg-slate-200'
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                  isPinEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
           {/* Change PIN Action */}
           <button
             onClick={() => {
@@ -661,20 +719,22 @@ export default function ProfilePanel({
             </div>
 
             <form onSubmit={handleChangePinSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  {lang === 'bn' ? 'বর্তমান পিন দিন' : 'Current 4-Digit PIN'}
-                </label>
-                <input
-                  type="password"
-                  maxLength={4}
-                  required
-                  placeholder="••••"
-                  value={currentPinInput}
-                  onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full text-center tracking-[1em] text-lg font-bold p-2.5 rounded-2xl bg-slate-50 border border-slate-150 text-slate-900 focus:outline-none focus:border-blue-500"
-                />
-              </div>
+              {localStorage.getItem('secure_wallet_pin') && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    {lang === 'bn' ? 'বর্তমান পিন দিন' : 'Current 4-Digit PIN'}
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    required
+                    placeholder="••••"
+                    value={currentPinInput}
+                    onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                    className="w-full text-center tracking-[1em] text-lg font-bold p-2.5 rounded-2xl bg-slate-50 border border-slate-150 text-slate-900 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">

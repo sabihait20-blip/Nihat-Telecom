@@ -170,10 +170,13 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
       return;
     }
 
-    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
-    if (pinInput !== savedPin) {
-      setErrorMsg(lang === 'bn' ? 'ভুল পিন নম্বর! পুনরায় চেষ্টা করুন।' : 'Invalid PIN! Please try again.');
-      return;
+    const isPinEnabled = localStorage.getItem('secure_wallet_pin_enabled') === 'true' && !!localStorage.getItem('secure_wallet_pin');
+    if (isPinEnabled) {
+      const savedPin = localStorage.getItem('secure_wallet_pin') || '';
+      if (pinInput !== savedPin) {
+        setErrorMsg(lang === 'bn' ? 'ভুল পিন নম্বর! পুনরায় চেষ্টা করুন।' : 'Invalid PIN! Please try again.');
+        return;
+      }
     }
 
     if (selectedPack.price > currentBalance) {
@@ -453,24 +456,26 @@ export default function VoucherModal({ lang, isOpen, onClose, currentBalance, on
               </p>
             </div>
 
-            {/* PIN verification */}
-            <div className="space-y-1.5 pt-1">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider flex justify-between">
-                <span>{lang === 'bn' ? '৪ ডিজিটের সিকিউরিটি পিন' : 'Enter 4-Digit Wallet PIN'}</span>
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="password"
-                  required
-                  maxLength={4}
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-11 pr-4 text-xs font-black tracking-widest outline-none focus:border-indigo-500 focus:bg-white transition-all text-slate-900 font-mono"
-                />
+            {/* PIN verification (Conditional) */}
+            {localStorage.getItem('secure_wallet_pin_enabled') === 'true' && !!localStorage.getItem('secure_wallet_pin') && (
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider flex justify-between">
+                  <span>{lang === 'bn' ? '৪ ডিজিটের সিকিউরিটি পিন' : 'Enter 4-Digit Wallet PIN'}</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    maxLength={4}
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value)}
+                    placeholder="••••"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-11 pr-4 text-xs font-black tracking-widest outline-none focus:border-indigo-500 focus:bg-white transition-all text-slate-900 font-mono"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {errorMsg && (
               <div className="p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center gap-2">

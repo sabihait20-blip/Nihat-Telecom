@@ -107,12 +107,19 @@ export default function RechargeModal({
       setShowLowBalanceAlert(true);
       return;
     }
-    setStep('pin');
+    
+    const isPinEnabled = localStorage.getItem('secure_wallet_pin_enabled') === 'true' && !!localStorage.getItem('secure_wallet_pin');
+    if (isPinEnabled) {
+      setStep('pin');
+    } else {
+      setStep('success');
+      onSuccess(numAmt, selectedOp, phoneNumber);
+    }
   };
 
   const handlePinSubmit = () => {
-    const savedPin = localStorage.getItem('secure_wallet_pin') || '1234';
-    if (pin === savedPin) {
+    const savedPin = localStorage.getItem('secure_wallet_pin') || '';
+    if (pin && pin === savedPin) {
       setPinError(false);
       setStep('success');
       onSuccess(parseFloat(amount), selectedOp, phoneNumber);
