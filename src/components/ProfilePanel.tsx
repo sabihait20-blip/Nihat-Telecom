@@ -503,8 +503,44 @@ export default function ProfilePanel({
               onClick={async () => {
                 if (!currentUser) return;
                 const currentVal = userData?.pushNotificationsEnabled !== false;
+                const newVal = !currentVal;
+
+                if (newVal) {
+                  // Request browser notification permission if not already granted
+                  if ('Notification' in window && Notification.permission !== 'granted') {
+                    try {
+                      await Notification.requestPermission();
+                    } catch (e) {
+                      console.warn('Notification permission error:', e);
+                    }
+                  }
+
+                  localStorage.setItem('local_notification_allowed', 'granted');
+
+                  // Fire a background push notification via Service Worker
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then((reg) => {
+                      (reg as any).showNotification(
+                        lang === 'bn' ? '🔔 ব্যাকগ্রাউন্ড নোটিফিকেশন চালু হয়েছে!' : '🔔 Background Notifications Active!',
+                        {
+                          body: lang === 'bn' 
+                            ? 'এখন থেকে ব্রাউজার বন্ধ থাকলেও আপনি সমস্ত লেনদেন ও নোটিফিকেশন আপডেট সরাসরি আপনার স্ক্রিনে পাবেন।' 
+                            : 'You will now receive all real-time transaction updates even if the browser is closed.',
+                          icon: '/icon-192.png',
+                          badge: '/icon-192.png',
+                          vibrate: [200, 100, 200],
+                          tag: 'push-active-' + Date.now(),
+                          renotify: true,
+                          requireInteraction: true,
+                          data: { url: '/' }
+                        }
+                      ).catch(() => {});
+                    }).catch(() => {});
+                  }
+                }
+
                 await setDoc(doc(db, 'users', currentUser.uid), {
-                  pushNotificationsEnabled: !currentVal
+                  pushNotificationsEnabled: newVal
                 }, { merge: true });
               }}
               className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer outline-none ${

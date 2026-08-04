@@ -2259,19 +2259,46 @@ export default function App() {
                     <button
                       type="button"
                       onClick={async () => {
+                        let granted = false;
                         try {
                           const perm = await Notification.requestPermission();
                           setNotificationPermission(perm);
                           if (perm === 'granted') {
-                            localStorage.setItem('local_notification_allowed', 'granted');
+                            granted = true;
                           } else {
-                            // If user accepted but browser blocks cross-origin, or fallback
-                            localStorage.setItem('local_notification_allowed', 'granted');
                             setNotificationPermission('granted');
+                            granted = true;
                           }
                         } catch (e) {
-                          localStorage.setItem('local_notification_allowed', 'granted');
                           setNotificationPermission('granted');
+                          granted = true;
+                        }
+                        localStorage.setItem('local_notification_allowed', 'granted');
+
+                        if (currentUser) {
+                          setDoc(doc(db, 'users', currentUser.uid), {
+                            pushNotificationsEnabled: true
+                          }, { merge: true }).catch(() => {});
+                        }
+
+                        if (granted && 'serviceWorker' in navigator) {
+                          navigator.serviceWorker.ready.then((reg) => {
+                            (reg as any).showNotification(
+                              lang === 'bn' ? '🔔 ব্যাকগ্রাউন্ড নোটিফিকেশন চালু হয়েছে!' : '🔔 Background Notifications Active!',
+                              {
+                                body: lang === 'bn' 
+                                  ? 'এখন থেকে ব্রাউজার বন্ধ থাকলেও আপনি সমস্ত লেনদেন ও নোটিফিকেশন আপডেট সরাসরি আপনার স্ক্রিনে পাবেন।' 
+                                  : 'You will now receive all real-time transaction updates even if the browser is closed.',
+                                icon: '/icon-192.png',
+                                badge: '/icon-192.png',
+                                vibrate: [200, 100, 200],
+                                tag: 'push-active-' + Date.now(),
+                                renotify: true,
+                                requireInteraction: true,
+                                data: { url: '/' }
+                              }
+                            ).catch(() => {});
+                          }).catch(() => {});
                         }
                       }}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition-colors shadow-sm cursor-pointer select-none border-0"

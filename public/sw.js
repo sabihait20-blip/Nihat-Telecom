@@ -70,19 +70,37 @@ self.addEventListener('push', (event) => {
     icon: data.icon || '/icon-192.png',
     badge: '/icon-192.png',
     vibrate: [200, 100, 200, 100, 200, 100, 400],
-    tag: 'nihad-notif-' + Date.now(),
+    tag: data.tag || ('nihad-notif-' + Date.now()),
     renotify: true,
+    requireInteraction: true,
     data: {
       url: data.url || '/'
     },
     actions: [
-      { action: 'open', title: 'অ্যাপমেন্ট দেখুন' }
+      { action: 'open', title: 'অ্যাপ খুলুন' }
     ]
   };
 
   event.waitUntil(
     self.registration.showNotification(data.title || 'NIHAD BUSINESS POINT', options)
   );
+});
+
+// Handle direct message from client app to present persistent background notifications
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const payload = event.data.payload || {};
+    self.registration.showNotification(payload.title || 'NIHAD BUSINESS POINT', {
+      body: payload.body || '',
+      icon: payload.icon || '/icon-192.png',
+      badge: '/icon-192.png',
+      vibrate: [200, 100, 200, 100, 200, 100, 400],
+      tag: payload.tag || ('notif-' + Date.now()),
+      renotify: true,
+      requireInteraction: true,
+      data: { url: payload.url || '/' }
+    });
+  }
 });
 
 // When user taps on the phone notification
