@@ -666,6 +666,9 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
         if (isOnlyDigits && inputVal.length !== 11) {
           throw new Error(lang === 'bn' ? 'দয়া করে একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন!' : 'Please enter a valid 11-digit Bangladeshi mobile number!');
         }
+        if (!displayName.trim()) {
+          throw new Error(lang === 'bn' ? 'দয়া করে আপনার পূর্ণ নাম লিখুন!' : 'Please enter your full name!');
+        }
         if (password.length < 6) {
           throw new Error(lang === 'bn' ? 'পাসওয়ার্ড বা পিন অন্তত ৬ অক্ষরের হতে হবে!' : 'Password/PIN must be at least 6 characters!');
         }
@@ -679,41 +682,9 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           }
         }
 
-        // We require all information together now
-        if (!nidFront || !nidBack) {
-          throw new Error(lang === 'bn' ? 'অনুগ্রহ করে এনআইডি কার্ডের সামনের এবং পেছনের ছবি আপলোড করুন!' : 'Please upload both front and back images of your NID card!');
-        }
-        if (!displayName.trim()) {
-          throw new Error(lang === 'bn' ? 'দয়া করে এনআইডি অনুযায়ী ইংরেজী নাম লিখুন!' : 'Please enter English Name as per NID!');
-        }
-        if (!bengaliName.trim()) {
-          throw new Error(lang === 'bn' ? 'দয়া করে এনআইডি অনুযায়ী বাংলা নাম লিখুন!' : 'Please enter Bengali Name as per NID!');
-        }
-        if (!fatherName.trim()) {
-          throw new Error(lang === 'bn' ? 'দয়া করে পিতার নাম লিখুন!' : "Please enter Father's Name!");
-        }
-        if (!motherName.trim()) {
-          throw new Error(lang === 'bn' ? 'দয়া করে মাতার নাম লিখুন!' : "Please enter Mother's Name!");
-        }
-        if (!nidNumber.trim()) {
-          throw new Error(lang === 'bn' ? 'অনুগ্রহ করে এনআইডি নম্বর লিখুন!' : 'Please enter your NID number!');
-        }
-        if (!dob.trim()) {
-          throw new Error(lang === 'bn' ? 'অনুগ্রহ করে জন্ম তারিখ দিন!' : 'Please enter your Date of Birth!');
-        }
-        if (!address.trim()) {
-          throw new Error(lang === 'bn' ? 'অনুগ্রহ করে আপনার ঠিকানা লিখুন!' : 'Please enter your address!');
-        }
-
-        setSuccessMessage(lang === 'bn' ? 'এনআইডি ছবি আপলোড করা হচ্ছে...' : 'Uploading NID images...');
-
-        // 1. Upload images to ImgBB
-        const frontUrl = await uploadToImgBB(nidFront);
-        const backUrl = await uploadToImgBB(nidBack);
-
         setSuccessMessage(lang === 'bn' ? 'অ্যাকাউন্ট তৈরি করা হচ্ছে...' : 'Creating secure wallet account...');
 
-        // 2. Create the Firebase Auth account
+        // Create the Firebase Auth account
         const userCredential = await createUserWithEmailAndPassword(auth, resolvedEmail, password);
         const newUser = userCredential.user;
 
@@ -722,28 +693,15 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           displayName: displayName.trim()
         });
 
-        // Create new user document with NID / Address details
+        // Create new user document with default kycStatus as not_verified
         await setDoc(doc(db, 'users', newUser.uid), {
           uid: newUser.uid,
           displayName: displayName.trim(),
           phone: isOnlyDigits ? inputVal : '',
           email: newUser.email,
           createdAt: new Date().toISOString(),
-          address: address.trim(),
-          kycStatus: 'pending', // Set to pending, awaiting admin approval as requested
-          kycData: {
-            fullName: displayName.trim(),
-            bengaliName: bengaliName.trim(),
-            fatherName: fatherName.trim(),
-            motherName: motherName.trim(),
-            nidNumber: nidNumber.trim(),
-            dob: dob.trim(),
-            address: address.trim(),
-            nidFrontUrl: frontUrl,
-            nidBackUrl: backUrl,
-            submittedAt: new Date().toISOString(),
-            verifiedBy: ''
-          }
+          address: '',
+          kycStatus: 'not_verified'
         });
 
         // Initialize wallet
@@ -753,7 +711,7 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           totalGiven: 0
         });
         
-        setSuccessMessage(lang === 'bn' ? 'অ্যাকাউন্ট এবং ডিজিটাল কেওয়াইসি সফলভাবে তৈরি হয়েছে!' : 'Account and Digital KYC created successfully!');
+        setSuccessMessage(lang === 'bn' ? 'অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!' : 'Account created successfully!');
         setTimeout(() => {
           onSuccess();
         }, 1200);
@@ -984,6 +942,26 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
           <form onSubmit={handleAuth} className="space-y-3.5">
             {isSignUp ? (
               <div className="space-y-3.5">
+                {/* Full Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
+                    {lang === 'bn' ? 'পূর্ণ নাম' : 'Full Name'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                      <User className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      placeholder={lang === 'bn' ? 'আপনার সম্পূর্ণ নাম লিখুন' : 'Enter your full name'}
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
                 {/* Mobile Number */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
@@ -1028,227 +1006,6 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
                     >
                       {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                     </button>
-                  </div>
-                </div>
-
-                {/* AI Digital KYC Header */}
-                <div className="flex items-center gap-3 bg-emerald-500/10 p-3.5 border border-emerald-500/20 rounded-2xl mb-2 text-emerald-400">
-                  <Sparkles className="h-4.5 w-4.5 shrink-0 animate-pulse" />
-                  <div className="text-left">
-                    <p className="text-[11px] font-black leading-tight">
-                      {lang === 'bn' ? 'এআই ডিজিটাল কেওয়াইসি ভেরিফিকেশন' : 'AI Digital KYC Verification'}
-                    </p>
-                    <p className="text-[9px] font-bold text-slate-400 leading-normal mt-0.5">
-                      {lang === 'bn' ? 'এনআইডির ছবি দিন, এআই বাকি তথ্য সয়ংক্রিয়ভাবে পূরণ করবে' : 'Upload front & back NID, AI auto-fills fields'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* OCR Success Message */}
-                {ocrSuccessMsg && (
-                  <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-start gap-2.5 text-emerald-300 text-xs font-semibold animate-pulse">
-                    <Sparkles className="h-4.5 w-4.5 shrink-0 text-emerald-400" />
-                    <div className="text-left">
-                      <p className="text-[10px] font-extrabold leading-none">{lang === 'bn' ? 'সয়ংক্রিয় এআই স্ক্যান' : 'Automated AI Scan'}</p>
-                      <p className="text-[10px] text-emerald-300/90 leading-tight mt-1">{ocrSuccessMsg}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Front & Back Images row */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Front Side */}
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block ml-1">
-                      {lang === 'bn' ? 'এনআইডি সামনের অংশ' : 'NID Front side'}
-                    </label>
-                    <div 
-                      onClick={() => document.getElementById('nidFrontSignUpInput')?.click()}
-                      className="relative aspect-video bg-slate-800/80 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-500/5 transition-all overflow-hidden group"
-                    >
-                      {nidFront ? (
-                        <img src={nidFront} alt="Front" className="w-full h-full object-cover" />
-                      ) : (
-                        <>
-                          <Camera className="h-5 w-5 text-slate-400 group-hover:scale-110 transition-transform mb-1" />
-                          <p className="text-[9px] font-black text-slate-400 text-center px-2">
-                            {lang === 'bn' ? 'সামনের ছবি' : 'Front Photo'}
-                          </p>
-                        </>
-                      )}
-                      <input 
-                        id="nidFrontSignUpInput" 
-                        type="file" 
-                        accept="image/*" 
-                        hidden 
-                        onChange={e => handleImageChange(e, 'nidFront')} 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Back Side */}
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block ml-1">
-                      {lang === 'bn' ? 'এনআইডি পেছনের অংশ' : 'NID Back side'}
-                    </label>
-                    <div 
-                      onClick={() => document.getElementById('nidBackSignUpInput')?.click()}
-                      className="relative aspect-video bg-slate-800/80 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-500/5 transition-all overflow-hidden group"
-                    >
-                      {nidBack ? (
-                        <img src={nidBack} alt="Back" className="w-full h-full object-cover" />
-                      ) : (
-                        <>
-                          <Camera className="h-5 w-5 text-slate-400 group-hover:scale-110 transition-transform mb-1" />
-                          <p className="text-[9px] font-black text-slate-400 text-center px-2">
-                            {lang === 'bn' ? 'পেছনের ছবি' : 'Back Photo'}
-                          </p>
-                        </>
-                      )}
-                      <input 
-                        id="nidBackSignUpInput" 
-                        type="file" 
-                        accept="image/*" 
-                        hidden 
-                        onChange={e => handleImageChange(e, 'nidBack')} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Editable OCR results */}
-                <div className="space-y-3 pt-1 text-left">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'এনআইডি অনুযায়ী পূর্ণ নাম' : 'Name (English as per NID)'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <User className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? 'আপনার নাম নিশ্চিত করুন (ইংরেজীতে)' : 'Confirm your full name in English'}
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'নাম (বাংলা)' : 'Name (Bengali as per NID)'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <User className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? 'বাংলায় নাম নিশ্চিত করুন' : 'Confirm your full name in Bengali'}
-                        value={bengaliName}
-                        onChange={(e) => setBengaliName(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'পিতার নাম' : "Father's Name"}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <User className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? 'পিতার নাম নিশ্চিত করুন' : "Confirm father's name"}
-                        value={fatherName}
-                        onChange={(e) => setFatherName(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'মাতার নাম' : "Mother's Name"}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <User className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? 'মাতার নাম নিশ্চিত করুন' : "Confirm mother's name"}
-                        value={motherName}
-                        onChange={(e) => setMotherName(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'এনআইডি কার্ড নম্বর' : 'NID Card Number'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <CreditCard className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? '১০ বা ১৭ ডিজিটের এনআইডি নং' : '10 or 17 digit NID number'}
-                        value={nidNumber}
-                        onChange={(e) => setNidNumber(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'জন্ম তারিখ' : 'Date of Birth'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <Calendar className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? 'উদাহরণ: DD/MM/YYYY' : 'Example: DD/MM/YYYY'}
-                        value={dob}
-                        onChange={(e) => setDob(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                      {lang === 'bn' ? 'পূর্ণ ঠিকানা (এনআইডি অনুযায়ী)' : 'Full Address (as per NID)'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <MapPin className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={lang === 'bn' ? 'যেমন: গ্রাম, থানা, জেলা' : 'E.g., Village, P.O, District'}
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
                   </div>
                 </div>
 

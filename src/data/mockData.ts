@@ -95,8 +95,8 @@ export const POPULAR_PACKAGES: RechargePackage[] = [
     category: 'internet',
     volume: '10 GB (Social)',
     volumeBn: '১০জিবি (সোশ্যাল)',
-    description: 'Fb, YouTube & TikTok non-stop access',
-    descriptionBn: 'ফেসবুক, ইউটিউব ও টিকটক নন-স্টপ ব্যবহার',
+    description: 'Social media, YouTube & TikTok non-stop access',
+    descriptionBn: 'সোশ্যাল মিডিয়া, ইউটিউব ও টিকটক নন-স্টপ ব্যবহার',
     isPopular: false,
   },
   {

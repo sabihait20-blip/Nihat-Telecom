@@ -33,6 +33,10 @@ export default function VipMoneyRequestModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isVip) {
+      setErrorMsg(lang === 'bn' ? 'শুধুমাত্র ভিআইপি সদস্যরাই মানি রিকুয়েস্ট করতে পারেন!' : 'Only VIP users can submit money requests!');
+      return;
+    }
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setErrorMsg(lang === 'bn' ? 'সঠিক টাকার পরিমাণ লিখুন!' : 'Please enter a valid amount!');
@@ -131,100 +135,113 @@ export default function VipMoneyRequestModal({
           </button>
         </div>
 
-        {!isVip && (
-          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs font-semibold flex items-center gap-2.5">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-400" />
-            <p className="leading-snug text-[11px]">
-              {lang === 'bn' 
-                ? 'অনুরোধটি পাঠানোর পর এডমিন আপনার অ্যাকাউন্ট রিভিউ করবেন। আপনার VIP ব্যাজ সক্রিয় থাকলে রিকুয়েস্ট দ্রুত প্রসেস হবে।' 
-                : 'Notice: VIP privilege processing applies. The admin will review and verify your request.'}
-            </p>
+        {!isVip ? (
+          <div className="space-y-4 py-2">
+            <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-300 text-xs font-semibold flex flex-col items-center gap-3 text-center">
+              <AlertCircle className="h-8 w-8 text-amber-400" />
+              <div>
+                <p className="font-extrabold text-[12px] uppercase tracking-wider text-amber-200">
+                  {lang === 'bn' ? 'ভিআইপি সেবা লকড' : 'VIP Service Locked'}
+                </p>
+                <p className="leading-relaxed text-[11px] mt-1.5 text-amber-300/80">
+                  {lang === 'bn' 
+                    ? 'আপনি এখনও ভিআইপি (VIP) সদস্য নন। শুধুমাত্র এডমিন আপনাকে ভিআইপি সদস্য হিসেবে সক্রিয় করলেই আপনি সরাসরি মানি রিকুয়েস্ট করতে পারবেন।' 
+                    : 'You are not a VIP member yet. Only users set as VIP by the admin can request money directly.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full py-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-2xl font-black text-xs transition-all cursor-pointer"
+            >
+              {lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+            </button>
           </div>
-        )}
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Amount input */}
+            <div>
+              <label className="block text-[10px] font-black text-amber-300 uppercase tracking-widest mb-1.5">
+                {lang === 'bn' ? 'অনুরোধের পরিমাণ (৳)' : 'Requested Amount (৳)'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold text-lg font-mono">
+                  ৳
+                </span>
+                <input 
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="500"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-slate-900 border border-amber-500/30 focus:border-amber-400 rounded-2xl py-3 pl-8 pr-4 text-white text-lg font-black font-mono outline-none transition-all placeholder:text-slate-600"
+                />
+              </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Amount input */}
-          <div>
-            <label className="block text-[10px] font-black text-amber-300 uppercase tracking-widest mb-1.5">
-              {lang === 'bn' ? 'অনুরোধের পরিমাণ (৳)' : 'Requested Amount (৳)'}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold text-lg font-mono">
-                ৳
-              </span>
-              <input 
-                type="number"
-                required
-                min="1"
-                placeholder="500"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-slate-900 border border-amber-500/30 focus:border-amber-400 rounded-2xl py-3 pl-8 pr-4 text-white text-lg font-black font-mono outline-none transition-all placeholder:text-slate-600"
+              {/* Quick Amount Pills */}
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {quickAmounts.map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setAmount(amt.toString())}
+                    className={`px-3 py-1 rounded-xl text-[10px] font-black font-mono transition-all cursor-pointer border ${
+                      amount === amt.toString()
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/20'
+                        : 'bg-white/5 text-amber-200/80 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    ৳{amt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reason / Note input */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                {lang === 'bn' ? 'কারণ বা বিবরণ (ঐচ্ছিক)' : 'Note / Reason for Admin (Optional)'}
+              </label>
+              <textarea
+                rows={2}
+                placeholder={lang === 'bn' ? 'যেমন: জরুরি ফ্লেক্সিলোড / শপ বিজনেস ব্যালেন্স' : 'e.g. Urgent shop business float credit'}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="w-full bg-slate-900 border border-white/10 focus:border-amber-400/50 rounded-2xl p-3 text-xs text-white placeholder:text-slate-600 outline-none transition-all"
               />
             </div>
 
-            {/* Quick Amount Pills */}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {quickAmounts.map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => setAmount(amt.toString())}
-                  className={`px-3 py-1 rounded-xl text-[10px] font-black font-mono transition-all cursor-pointer border ${
-                    amount === amt.toString()
-                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/20'
-                      : 'bg-white/5 text-amber-200/80 border-white/10 hover:bg-white/10'
-                  }`}
-                >
-                  ৳{amt}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Reason / Note input */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
-              {lang === 'bn' ? 'কারণ বা বিবরণ (ঐচ্ছিক)' : 'Note / Reason for Admin (Optional)'}
-            </label>
-            <textarea
-              rows={2}
-              placeholder={lang === 'bn' ? 'যেমন: জরুরি ফ্লেক্সিলোড / শপ বিজনেস ব্যালেন্স' : 'e.g. Urgent shop business float credit'}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full bg-slate-900 border border-white/10 focus:border-amber-400/50 rounded-2xl p-3 text-xs text-white placeholder:text-slate-600 outline-none transition-all"
-            />
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-pulse">
-              <Check className="h-4 w-4 shrink-0 text-emerald-400" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 hover:from-amber-400 hover:to-yellow-300 rounded-2xl font-black text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-          >
-            {isSubmitting ? (
-              <span>{lang === 'bn' ? 'পাঠানো হচ্ছে...' : 'Submitting Request...'}</span>
-            ) : (
-              <>
-                <Send className="h-4 w-4 stroke-[2.5]" />
-                <span>{lang === 'bn' ? 'এডমিনকে রিকুয়েস্ট পাঠান' : 'Send VIP Money Request'}</span>
-              </>
+            {errorMsg && (
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                <span>{errorMsg}</span>
+              </div>
             )}
-          </button>
-        </form>
+
+            {successMsg && (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-pulse">
+                <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 hover:from-amber-400 hover:to-yellow-300 rounded-2xl font-black text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+            >
+              {isSubmitting ? (
+                <span>{lang === 'bn' ? 'পাঠানো হচ্ছে...' : 'Submitting Request...'}</span>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 stroke-[2.5]" />
+                  <span>{lang === 'bn' ? 'এডমিনকে রিকুয়েস্ট পাঠান' : 'Send VIP Money Request'}</span>
+                </>
+              )}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

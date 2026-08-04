@@ -60,6 +60,37 @@ export default function ProfilePanel({
   // Profile Upload State
   const [uploadingProfile, setUploadingProfile] = useState(false);
 
+  const getJoinedDateString = () => {
+    const rawDate = userData?.createdAt || currentUser?.metadata?.creationTime;
+    if (!rawDate) {
+      return t.joinedDate;
+    }
+    try {
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) {
+        return t.joinedDate;
+      }
+      const year = d.getFullYear();
+      
+      const bnMonths = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+      const enMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      if (lang === 'bn') {
+        const monthBn = bnMonths[d.getMonth()];
+        const toBnNum = (num: number) => {
+          const bnNums = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+          return num.toString().split('').map(digit => bnNums[parseInt(digit)] || digit).join('');
+        };
+        return `যুক্ত হয়েছেন: ${monthBn} ${toBnNum(year)}`;
+      } else {
+        const monthEn = enMonths[d.getMonth()];
+        return `Joined: ${monthEn} ${year}`;
+      }
+    } catch (e) {
+      return t.joinedDate;
+    }
+  };
+
   const handleProfilePicChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentUser) return;
@@ -193,7 +224,7 @@ export default function ProfilePanel({
         </div>
 
         <div className="mt-4 pt-3 border-t border-white/10 flex justify-between items-center text-[10px] text-white/50 relative z-10 font-semibold">
-          <span>{t.joinedDate}</span>
+          <span>{getJoinedDateString()}</span>
           <span className="bg-white/10 text-white hover:bg-white/20 transition-all font-bold px-2 py-0.5 rounded-sm select-none">
             ID: {currentUser?.uid ? `FLX-${currentUser.uid.slice(0, 6).toUpperCase()}` : 'FLX-88290'}
           </span>

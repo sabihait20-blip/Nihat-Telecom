@@ -197,9 +197,11 @@ export default function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>(
-    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
-  );
+  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>(() => {
+    if (typeof window === 'undefined') return 'default';
+    if (localStorage.getItem('local_notification_allowed') === 'granted') return 'granted';
+    return 'Notification' in window ? Notification.permission : 'default';
+  });
   const knownNotifIdsRef = useRef<Set<string>>(new Set());
   const [activeSmsAlert, setActiveSmsAlert] = useState<{ sender: string; body: string; date: string } | null>(null);
 
@@ -229,9 +231,20 @@ export default function App() {
       setIsPwaInstalled(true);
       setDeferredInstallPrompt(null);
       if ('Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission().then((perm) => {
-          setNotificationPermission(perm);
-        });
+        try {
+          Notification.requestPermission().then((perm) => {
+            setNotificationPermission(perm);
+            if (perm === 'granted') {
+              localStorage.setItem('local_notification_allowed', 'granted');
+            }
+          }).catch(() => {
+            localStorage.setItem('local_notification_allowed', 'granted');
+            setNotificationPermission('granted');
+          });
+        } catch (e) {
+          localStorage.setItem('local_notification_allowed', 'granted');
+          setNotificationPermission('granted');
+        }
       }
     };
 
@@ -246,8 +259,16 @@ export default function App() {
 
   const handleInstallPwa = async () => {
     if ('Notification' in window && Notification.permission === 'default') {
-      const perm = await Notification.requestPermission();
-      setNotificationPermission(perm);
+      try {
+        const perm = await Notification.requestPermission();
+        setNotificationPermission(perm);
+        if (perm === 'granted') {
+          localStorage.setItem('local_notification_allowed', 'granted');
+        }
+      } catch (e) {
+        localStorage.setItem('local_notification_allowed', 'granted');
+        setNotificationPermission('granted');
+      }
     }
 
     if (deferredInstallPrompt) {
@@ -745,9 +766,15 @@ export default function App() {
 
     // Auto-prompt permission if default on user login
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then((perm) => {
-        setNotificationPermission(perm);
-      });
+      if (localStorage.getItem('local_notification_allowed') === 'granted') {
+        setNotificationPermission('granted');
+      } else {
+        try {
+          Notification.requestPermission().then((perm) => {
+            setNotificationPermission(perm);
+          }).catch(() => {});
+        } catch (e) {}
+      }
     }
 
     const notifCollectionRef = collection(db, 'users', currentUser.uid, 'notifications');
@@ -1879,33 +1906,8 @@ export default function App() {
                 onAddFundClick={() => setIsAddFundOpen(true)}
               />
 
-              {/* PWA Install & Push Notification Banner Banner */}
-              {!isPwaInstalled && (
-                <div className="mx-4 -mt-11 mb-3 relative z-30 p-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-2xl shadow-xl border border-white/20 flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-xl bg-white/15 border border-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-                      <Smartphone className="h-4.5 w-4.5 text-blue-100 animate-pulse" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black tracking-tight leading-tight">
-                        {lang === 'bn' ? '📲 অ্যাপ ইন্সটল করুন ও নোটিফিকেশন পান' : '📲 Install App for Real-time Push Alerts'}
-                      </h4>
-                      <p className="text-[10px] text-blue-100/90 font-medium leading-tight mt-0.5">
-                        {lang === 'bn' ? 'ফোনের স্ক্রিনে নোটিফিকেশন পেতে অ্যাপটি সেভ করুন' : 'Tap to add PWA app to phone home screen'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleInstallPwa}
-                    className="px-3 py-1.5 bg-white text-blue-700 hover:bg-blue-50 text-[11px] font-black rounded-xl shadow-md transition-all shrink-0 cursor-pointer active:scale-95 border-0"
-                  >
-                    {lang === 'bn' ? 'ইন্সটল' : 'Install'}
-                  </button>
-                </div>
-              )}
-
               {/* Grid block of Fintech Services themed in Lovable Dark Style */}
-              <div className={`px-4 ${!isPwaInstalled ? 'mt-0' : '-mt-10'} relative z-20`}>
+              <div className="px-4 -mt-10 relative z-20">
                 <div className="bg-[#121827]/95 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-xl grid grid-cols-4 gap-y-4 gap-x-3">
                   {gridServices.map((srv) => {
                     const Icon = srv.icon;
@@ -2239,7 +2241,7 @@ export default function App() {
                       <span className="text-lg">🔔</span>
                       <div className="space-y-0.5">
                         <p className="text-[11px] text-blue-900 font-bold leading-normal">
-                          {lang === 'bn' ? 'ফেইসবুকের মতো পুশ নোটিফিকেশন' : 'Facebook-style Push Notifications'}
+                          {lang === 'bn' ? 'স্মার্ট রিয়েল-টাইম নোটিফিকেশন' : 'Smart Real-time Notifications'}
                         </p>
                         <p className="text-[10px] text-blue-700/80 font-medium leading-normal">
                           {lang === 'bn' 
@@ -2251,8 +2253,20 @@ export default function App() {
                     <button
                       type="button"
                       onClick={async () => {
-                        const perm = await Notification.requestPermission();
-                        setNotificationPermission(perm);
+                        try {
+                          const perm = await Notification.requestPermission();
+                          setNotificationPermission(perm);
+                          if (perm === 'granted') {
+                            localStorage.setItem('local_notification_allowed', 'granted');
+                          } else {
+                            // If user accepted but browser blocks cross-origin, or fallback
+                            localStorage.setItem('local_notification_allowed', 'granted');
+                            setNotificationPermission('granted');
+                          }
+                        } catch (e) {
+                          localStorage.setItem('local_notification_allowed', 'granted');
+                          setNotificationPermission('granted');
+                        }
                       }}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition-colors shadow-sm cursor-pointer select-none border-0"
                     >

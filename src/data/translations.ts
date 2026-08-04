@@ -90,7 +90,7 @@ export const TRANSLATIONS = {
     // Profile Section
     accountConfig: 'অ্যাকাউন্ট সেটিংস',
     userStatus: 'ফিনটেক গোল্ড মেম্বার',
-    joinedDate: 'আজাদ হয়েছেন: জানুয়ারি ২০২৬',
+    joinedDate: 'যুক্ত হয়েছেন: জানুয়ারি ২০২৬',
     support: 'গ্রাহক সেবা লাইন',
     supportDesc: '২৪/৭ যেকোনো প্রয়োজনে কল করুন ০১৯৭০২৫০৯৮৮ নম্বরে',
     notifications: 'বার্তা ও নোটিফিকেশন',
