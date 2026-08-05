@@ -811,37 +811,42 @@ export default function App() {
               const body = lang === 'bn' ? (notif.descBn || notif.desc) : (notif.desc || notif.descBn);
 
               // 1. Browser Native Push Notification (via Service Worker or Native Web API)
-              if (userData?.pushNotificationsEnabled !== false) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                  try {
-                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                      navigator.serviceWorker.ready.then((reg) => {
-                        (reg as any).showNotification(title || 'NIHAD BUSINESS POINT', {
-                          body: body || '',
-                          icon: '/icon-192.png',
-                          badge: '/icon-192.png',
-                          vibrate: [200, 100, 200, 100, 200, 100, 400],
-                          tag: notif.id,
-                          renotify: true,
-                          data: { url: '/' }
-                        });
-                      }).catch(() => {
+              const isNotifAllowed = ('Notification' in window && Notification.permission === 'granted') ||
+                                     notificationPermission === 'granted' ||
+                                     localStorage.getItem('local_notification_allowed') === 'granted';
+
+              if (userData?.pushNotificationsEnabled !== false && isNotifAllowed) {
+                try {
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then((reg) => {
+                      (reg as any).showNotification(title || 'NIHAD BUSINESS POINT', {
+                        body: body || '',
+                        icon: '/icon-192.png',
+                        badge: '/icon-192.png',
+                        vibrate: [200, 100, 200, 100, 200, 100, 400],
+                        tag: notif.id,
+                        renotify: true,
+                        requireInteraction: true,
+                        data: { url: '/' }
+                      });
+                    }).catch(() => {
+                      if ('Notification' in window && Notification.permission === 'granted') {
                         new Notification(title || 'NIHAD BUSINESS POINT', {
                           body: body || '',
                           icon: '/icon-192.png',
                           tag: notif.id,
                         });
-                      });
-                    } else {
-                      new Notification(title || 'NIHAD BUSINESS POINT', {
-                        body: body || '',
-                        icon: '/icon-192.png',
-                        tag: notif.id,
-                      });
-                    }
-                  } catch (e) {
-                    console.error("Error displaying notification: ", e);
+                      }
+                    });
+                  } else if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(title || 'NIHAD BUSINESS POINT', {
+                      body: body || '',
+                      icon: '/icon-192.png',
+                      tag: notif.id,
+                    });
                   }
+                } catch (e) {
+                  console.error("Error displaying notification: ", e);
                 }
               }
 
