@@ -1963,31 +1963,7 @@ export default function App() {
                 onSelectPromo={handleSelectPromo}
               />
 
-              {/* PWA App Install Banner Card */}
-              {!isPwaInstalled && (
-                <div className="mx-4 p-3 bg-gradient-to-br from-indigo-600 via-blue-700 to-indigo-800 text-white rounded-2xl flex items-center justify-between gap-3 shadow-xl border border-white/10">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-xl bg-white/20 border border-white/20 flex items-center justify-center shrink-0">
-                      <Smartphone className="h-5 w-5 text-amber-300" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-black leading-tight flex items-center gap-1 text-white">
-                        <span>{lang === 'bn' ? '📲 NIHAD TELECOM অ্যাপ ইনস্টল করুন' : '📲 Install Mobile App'}</span>
-                      </p>
-                      <p className="text-[10px] text-indigo-100/90 font-medium leading-tight">
-                        {lang === 'bn' ? 'হোম স্ক্রিনে রাখুন এবং লাইভ পুশ নোটিফিকেশন পান' : 'Add to Home Screen & receive background alerts'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleInstallPwa}
-                    className="shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold py-2 px-3 rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer"
-                  >
-                    {lang === 'bn' ? 'ইনস্টল' : 'Install'}
-                  </button>
-                </div>
-              )}
+
 
               {/* Dynamic Warning Marquee notice ticker */}
               {appConfig.showNotice && (
@@ -2252,31 +2228,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* PWA App Install Banner */}
-                {!isPwaInstalled && (
-                  <div className="p-3.5 bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-2xl flex flex-col gap-2 shadow-md">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
-                        <Smartphone className="h-4.5 w-4.5 text-indigo-100" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-black leading-tight">
-                          {lang === 'bn' ? '📲 ফোনে PWA অ্যাপটি ইনস্টল করুন' : '📲 Install App on Phone (PWA)'}
-                        </p>
-                        <p className="text-[10px] text-indigo-100/90 font-medium leading-tight">
-                          {lang === 'bn' ? 'হোম স্ক্রিনে আইকন রাখুন এবং সরাসরি পুশ নোটিফিকেশন পান' : 'Add to home screen & receive real-time push alerts'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleInstallPwa}
-                      className="w-full bg-white text-indigo-700 hover:bg-indigo-50 font-black py-2 px-3 rounded-xl text-xs transition-colors shadow-sm cursor-pointer select-none border-0"
-                    >
-                      {lang === 'bn' ? 'সরাসরি অ্যাপ ইনস্টল করুন' : 'Install PWA App Now'}
-                    </button>
-                  </div>
-                )}
+
 
                 {('Notification' in window) && notificationPermission !== 'granted' && (
                   <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex flex-col gap-2">

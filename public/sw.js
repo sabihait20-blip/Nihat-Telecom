@@ -1,12 +1,14 @@
 // Service Worker for NIHAD BUSINESS POINT PWA & Push Notifications
 
-const CACHE_NAME = 'nihad-business-point-v2';
+const CACHE_NAME = 'nihad-business-point-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon.png',
+  '/apple-touch-icon.png',
   '/icon.svg'
 ];
 

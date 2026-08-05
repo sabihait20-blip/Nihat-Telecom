@@ -1,5 +1,5 @@
 {
-  "short_name": "NBP Telecom",
+  "short_name": "NBP",
   "name": "Nihad Business Point",
   "description": "Nihad Business Point - গ্যারান্টিড সেবা, ইনস্ট্যান্ট মোবাইল রিচার্জ, ড্রাইভ অফার, বিল পে ও ডিজিটাল ওয়ালেট।",
   "icons": [
@@ -7,13 +7,25 @@
       "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     },
     {
       "src": "/icon.png",
@@ -23,9 +35,10 @@
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "background_color": "#0f172a",
-  "theme_color": "#1e3a8a",
+  "theme_color": "#0f172a",
   "display": "standalone",
   "orientation": "portrait",
-  "id": "nihad-business-point-pwa"
+  "id": "nihad-business-point-app"
 }

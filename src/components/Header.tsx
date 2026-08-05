@@ -171,19 +171,7 @@ export default function Header({
 
         {/* Global Toolbar */}
         <div className="flex items-center gap-2">
-          {/* PWA Install Button */}
-          {!isPwaInstalled && onInstallPwa && (
-            <motion.button
-              onClick={onInstallPwa}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-2.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white font-extrabold text-[10.5px] flex items-center gap-1 shadow-lg shadow-rose-500/20 cursor-pointer border border-white/20 tracking-tight"
-              title={lang === 'bn' ? 'PWA অ্যাপ ইনস্টল করুন' : 'Install PWA App'}
-            >
-              <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>{lang === 'bn' ? 'ইনস্টল' : 'Install'}</span>
-            </motion.button>
-          )}
+
 
           {/* Language Toggle Button */}
           <motion.button
