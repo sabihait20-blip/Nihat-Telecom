@@ -1,12 +1,13 @@
 // Service Worker for NIHAD BUSINESS POINT PWA & Push Notifications
 
-const CACHE_NAME = 'nihad-telecom-pwa-v1';
+const CACHE_NAME = 'nihad-business-point-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
