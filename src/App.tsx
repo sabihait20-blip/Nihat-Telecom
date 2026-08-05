@@ -1802,6 +1802,8 @@ export default function App() {
                     onKYCClick={() => setIsKYCOpen(true)}
                     requireKyc={appConfig.requireKyc}
                     onVipMoneyRequestClick={() => setIsVipMoneyRequestOpen(true)}
+                    onInstallPwa={handleInstallPwa}
+                    isPwaInstalled={isPwaInstalled}
                   />
                 </div>
               )}
@@ -1915,6 +1917,8 @@ export default function App() {
                 onNotificationClick={handleNotificationClick}
                 unreadNotifications={unreadNotifications}
                 onAddFundClick={() => setIsAddFundOpen(true)}
+                onInstallPwa={handleInstallPwa}
+                isPwaInstalled={isPwaInstalled}
               />
 
               {/* Grid block of Fintech Services themed in Lovable Dark Style */}
@@ -1958,6 +1962,32 @@ export default function App() {
                 banners={dbBanners}
                 onSelectPromo={handleSelectPromo}
               />
+
+              {/* PWA App Install Banner Card */}
+              {!isPwaInstalled && (
+                <div className="mx-4 p-3 bg-gradient-to-br from-indigo-600 via-blue-700 to-indigo-800 text-white rounded-2xl flex items-center justify-between gap-3 shadow-xl border border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-white/20 border border-white/20 flex items-center justify-center shrink-0">
+                      <Smartphone className="h-5 w-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black leading-tight flex items-center gap-1 text-white">
+                        <span>{lang === 'bn' ? '📲 NIHAD TELECOM অ্যাপ ইনস্টল করুন' : '📲 Install Mobile App'}</span>
+                      </p>
+                      <p className="text-[10px] text-indigo-100/90 font-medium leading-tight">
+                        {lang === 'bn' ? 'হোম স্ক্রিনে রাখুন এবং লাইভ পুশ নোটিফিকেশন পান' : 'Add to Home Screen & receive background alerts'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleInstallPwa}
+                    className="shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold py-2 px-3 rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+                  >
+                    {lang === 'bn' ? 'ইনস্টল' : 'Install'}
+                  </button>
+                </div>
+              )}
 
               {/* Dynamic Warning Marquee notice ticker */}
               {appConfig.showNotice && (
@@ -2018,6 +2048,8 @@ export default function App() {
               onKYCClick={() => setIsKYCOpen(true)}
               requireKyc={appConfig.requireKyc}
               onVipMoneyRequestClick={() => setIsVipMoneyRequestOpen(true)}
+              onInstallPwa={handleInstallPwa}
+              isPwaInstalled={isPwaInstalled}
             />
           )}
         </div>

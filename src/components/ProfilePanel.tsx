@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   User, Shield, Phone, BellRing, Info, LogOut, ChevronRight,
-  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift, Crown, Coins
+  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift, Crown, Coins, Smartphone, Download
 } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
@@ -22,6 +22,8 @@ interface ProfilePanelProps {
   onKYCClick?: () => void;
   requireKyc?: boolean;
   onVipMoneyRequestClick?: () => void;
+  onInstallPwa?: () => void;
+  isPwaInstalled?: boolean;
 }
 
 export default function ProfilePanel({
@@ -37,6 +39,8 @@ export default function ProfilePanel({
   onKYCClick,
   requireKyc = true,
   onVipMoneyRequestClick,
+  onInstallPwa,
+  isPwaInstalled,
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
@@ -459,6 +463,33 @@ export default function ProfilePanel({
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
+
+          {/* PWA App Install button option */}
+          {!isPwaInstalled && onInstallPwa && (
+            <button
+              onClick={onInstallPwa}
+              id="profile-pwa-install-btn"
+              className="w-full text-left p-3.5 flex items-center justify-between bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-rose-500/10 hover:from-amber-500/20 hover:to-rose-500/20 transition-all cursor-pointer group border-b border-slate-800/60"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-rose-500 text-white rounded-xl shadow-md">
+                  <Download className="h-4.5 w-4.5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-amber-300 font-black text-xs flex items-center gap-1.5">
+                    <span>{lang === 'bn' ? '📲 PWA অ্যাপ ইনস্টল করুন' : '📲 Install Mobile App (PWA)'}</span>
+                    <span className="text-[9px] bg-amber-400/20 text-amber-200 px-1.5 py-0.5 rounded-full border border-amber-400/30 font-bold">
+                      {lang === 'bn' ? 'ইনস্ট্যান্ট' : 'Instant'}
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-slate-300 font-medium mt-0.5">
+                    {lang === 'bn' ? 'হোম স্ক্রিনে আইকন সেট করুন এবং রিয়েল-টাইম পুশ পান' : 'Add to home screen & receive real-time push alerts'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
           )}
 
