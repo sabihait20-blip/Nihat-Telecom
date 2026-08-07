@@ -6,10 +6,13 @@ const svgPath = path.resolve('public/icon.svg');
 const svgBuffer = fs.readFileSync(svgPath);
 
 const targets = [
+  { name: 'icon-96.png', width: 96, height: 96 },
   { name: 'icon-192.png', width: 192, height: 192 },
   { name: 'icon-512.png', width: 512, height: 512 },
   { name: 'apple-touch-icon.png', width: 180, height: 180 },
   { name: 'icon.png', width: 512, height: 512 },
+  { name: 'shortcut-recharge.png', width: 192, height: 192 },
+  { name: 'shortcut-addfund.png', width: 192, height: 192 },
 ];
 
 console.log('Generating PWA PNG icons from SVG...');
