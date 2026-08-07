@@ -55,6 +55,7 @@ import KYCModal from './components/KYCModal';
 import SimCardModal from './components/SimCardModal';
 import VipMoneyRequestModal from './components/VipMoneyRequestModal';
 import TrafficFineModal from './components/TrafficFineModal';
+import PwaInstallModal from './components/PwaInstallModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -211,6 +212,7 @@ export default function App() {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
   });
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState<boolean>(false);
 
   // Register PWA Service Worker & capture Install Prompt
   useEffect(() => {
@@ -271,20 +273,7 @@ export default function App() {
       }
     }
 
-    if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      const choice = await deferredInstallPrompt.userChoice;
-      if (choice?.outcome === 'accepted') {
-        setIsPwaInstalled(true);
-      }
-      setDeferredInstallPrompt(null);
-    } else {
-      alert(
-        lang === 'bn'
-          ? 'ফোনে PWA অ্যাপ ইনস্টল করতে ব্রাউজারের ৩-ডট (⋮) বা শেয়ার মেনু থেকে "Add to Home Screen" বা "Install App" অপশনে প্রেস করুন এবং নোটিফিকেশন এলাউ করুন।'
-          : 'To install PWA app, open browser menu (⋮) -> "Add to Home Screen" or "Install App" and allow notifications.'
-      );
-    }
+    setIsPwaModalOpen(true);
   };
 
   // --- PHONE BACK BUTTON INTERCEPTOR AND MODAL HANDLER ---
@@ -1298,7 +1287,12 @@ export default function App() {
     }
   };
 
-  const handleAddFundSuccess = async (amount: number, method: string, trxId: string, senderNumber: string) => {
+  const handleAddFundSuccess = async (
+    amount: number, 
+    method: string, 
+    trxId: string, 
+    senderNumber: string
+  ) => {
     if (!currentUser) return;
     const newTxId = `tx-${Date.now()}`;
 
@@ -2415,6 +2409,16 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* PWA Install Guide & Trigger Modal */}
+        <PwaInstallModal
+          lang={lang}
+          isOpen={isPwaModalOpen}
+          onClose={() => setIsPwaModalOpen(false)}
+          deferredInstallPrompt={deferredInstallPrompt}
+          isPwaInstalled={isPwaInstalled}
+          onAppInstalled={() => setIsPwaInstalled(true)}
+        />
 
       </div>
     );

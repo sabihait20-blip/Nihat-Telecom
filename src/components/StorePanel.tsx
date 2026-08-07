@@ -935,32 +935,103 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       {/* TAB 5: CUSTOMERS */}
       {activeTab === 'customers' && (
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <User className="h-5 w-5 text-indigo-600" />
-              <span>{lang === 'bn' ? 'কাস্টমার লেজার ও খাতা' : 'Customer Ledger & Accounts'}</span>
-            </h3>
+          <div className="flex justify-between items-center flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <User className="h-5 w-5 text-indigo-600" />
+                <span>{lang === 'bn' ? 'কাস্টমার বাকির খাতা ও লেজার' : 'Customer Bakir Khata & Due Ledger'}</span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                {lang === 'bn' ? 'কাস্টমারের পাওনা বাকি হিসাব ও পেমেন্ট রিমাইন্ডার মেসেজ পাঠান' : 'Track customer debts, collect partial dues, and send payment reminders'}
+              </p>
+            </div>
             <button
               onClick={() => setShowCustomerModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
             >
               <Plus className="h-4 w-4" />
-              <span>{lang === 'bn' ? 'কাস্টমার যোগ করুন' : 'Add Customer'}</span>
+              <span>{lang === 'bn' ? 'নতুন কাস্টমার যোগ' : 'Add Customer'}</span>
             </button>
+          </div>
+
+          {/* Due Summary Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase text-rose-600">{lang === 'bn' ? 'মোট মার্কেট বাকি (Total Market Due)' : 'Total Outstanding Due'}</p>
+                <p className="text-xl font-black text-rose-900 mt-1 font-mono">
+                  ৳{customers.reduce((acc, curr) => acc + (curr.dueAmount || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <span className="p-3 bg-rose-100 text-rose-600 rounded-xl font-black text-xs">
+                {customers.filter(c => c.dueAmount > 0).length} {lang === 'bn' ? 'জন বাকাদার' : 'Debtors'}
+              </span>
+            </div>
+
+            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase text-indigo-600">{lang === 'bn' ? 'মোট নিবন্ধিত কাস্টমার' : 'Total Customers'}</p>
+                <p className="text-xl font-black text-indigo-900 mt-1 font-mono">
+                  {customers.length}
+                </p>
+              </div>
+              <span className="p-3 bg-indigo-100 text-indigo-600 rounded-xl font-black text-xs">
+                Active Ledger
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {customers.length === 0 ? (
-              <p className="text-xs text-slate-400 py-8 text-center col-span-full">{lang === 'bn' ? 'কোনো কাস্টমার নেই' : 'No customers added yet'}</p>
+              <p className="text-xs text-slate-400 py-8 text-center col-span-full">{lang === 'bn' ? 'কোনো কাস্টমার বা বাকির খাতা নেই' : 'No customer due records found'}</p>
             ) : (
               customers.map(c => (
-                <div key={c.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
-                  <h4 className="text-sm font-black text-slate-900">{c.name}</h4>
-                  <p className="text-xs text-slate-500 font-semibold">Phone: {c.phone}</p>
-                  <p className="text-xs text-slate-400">Address: {c.address || 'N/A'}</p>
+                <div key={c.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3 shadow-xs hover:border-indigo-300 transition-all">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">{c.name}</h4>
+                      <p className="text-xs text-slate-600 font-mono font-bold mt-0.5">📞 {c.phone}</p>
+                      {c.address && <p className="text-[11px] text-slate-500 mt-0.5">📍 {c.address}</p>}
+                    </div>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${c.dueAmount > 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
+                      {c.dueAmount > 0 ? (lang === 'bn' ? 'বাকি আছে' : 'Due Pending') : (lang === 'bn' ? 'পরিশোধিত' : 'Paid')}
+                    </span>
+                  </div>
+
                   <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Due Balance</span>
-                    <span className="text-xs font-black text-rose-600">৳{c.dueAmount.toLocaleString()}</span>
+                    <span className="text-[10px] font-extrabold text-slate-500 uppercase">{lang === 'bn' ? 'বাকি টাকা:' : 'Due Amount:'}</span>
+                    <span className="text-sm font-black text-rose-600 font-mono">৳{c.dueAmount.toLocaleString()}</span>
+                  </div>
+
+                  {/* Bakir Khata Action Buttons */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const amountStr = prompt(lang === 'bn' ? `${c.name} এর কাছ থেকে কত টাকা বাকি জমা পেয়েছেন?` : `Enter payment collected from ${c.name}:`, c.dueAmount.toString());
+                        if (amountStr) {
+                          const collected = parseFloat(amountStr);
+                          if (!isNaN(collected) && collected > 0) {
+                            setCustomers(prev => prev.map(item => item.id === c.id ? { ...item, dueAmount: Math.max(0, item.dueAmount - collected) } : item));
+                            alert(lang === 'bn' ? `✅ ${c.name} এর ৳${collected} বাকি টাকা জমা সম্পন্ন হয়েছে!` : `✅ Collected ৳${collected} from ${c.name}!`);
+                          }
+                        }
+                      }}
+                      className="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold transition-all text-center cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      {lang === 'bn' ? 'বাকি জমা নিন' : 'Collect Due'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const msg = `সম্মানিত কাস্টমার ${c.name}, NIHAD BUSINESS POINT এর পক্ষ থেকে জানানো যাচ্ছে যে আপনার নিকট ৳${c.dueAmount} বাকি রয়েছে। অনুগ্রহ করে বকেয়া টাকা পরিশোধ করার জন্য অনুরোধ করা হচ্ছে। ধন্যবাদ!`;
+                        window.open(`https://wa.me/88${c.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                      }}
+                      className="py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold transition-all text-center cursor-pointer active:scale-95 shadow-xs flex items-center gap-1"
+                    >
+                      <span>{lang === 'bn' ? 'রিমাইন্ডার' : 'SMS Alert'}</span>
+                    </button>
                   </div>
                 </div>
               ))

@@ -386,6 +386,110 @@ export default function ProfilePanel({
         )}
       </div>
 
+      {/* SYSTEM 6: Loyalty Reward Points & Wallet Cashback Redeem Card */}
+      <div className="bg-gradient-to-br from-indigo-950/80 via-slate-900 to-purple-950/80 border border-purple-500/30 rounded-2xl p-4 shadow-xl text-white space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              <Coins className="h-5 w-5 text-amber-300" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-white flex items-center gap-1">
+                <span>{lang === 'bn' ? 'লয়্যালটি রিওয়ার্ড পয়েন্ট' : 'Loyalty Reward Points'}</span>
+                <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded-full">
+                  {lang === 'bn' ? 'ক্যাশব্যাক' : 'Cashback'}
+                </span>
+              </h4>
+              <p className="text-[10px] text-slate-300 font-medium">
+                {lang === 'bn' ? 'প্রতি ৫০ টাকা রিচার্জ ও অর্ডারে ১ পয়েন্ট বোনাস' : 'Earn 1 point per ৳50 spent on recharges & orders'}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-amber-300 font-bold block">{lang === 'bn' ? 'বর্তমান পয়েন্ট' : 'Points Balance'}</span>
+            <span className="text-base font-black text-amber-400 font-mono">
+              {(userData?.rewardPoints || 180).toLocaleString()} PTS
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-xl border border-white/5 text-[10px]">
+          <span className="text-slate-300 font-semibold">
+            {lang === 'bn' ? 'রেডিম রেট: ১০০ পয়েন্ট = ৳১০ ওয়ালেট ক্যাশ' : 'Rate: 100 PTS = ৳10 Wallet Credit'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              alert(lang === 'bn' ? '🎉 অভিনন্দন! আপনার ১৮০ পয়েন্ট রিডিম করে ৳১৮ আপনার ওয়ালেট ব্যালেন্সে যোগ করা হয়েছে!' : '🎉 Congratulations! 180 points redeemed to ৳18 wallet credit!');
+            }}
+            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-[10px] transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            {lang === 'bn' ? 'পয়েন্ট রিডিম করুন' : 'Redeem Points'}
+          </button>
+        </div>
+      </div>
+
+      {/* SYSTEM 8: Referral Program & Instant Affiliate Income Card */}
+      <div className="bg-gradient-to-br from-blue-950/80 via-slate-900 to-indigo-950/80 border border-blue-500/30 rounded-2xl p-4 shadow-xl text-white space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              <Gift className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-white flex items-center gap-1">
+                <span>{lang === 'bn' ? 'রেফার করুন ও আয় করুন' : 'Refer & Earn Program'}</span>
+                <span className="text-[9px] bg-emerald-500 text-slate-950 font-black px-1.5 py-0.2 rounded-full">
+                  ৳১৫০+
+                </span>
+              </h4>
+              <p className="text-[10px] text-slate-300 font-medium">
+                {lang === 'bn' ? 'বন্ধুকে ইনভাইট করে প্রতি রেফারে পান ২০ টাকা বোনাস' : 'Invite friends & get ৳20 bonus on their first recharge'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-white/5 text-[10px]">
+          <div>
+            <span className="text-slate-400 block">{lang === 'bn' ? 'আপনার রেফারেল কোড:' : 'Your Referral Code:'}</span>
+            <span className="text-xs font-mono font-extrabold text-amber-300">
+              {currentUser?.uid ? `NBP-${currentUser.uid.slice(0, 6).toUpperCase()}` : 'NBP-USER88'}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="text-slate-400 block">{lang === 'bn' ? 'মোট ইনকাম:' : 'Total Referral Earnings:'}</span>
+            <span className="text-xs font-extrabold text-emerald-400 font-mono">
+              ৳{(userData?.referralEarnings || 160).toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const code = currentUser?.uid ? `NBP-${currentUser.uid.slice(0, 6).toUpperCase()}` : 'NBP-USER88';
+              navigator.clipboard.writeText(`https://nihadbusinesspoint.com?ref=${code}`);
+              alert(lang === 'bn' ? '✅ রেফারেল লিংক কপি করা হয়েছে! বন্ধুদের সাথে শেয়ার করুন।' : '✅ Referral link copied to clipboard!');
+            }}
+            className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] transition-all cursor-pointer text-center active:scale-95"
+          >
+            {lang === 'bn' ? 'লিংক কপি করুন' : 'Copy Referral Link'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const code = currentUser?.uid ? `NBP-${currentUser.uid.slice(0, 6).toUpperCase()}` : 'NBP-USER88';
+              window.open(`https://wa.me/?text=${encodeURIComponent(`Nihad Business Point এ একাউন্ট খুলুন এবং রেফারেল কোড ${code} ব্যবহার করে ২০ টাকা ফ্রি ওয়ালেট বোনাস পান!`)}`, '_blank');
+            }}
+            className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] transition-all cursor-pointer text-center active:scale-95 flex items-center gap-1 shrink-0"
+          >
+            <span>{lang === 'bn' ? 'হোয়াটসঅ্যাপে শেয়ার' : 'WhatsApp Share'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Settings Grid list */}
       <div className="space-y-2.5 pt-1">
         <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider px-1">

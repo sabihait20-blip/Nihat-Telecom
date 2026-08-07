@@ -1,6 +1,6 @@
 // Service Worker for NIHAD BUSINESS POINT PWA & Push Notifications
 
-const CACHE_NAME = 'nihad-business-point-v3';
+const CACHE_NAME = 'nihad-business-point-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -36,18 +36,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Serve cached assets when offline if available
+// Fetch handler with dynamic caching for assets and fallback for offline SPA navigation
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+
+  // Skip non-http/https requests
+  if (!url.protocol.startsWith('http')) return;
+
+  // For HTML page navigation requests: Network first -> fallback to cached /index.html
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match('/index.html').then((cached) => cached || caches.match('/'));
+        })
+    );
+    return;
+  }
+
+  // For CSS, JS, Images, Fonts and static assets: Network first -> dynamic cache -> cache fallback
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request).then((response) => {
-        if (response) return response;
-        if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/index.html');
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });
 
@@ -126,3 +155,4 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+

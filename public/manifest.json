@@ -1,5 +1,5 @@
 {
-  "short_name": "NBP",
+  "short_name": "NBP Telecom",
   "name": "Nihad Business Point",
   "description": "Nihad Business Point - গ্যারান্টিড সেবা, ইনস্ট্যান্ট মোবাইল রিচার্জ, ড্রাইভ অফার, বিল পে ও ডিজিটাল ওয়ালেট।",
   "icons": [
@@ -34,11 +34,32 @@
       "purpose": "any"
     }
   ],
-  "start_url": "/",
+  "start_url": "/?utm_source=pwa",
   "scope": "/",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait",
-  "id": "nihad-business-point-app"
+  "categories": ["finance", "utilities", "shopping"],
+  "lang": "bn",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "রিচার্জ করুন",
+      "short_name": "Recharge",
+      "description": "ইনস্ট্যান্ট মোবাইল রিচার্জ",
+      "url": "/?action=recharge",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "এড ফান্ড",
+      "short_name": "Add Fund",
+      "description": "বিকাশ/নগদ অটো এড ফান্ড",
+      "url": "/?action=addfund",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "id": "/"
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Flame, ArrowUpRight, ArrowDownLeft, Landmark, FileText, Smartphone, Gift } from 'lucide-react';
+import { Search, Flame, ArrowUpRight, ArrowDownLeft, Landmark, FileText, Smartphone, Gift, Printer, Download, CheckCircle2, X } from 'lucide-react';
 import { Transaction, Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 
@@ -11,7 +11,8 @@ interface HistoryListProps {
 export default function HistoryList({ transactions, lang }: HistoryListProps) {
   const [filter, setFilter] = useState<'All' | 'Recharge' | 'Bill' | 'CashIn' | 'Transfer' | 'Voucher' | 'ScratchCard'>('All');
   const [query, setQuery] = useState('');
-  
+  const [selectedTxForMemo, setSelectedTxForMemo] = useState<Transaction | null>(null);
+
   const t = TRANSLATIONS[lang];
 
   // Apply filters
@@ -29,6 +30,10 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
 
     return matchesFilter && matchesSearch;
   });
+
+  const handlePrintMemo = () => {
+    window.print();
+  };
 
   const getTxTypeBadgeColor = (type: string) => {
     switch (type) {
@@ -230,6 +235,16 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
                 <p className={`font-display font-bold text-sm ${tx.type === 'CashIn' ? 'text-emerald-400' : 'text-white'}`}>
                   {tx.type === 'CashIn' ? '+' : '-'}৳{tx.amount.toLocaleString()}
                 </p>
+
+                {/* Cash Memo Button */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTxForMemo(tx)}
+                  className="mt-1 px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold flex items-center gap-1 ml-auto cursor-pointer transition-all active:scale-95"
+                >
+                  <Printer className="w-3 h-3 text-indigo-400" />
+                  <span>{lang === 'bn' ? 'ক্যাশ মেমো' : 'Memo'}</span>
+                </button>
               </div>
             </div>
           ))
@@ -241,6 +256,106 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
           </div>
         )}
       </div>
+
+      {/* Printable Digital Cash Memo Modal (System 1) */}
+      {selectedTxForMemo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-indigo-500/30 rounded-3xl p-6 max-w-sm w-full text-white space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => setSelectedTxForMemo(null)}
+              className="absolute top-4 right-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Cash Memo Header */}
+            <div className="text-center space-y-1 border-b border-slate-800 pb-4">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 mb-1">
+                <Printer className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-black tracking-tight text-white uppercase font-display">
+                NIHAD BUSINESS POINT
+              </h3>
+              <p className="text-[11px] text-amber-400 font-bold">
+                {lang === 'bn' ? 'ডিজিটাল অফিশিয়াল ক্যাশ মেমো' : 'Official Digital Cash Memo / Receipt'}
+              </p>
+              <p className="text-[10px] text-slate-400 font-mono">
+                {selectedTxForMemo.date} | TxID: <span className="text-slate-200 font-bold">{selectedTxForMemo.txId}</span>
+              </p>
+            </div>
+
+            {/* Memo Details */}
+            <div className="bg-slate-950/60 rounded-2xl p-4 border border-slate-800/80 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center text-slate-400">
+                <span>{lang === 'bn' ? 'সেবার ধরন:' : 'Service Type:'}</span>
+                <span className="font-bold text-white">
+                  {selectedTxForMemo.type === 'Recharge'
+                    ? (lang === 'bn' ? 'মোবাইল রিচার্জ' : 'Mobile Recharge')
+                    : selectedTxForMemo.type === 'Bill'
+                    ? (lang === 'bn' ? selectedTxForMemo.billerNameBn || selectedTxForMemo.billerName : selectedTxForMemo.billerName)
+                    : selectedTxForMemo.type}
+                </span>
+              </div>
+
+              {selectedTxForMemo.targetNumber && (
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>{lang === 'bn' ? 'গ্রাহক / অ্যাকাউন্ট নম্বর:' : 'Customer Number:'}</span>
+                  <span className="font-mono font-extrabold text-amber-300">{selectedTxForMemo.targetNumber}</span>
+                </div>
+              )}
+
+              {selectedTxForMemo.operator && (
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>{lang === 'bn' ? 'অপারেটর / সার্ভিস:' : 'Operator:'}</span>
+                  <span className="font-bold text-indigo-300">{selectedTxForMemo.operator}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-slate-400 pt-2 border-t border-slate-800">
+                <span className="font-bold text-slate-200">{lang === 'bn' ? 'মোট পরিশোধিত টাকা:' : 'Total Paid:'}</span>
+                <span className="font-black text-emerald-400 text-lg">৳{selectedTxForMemo.amount.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-slate-400">{lang === 'bn' ? 'স্ট্যাটাস:' : 'Status:'}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  {selectedTxForMemo.status === 'Success' || selectedTxForMemo.status === 'Approved' ? (lang === 'bn' ? 'অনুমোদিত ও সফল' : 'Verified & Successful') : selectedTxForMemo.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Official Seal Badge */}
+            <div className="flex items-center justify-between px-3 py-2 bg-indigo-950/40 border border-indigo-500/20 rounded-xl text-[10px]">
+              <span className="text-slate-400 font-medium">
+                {lang === 'bn' ? 'অনলাইন কম্পিউটার জেনারেটেড রসিদ' : 'Computer Generated Official Receipt'}
+              </span>
+              <span className="text-emerald-400 font-bold tracking-widest uppercase border border-emerald-500/40 px-2 py-0.5 rounded bg-emerald-950/40">
+                PAID & SEALED
+              </span>
+            </div>
+
+            {/* Print & Close Actions */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handlePrintMemo}
+                className="py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95"
+              >
+                <Printer className="w-4 h-4" />
+                <span>{lang === 'bn' ? 'মেমো প্রিন্ট করুন' : 'Print Memo'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTxForMemo(null)}
+                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center transition-all cursor-pointer"
+              >
+                {lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

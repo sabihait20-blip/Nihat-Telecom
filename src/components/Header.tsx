@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Eye, EyeOff, Coins, Bell, Globe, Sparkles, Plus, Smartphone, Download } from 'lucide-react';
+import { Eye, EyeOff, Coins, Bell, Globe, Sparkles, Plus, Smartphone } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 import { auth } from '../firebase';
@@ -171,8 +171,6 @@ export default function Header({
 
         {/* Global Toolbar */}
         <div className="flex items-center gap-2">
-
-
           {/* Language Toggle Button */}
           <motion.button
             onClick={onLanguageToggle}

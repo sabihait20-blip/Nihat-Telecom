@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Landmark, Smartphone, Check, ShieldCheck, 
   HelpCircle, Sparkles, Plus, RefreshCw, AlertCircle, ArrowRight,
-  UserCheck, Building2, Copy, CheckCircle2
+  UserCheck, Building2, Copy, CheckCircle2, ShieldAlert, Zap
 } from 'lucide-react';
 import { Language } from '../types';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -63,6 +63,7 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
           personalCharge: data.personalCharge || '1.5% (প্রতি হাজারে ১৫ টাকা)',
           minAddFund: typeof data.minAddFund === 'number' ? data.minAddFund : 100,
           maxAddFund: typeof data.maxAddFund === 'number' ? data.maxAddFund : 25000,
+          autoAddFundEnabled: data.autoAddFundEnabled !== false,
         });
       }
     }, (error) => {
@@ -81,13 +82,13 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
     amtLabel: lang === 'bn' ? 'টাকার পরিমাণ (৳)' : 'Enter Amount (৳)',
     senderLabel: lang === 'bn' ? 'যে নম্বর থেকে টাকা পাঠিয়েছেন' : 'Your Sender Number / Account',
     trxLabel: lang === 'bn' ? 'ট্রানজেকশন আইডি (TrxID)' : 'Transaction ID (TrxID)',
-    placeholderTrx: lang === 'bn' ? 'যেমন: 9H7K0L' : 'e.g. 9H7K0L',
+    placeholderTrx: lang === 'bn' ? 'যেমন: 9H7K0L12M3' : 'e.g. 9H7K0L12M3',
     placeholderSender: lang === 'bn' ? 'যেমন: 017XXXXXXXX' : 'e.g. 017XXXXXXXX',
     placeholderAmt: lang === 'bn' ? `ন্যূনতম ${settings.minAddFund} টাকা` : `Minimum ৳${settings.minAddFund}`,
     cancel: lang === 'bn' ? 'বাতিল' : 'Cancel',
     submit: lang === 'bn' ? 'পেমেন্ট ভেরিফাই করুন' : 'Verify & Add Fund',
-    successTitle: lang === 'bn' ? 'টাকা যোগ সফল হয়েছে!' : 'Fund Added Successfully!',
-    successDesc: lang === 'bn' ? 'আপনার ব্যালেন্স সফলভাবে আপডেট করা হয়েছে।' : 'Your digital wallet balance has been updated.',
+    successTitle: lang === 'bn' ? 'অনুরোধ সফল হয়েছে!' : 'Request Submitted!',
+    successDesc: lang === 'bn' ? 'আপনার পেমেন্ট তথ্য অ্যাডমিন ভেরিফিকেশনের জন্য পাঠানো হয়েছে।' : 'Your deposit details have been sent for admin verification.',
     agentLabel: lang === 'bn' ? 'এজেন্ট (Cash Out)' : 'Agent (Cash Out)',
     personalLabel: lang === 'bn' ? 'পার্সোনাল (Send Money)' : 'Personal (Send Money)',
     copyNumber: lang === 'bn' ? 'নম্বর কপি করুন' : 'Copy Number',
@@ -149,7 +150,8 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
       return;
     }
 
-    if (!trxId.trim() || trxId.length < 5) {
+    const cleanTrx = trxId.trim().toUpperCase();
+    if (!cleanTrx || cleanTrx.length < 4) {
       setValidationError(lang === 'bn' ? 'সঠিক পেমেন্ট ট্রানজেকশন আইডি (TrxID) দিন!' : 'Please input a valid transaction ID.');
       return;
     }
@@ -159,17 +161,17 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
     setTimeout(() => {
       setIsLoading(false);
       setShowSuccessOverlay(true);
-      
+
       setTimeout(() => {
         const fullMethodName = `${getMethodName(method)} (${accountType === 'agent' ? 'Agent' : 'Personal'})`;
-        onSuccess(amt, fullMethodName, trxId, senderNumber, accountType);
+        onSuccess(amt, fullMethodName, cleanTrx, senderNumber, accountType);
         setShowSuccessOverlay(false);
         setAmountInput('');
         setSenderNumber('');
         setTrxId('');
         onClose();
-      }, 2000);
-    }, 1500);
+      }, 1800);
+    }, 1000);
   };
 
   return (
@@ -389,7 +391,7 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                <ShieldCheck className="h-4 w-4" />
+                <ShieldCheck className="h-4 w-4 text-slate-400" />
               </span>
               <input
                 type="text"
@@ -400,7 +402,7 @@ export default function AddFundModal({ lang, isOpen, onClose, onSuccess }: AddFu
                   setValidationError('');
                   setTrxId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
                 }}
-                className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-10 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all font-mono uppercase"
+                className="w-full bg-slate-50/80 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-2xl py-3 pl-10 pr-4 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all font-mono uppercase tracking-wider"
               />
             </div>
           </div>
