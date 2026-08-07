@@ -40,7 +40,7 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-2 bg-[#0B0F19]/90 backdrop-blur-xl border-t border-slate-800/80 flex justify-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)] selection:bg-transparent">
+    <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-2 bg-[#12071a]/85 backdrop-blur-2xl border-t border-rose-500/20 flex justify-center shadow-[0_-10px_35px_rgba(244,63,94,0.15)] selection:bg-transparent">
       <div className="w-full max-w-md flex items-end justify-around px-2 relative h-14">
         
         {tabs.map((tab) => {
@@ -72,21 +72,21 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
               {/* Active glowing pill */}
               {isActive && (
                 <motion.div
-                  layoutId="active-nav-indigo-pill"
+                  layoutId="active-nav-pink-pill"
                   transition={{ type: 'spring', stiffness: 380, damping: 22 }}
-                  className="absolute inset-0 bg-indigo-500/15 rounded-2xl -z-10 border border-indigo-500/30 shadow-sm shadow-indigo-500/20"
+                  className="absolute inset-0 bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-orange-500/20 rounded-2xl -z-10 border border-pink-500/40 shadow-md shadow-pink-500/20 backdrop-blur-md"
                 />
               )}
 
               {/* Tab Icon */}
               <Icon
-                className={`transition-colors h-5 w-5 mb-1 ${isActive ? 'text-indigo-400 stroke-[2.25px]' : 'text-slate-400'}`}
+                className={`transition-colors h-5 w-5 mb-1 ${isActive ? 'text-pink-400 stroke-[2.25px]' : 'text-slate-400'}`}
               />
 
               {/* Tab Label */}
               <span
                 className={`text-[10px] font-bold transition-all tracking-tight ${
-                  isActive ? 'text-indigo-300' : 'text-slate-400'
+                  isActive ? 'text-rose-200' : 'text-slate-400'
                 }`}
               >
                 {tab.label}

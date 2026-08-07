@@ -73,7 +73,7 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
     <div className="px-4 py-3">
       <div className="flex items-center justify-between mb-3 px-1">
         <h3 className="text-white font-bold text-xs tracking-tight flex items-center gap-1.5 font-display">
-          <Sparkles className="h-4 w-4 text-indigo-400 fill-indigo-400/20" />
+          <Sparkles className="h-4 w-4 text-pink-400 fill-pink-400/20" />
           <span>{t.promos}</span>
         </h3>
         <div className="flex items-center gap-1">
@@ -103,10 +103,10 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
             onClick={() => onSelectPromo(activePromo.operator, activePromo.prefillAmount)}
-            className={`border rounded-2xl p-4.5 cursor-pointer relative overflow-hidden transition-all group hover:scale-[1.01] hover:shadow-xl min-h-[120px] flex items-center ${
+            className={`border border-pink-500/25 rounded-2xl p-4.5 cursor-pointer relative overflow-hidden transition-all group hover:scale-[1.01] hover:shadow-2xl hover:shadow-pink-500/20 min-h-[120px] flex items-center backdrop-blur-xl ${
               activePromo.imageUrl 
-                ? 'bg-[#0E1422] border-slate-800 text-white' 
-                : 'bg-[#131B2E] border-white/10 text-white'
+                ? 'bg-[#1a0a27]/90 text-white' 
+                : 'bg-[#220d32]/85 text-white'
             }`}
           >
             {/* Custom Banner Image if available */}
@@ -118,7 +118,7 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
                   referrerPolicy="no-referrer"
                   className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#060911] via-[#060911]/80 to-transparent z-0" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#12071a] via-[#12071a]/80 to-transparent z-0" />
               </>
             )}
 
@@ -132,20 +132,20 @@ export default function Banners({ lang, banners = [], onSelectPromo }: BannersPr
             <div className="flex items-start justify-between relative z-10 gap-3 w-full">
               <div className="space-y-1 max-w-[80%]">
                 <div className="flex items-center gap-1.5">
-                  <span className="flex h-2 w-2 rounded-full bg-indigo-400 animate-pulse" />
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-400">
+                  <span className="flex h-2 w-2 rounded-full bg-rose-400 animate-pulse" />
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-rose-300">
                     PROMO
                   </span>
                 </div>
                 <h4 className="text-sm font-bold tracking-tight text-white">
                   {lang === 'bn' ? activePromo.title : activePromo.titleEn}
                 </h4>
-                <p className="text-xs leading-relaxed font-medium text-slate-300">
+                <p className="text-xs leading-relaxed font-medium text-pink-100/80">
                   {lang === 'bn' ? activePromo.desc : activePromo.descEn}
                 </p>
               </div>
 
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center shadow-md bg-indigo-600 text-white shadow-indigo-600/30 group-hover:scale-110 transition-transform duration-300">
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-tr from-pink-500 via-rose-500 to-orange-500 text-white shadow-pink-500/30 group-hover:scale-110 transition-transform duration-300 shrink-0">
                 <Zap className="h-4.5 w-4.5 fill-current/20" />
               </div>
             </div>

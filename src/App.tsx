@@ -100,9 +100,9 @@ export default function App() {
   useEffect(() => {
     const bodyEl = document.body;
     if (bodyEl) {
-      bodyEl.style.backgroundColor = '#020617';
+      bodyEl.style.backgroundColor = '#0c0714';
       bodyEl.style.color = '#f8fafc';
-      bodyEl.className = 'bg-slate-950 text-slate-100 font-sans antialiased';
+      bodyEl.className = 'bg-[#0c0714] text-slate-100 font-sans antialiased';
     }
   }, []);
   
@@ -1351,13 +1351,13 @@ export default function App() {
     }
   };
 
-  // Home Dashboard quick shortcut grids restored with bKash pink color design and macOS dock spring animation styles
+  // Home Dashboard quick shortcut grids restored with Glassmorphic Pink & Orange design
   const gridServices = [
     {
       id: 'recharge',
       title: t.mobileRecharge,
       icon: Smartphone,
-      color: 'bg-blue-50 text-blue-600 border border-blue-100/40 shadow-xs shadow-blue-500/2',
+      color: 'bg-gradient-to-br from-pink-500/25 to-rose-500/25 text-pink-300 border border-pink-400/40 shadow-md shadow-pink-500/20',
       action: () => {
         setPrefilledOp(null);
         setPrefilledAmt(null);
@@ -1368,63 +1368,63 @@ export default function App() {
       id: 'scratch_card',
       title: lang === 'bn' ? 'স্ক্র্যাচ কার্ড' : 'Scratch Card',
       icon: CreditCard,
-      color: 'bg-orange-50 text-orange-600 border border-orange-100/40 shadow-xs shadow-orange-500/2',
+      color: 'bg-gradient-to-br from-orange-500/25 to-amber-500/25 text-orange-300 border border-orange-400/40 shadow-md shadow-orange-500/20',
       action: () => setIsScratchCardOpen(true)
     },
     {
       id: 'add_fund',
       title: lang === 'bn' ? 'এড ফান্ড' : 'Add Fund',
       icon: Wallet,
-      color: 'bg-teal-50 text-teal-600 border border-teal-100/40 shadow-xs shadow-teal-500/2',
+      color: 'bg-gradient-to-br from-rose-500/25 to-pink-500/25 text-rose-300 border border-rose-400/40 shadow-md shadow-rose-500/20',
       action: () => setIsAddFundOpen(true)
     },
     {
       id: 'packs',
       title: t.internetPackage,
       icon: Wifi,
-      color: 'bg-emerald-50 text-emerald-600 border border-emerald-100/40 shadow-xs shadow-emerald-500/2',
+      color: 'bg-gradient-to-br from-amber-500/25 to-orange-500/25 text-amber-300 border border-amber-400/40 shadow-md shadow-amber-500/20',
       action: () => setActiveTab('packages')
     },
     {
       id: 'bill',
       title: t.billPayment,
       icon: Landmark,
-      color: 'bg-amber-50 text-amber-600 border border-amber-100/40 shadow-xs shadow-amber-500/2',
+      color: 'bg-gradient-to-br from-pink-500/25 to-orange-500/25 text-orange-300 border border-orange-400/40 shadow-md shadow-orange-500/20',
       action: () => setIsBillPayOpen(true)
     },
     {
       id: 'transfer',
       title: lang === 'bn' ? 'ব্যালেন্স ট্রান্সফার' : 'Balance Transfer',
       icon: Send,
-      color: 'bg-violet-50 text-violet-600 border border-violet-100/40 shadow-xs shadow-violet-500/2',
+      color: 'bg-gradient-to-br from-rose-500/25 to-pink-500/25 text-pink-300 border border-pink-400/40 shadow-md shadow-pink-500/20',
       action: () => setIsTransferOpen(true)
     },
     {
       id: 'store',
       title: lang === 'bn' ? 'মেগা স্টোর' : 'Mega Store',
       icon: ShoppingBag,
-      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
+      color: 'bg-gradient-to-br from-orange-500/25 to-rose-500/25 text-rose-300 border border-rose-400/40 shadow-md shadow-rose-500/20',
       action: () => setActiveTab('store')
     },
     {
       id: 'sim',
       title: lang === 'bn' ? 'সিম কার্ড' : 'SIM Card',
       icon: Smartphone,
-      color: 'bg-indigo-50 text-indigo-600 border border-indigo-100/40 shadow-xs shadow-indigo-500/2',
+      color: 'bg-gradient-to-br from-pink-500/25 to-rose-500/25 text-pink-300 border border-pink-400/40 shadow-md shadow-pink-500/20',
       action: () => setIsSimOpen(true)
     },
     {
       id: 'traffic_fine',
       title: lang === 'bn' ? 'ট্রাফিক ফাইন' : 'Traffic Fine',
       icon: AlertTriangle,
-      color: 'bg-rose-50 text-rose-600 border border-rose-100/40 shadow-xs shadow-rose-500/2',
+      color: 'bg-gradient-to-br from-orange-500/25 to-amber-500/25 text-orange-300 border border-orange-400/40 shadow-md shadow-orange-500/20',
       action: () => setIsTrafficFineOpen(true)
     },
     {
       id: 'support',
       title: lang === 'bn' ? 'সাপোর্ট ও চ্যাট' : 'Support & Chat',
       icon: MessageSquare,
-      color: 'bg-blue-50 text-blue-600 border border-blue-100/40 shadow-xs shadow-blue-500/2',
+      color: 'bg-gradient-to-br from-rose-500/25 to-orange-500/25 text-rose-300 border border-rose-400/40 shadow-md shadow-rose-500/20',
       action: () => setIsSupportOpen(true)
     },
   ];
@@ -1830,17 +1830,17 @@ export default function App() {
   return (
     <div className={`w-full ${
       viewMode === 'desktop' && isLargeScreen
-        ? 'h-screen overflow-hidden bg-[#060911] text-white'
-        : `min-h-screen bg-[#060911] text-white flex items-center justify-center p-0 md:p-6`
+        ? 'h-screen overflow-hidden bg-[#0c0714] text-white'
+        : `min-h-screen bg-[#0c0714] text-white flex items-center justify-center p-0 md:p-6`
     } select-none font-sans antialiased`}>
       
       {/* Dynamic view toggler float pill on computer wide screens */}
       {isLargeScreen && (
-        <div className="fixed top-4 right-4 z-50 flex gap-1.5 bg-[#0D111C]/90 backdrop-blur-md p-1.5 rounded-full shadow-xl border border-slate-800 animate-fade-in">
+        <div className="fixed top-4 right-4 z-50 flex gap-1.5 bg-[#1f0b2e]/85 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-pink-500/30 animate-fade-in">
           <button
             onClick={() => setViewMode('desktop')}
             className={`p-2 rounded-full transition-all cursor-pointer ${
-              viewMode === 'desktop' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800'
+              viewMode === 'desktop' ? 'bg-gradient-to-r from-pink-500 to-orange-500 text-white shadow-md shadow-pink-500/30' : 'text-rose-200/70 hover:bg-rose-950/50'
             }`}
             title={lang === 'bn' ? 'কম্পিউটার ড্যাশবোর্ড' : 'Desktop Dashboard'}
           >
@@ -1849,7 +1849,7 @@ export default function App() {
           <button
             onClick={() => setViewMode('mobile-mock')}
             className={`p-2 rounded-full transition-all cursor-pointer ${
-              viewMode === 'mobile-mock' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800'
+              viewMode === 'mobile-mock' ? 'bg-gradient-to-r from-pink-500 to-orange-500 text-white shadow-md shadow-pink-500/30' : 'text-rose-200/70 hover:bg-rose-950/50'
             }`}
             title={lang === 'bn' ? 'মোবাইল স্ক্রিন' : 'Mobile Simulator'}
           >
@@ -1862,7 +1862,7 @@ export default function App() {
         renderDesktopDashboard()
       ) : (
         /* Smartphone Frame Outer Body container */
-        <div className={`w-full max-w-md ${!currentUser ? 'bg-[#0B0F19] border-slate-800/80 shadow-2xl text-slate-100' : 'bg-[#0B0F19] border-slate-800/80 shadow-2xl text-slate-100'} min-h-screen md:min-h-[812px] md:rounded-[2.5rem] relative overflow-hidden flex flex-col pb-24 border`}>
+        <div className={`w-full max-w-md ${!currentUser ? 'bg-[#150921]/95 border-pink-500/30 shadow-2xl text-slate-100' : 'bg-[#150921]/95 border-pink-500/30 shadow-2xl text-slate-100'} min-h-screen md:min-h-[812px] md:rounded-[2.5rem] relative overflow-hidden flex flex-col pb-24 border backdrop-blur-3xl shadow-pink-950/50`}>
         
         {/* Firebase user login / registration system */}
         <AnimatePresence>
@@ -1890,9 +1890,9 @@ export default function App() {
 
         {/* Auth loader screen */}
         {authChecking && (
-          <div className="absolute inset-0 z-50 bg-slate-900 text-white flex flex-col items-center justify-center space-y-4">
-            <div className="w-12 h-12 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
-            <p className="text-xs text-slate-400 font-medium">
+          <div className="absolute inset-0 z-50 bg-[#12071a] text-white flex flex-col items-center justify-center space-y-4">
+            <div className="w-12 h-12 rounded-full border-4 border-pink-500/20 border-t-pink-500 animate-spin" />
+            <p className="text-xs text-rose-200/80 font-medium">
               {lang === 'bn' ? 'সার্ভার সংযোগ যাচাই করা হচ্ছে...' : 'Verifying secure session...'}
             </p>
           </div>
@@ -1915,9 +1915,9 @@ export default function App() {
                 isPwaInstalled={isPwaInstalled}
               />
 
-              {/* Grid block of Fintech Services themed in Lovable Dark Style */}
+              {/* Grid block of Fintech Services themed in Glassmorphic Pink & Orange */}
               <div className="px-4 -mt-10 relative z-20">
-                <div className="bg-[#121827]/95 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-xl grid grid-cols-4 gap-y-4 gap-x-3">
+                <div className="bg-[#210c31]/90 border border-pink-500/30 rounded-2xl p-4 shadow-2xl shadow-pink-950/40 backdrop-blur-2xl grid grid-cols-4 gap-y-4 gap-x-3">
                   {gridServices.map((srv) => {
                     const Icon = srv.icon;
                     return (

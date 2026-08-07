@@ -79,11 +79,11 @@ export default function Header({
   }, [showBalance]);
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-[#0F172A] via-[#12192E] to-[#0B0F19] px-5 pt-7 pb-16 shadow-2xl rounded-b-[36px] select-none border-b border-white/10">
+    <div className="relative overflow-hidden bg-gradient-to-b from-[#180a22] via-[#240e32] to-[#12071a] px-5 pt-7 pb-16 shadow-2xl rounded-b-[36px] select-none border-b border-rose-500/20 backdrop-blur-xl">
       {/* Ambient Radial Glow Spots */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent opacity-80 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-10 -left-10 w-52 h-52 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-pink-500/15 via-transparent to-transparent opacity-90 pointer-events-none" />
 
       {/* Top Main Header Row */}
       <div className="relative flex items-center justify-between z-10 mb-5">
@@ -94,7 +94,7 @@ export default function Header({
             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
             className="relative cursor-pointer"
           >
-            <div className="w-11 h-11 rounded-full border border-indigo-500/40 bg-indigo-950/60 overflow-hidden flex items-center justify-center shadow-lg backdrop-blur-md">
+            <div className="w-11 h-11 rounded-full border border-pink-400/50 bg-rose-950/70 overflow-hidden flex items-center justify-center shadow-lg backdrop-blur-md">
               <img 
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" 
                 alt="user" 
@@ -104,12 +104,12 @@ export default function Header({
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
-              <span className="text-xs font-black text-indigo-300 font-sans absolute">
+              <span className="text-xs font-black text-rose-200 font-sans absolute">
                 {userInitials}
               </span>
             </div>
             {/* Active Green Dot */}
-            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#0D111C] bg-emerald-400 animate-pulse" />
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#180a22] bg-emerald-400 animate-pulse" />
           </motion.div>
           
           <div className="flex flex-col">
@@ -122,7 +122,7 @@ export default function Header({
               <motion.button
                 onClick={handleBalanceTap}
                 whileTap={{ scale: 0.96 }}
-                className="relative flex items-center bg-[#1A2338]/90 hover:bg-[#202C46] border border-white/10 rounded-full p-0.5 pr-3 pl-1 h-7.5 min-w-[145px] shadow-lg shadow-black/20 select-none outline-none overflow-hidden cursor-pointer backdrop-blur-md transition-colors"
+                className="relative flex items-center bg-[#2d143c]/80 hover:bg-[#3d1a50] border border-pink-500/30 rounded-full p-0.5 pr-3 pl-1 h-7.5 min-w-[145px] shadow-lg shadow-pink-950/40 select-none outline-none overflow-hidden cursor-pointer backdrop-blur-md transition-colors"
               >
                 {/* Shimmer loading wave */}
                 {isShimmering && (
@@ -130,12 +130,12 @@ export default function Header({
                     initial={{ x: '-100%' }}
                     animate={{ x: '100%' }}
                     transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-400/20 to-transparent w-full pointer-events-none"
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent w-full pointer-events-none"
                   />
                 )}
 
                 {/* Symbol badge */}
-                <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-[12px] font-black shrink-0 relative overflow-hidden shadow-sm">
+                <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-pink-600 via-rose-500 to-orange-500 flex items-center justify-center text-white text-[12px] font-black shrink-0 relative overflow-hidden shadow-sm">
                   <span className="leading-none select-none">৳</span>
                 </div>
 
@@ -147,7 +147,7 @@ export default function Header({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -8 }}
                       transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-                      className="text-indigo-200 font-medium text-[11px] ml-2 tracking-tight select-none grow text-left"
+                      className="text-pink-200 font-medium text-[11px] ml-2 tracking-tight select-none grow text-left"
                     >
                       {lang === 'bn' ? 'ব্যালেন্স দেখুন' : 'Tap for Balance'}
                     </motion.span>

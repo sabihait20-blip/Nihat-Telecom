@@ -803,25 +803,25 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
   };
 
   return (
-    <div className="absolute inset-0 z-50 bg-slate-900 text-white flex flex-col justify-between overflow-y-auto select-none font-sans pb-10">
+    <div className="absolute inset-0 z-50 bg-[#13071c] text-white flex flex-col justify-between overflow-y-auto select-none font-sans pb-10">
       
       {/* Scanning Overlay */}
       {scanning && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="fixed inset-0 bg-[#0d0514]/95 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-6 text-center select-none">
           <div className="relative mb-6">
-            <div className="p-5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 animate-pulse">
+            <div className="p-5 bg-rose-500/15 text-pink-400 rounded-full border border-pink-500/30 animate-pulse">
               <Scan className="h-10 w-10 animate-spin" style={{ animationDuration: '6s' }} />
             </div>
-            <div className="absolute inset-0 border border-emerald-500/30 rounded-full animate-ping pointer-events-none" />
+            <div className="absolute inset-0 border border-orange-500/30 rounded-full animate-ping pointer-events-none" />
           </div>
           
           <h3 className="text-white font-extrabold text-sm mb-1">{scanStatus}</h3>
-          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{scanProgress}% completed</p>
+          <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest">{scanProgress}% completed</p>
           
           {/* Progress bar */}
           <div className="w-48 h-1.5 bg-white/10 rounded-full mt-4 overflow-hidden relative border border-white/5">
             <div 
-              className="h-full bg-emerald-500 rounded-full transition-all duration-200" 
+              className="h-full bg-gradient-to-r from-pink-500 to-orange-500 rounded-full transition-all duration-200" 
               style={{ width: `${scanProgress}%` }}
             />
           </div>
@@ -829,18 +829,18 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
       )}
 
       {/* Visual glowing points */}
-      <div className="absolute top-0 left-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-72 h-72 bg-blue-500/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-0 left-0 w-72 h-72 bg-pink-500/20 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Top Header Logo Banner */}
       <div className="px-6 pt-10 pb-4 text-center relative z-10">
-        <div className="mx-auto w-14 h-14 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 mb-3 border border-white/10">
+        <div className="mx-auto w-14 h-14 bg-gradient-to-tr from-pink-500 via-rose-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/30 mb-3 border border-white/20">
           <Sparkles className="h-7 w-7 text-white" />
         </div>
         <h1 className="text-xl font-black tracking-tight text-white mb-1">
           {t.appName}
         </h1>
-        <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-[0.2em] font-mono">
+        <p className="text-[10px] text-pink-300 font-bold uppercase tracking-[0.2em] font-mono">
           {lang === 'bn' ? 'সর্বোত্তম ও নিরাপদ টেলিকম ওয়ালেট' : 'SECURE & RELIABLE TELECOM WALLET'}
         </p>
       </div>
