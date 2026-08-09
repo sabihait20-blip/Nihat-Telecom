@@ -103,7 +103,10 @@
     }
   </style>
 
-  <!-- Outer Dark Background Base -->
+  <!-- Full Square Dark Background for PWA Icon Compatibility -->
+  <rect width="500" height="500" fill="#020617" />
+
+  <!-- Outer Dark Background Base Circle -->
   <circle cx="250" cy="250" r="240" fill="#020617" />
   
   <!-- Glowing Background Layer -->
@@ -156,13 +159,14 @@
   <!-- Underline Accent Arc -->
   <path d="M 140 298 Q 250 318 360 298" fill="none" stroke="url(#ringGrad1)" stroke-width="4" stroke-linecap="round" filter="url(#glow)" />
 
-  <!-- Circular Curved Text Path -->
+  <!-- Circular Curved Text Path & Static Text for SVG Renderers -->
   <path id="textPathTop" d="M 100 250 A 150 150 0 0 1 400 250" fill="none" stroke="none" />
   <text class="sub-text">
     <textPath href="#textPathTop" startOffset="50%" text-anchor="middle">
       RECHARGE &amp; FINANCIAL
     </textPath>
   </text>
+  <text x="250" y="118" class="sub-text" text-anchor="middle" font-size="11" font-weight="bold" fill="#e2e8f0" letter-spacing="2">RECHARGE &amp; FINANCIAL</text>
 
   <!-- Mobile Financial Icons -->
   <!-- Wallet Icon -->
