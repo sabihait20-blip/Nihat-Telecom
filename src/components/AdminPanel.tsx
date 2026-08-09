@@ -2113,8 +2113,13 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         Digital: 'ডিজিটাল সার্ভিস',
         Electronics: 'ইলেকট্রনিক্স',
         Services: 'সেবাসমূহ',
+        Fashion: 'ফ্যাশন',
+        Gadgets: 'গ্যাজেট',
+        Grocery: 'গ্রোসারী',
         Other: 'অন্যান্য'
       };
+
+      const categoryName = productForm.category?.trim() || 'General';
 
       const newProduct: StoreProduct = {
         id: prodId,
@@ -2125,8 +2130,8 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
         description: productForm.description,
         descriptionBn: productForm.descriptionBn,
         imageUrl: productForm.imageUrl,
-        category: productForm.category,
-        categoryBn: catsBn[productForm.category] || 'অন্যান্য',
+        category: categoryName,
+        categoryBn: catsBn[categoryName] || categoryName,
       };
 
       await setDoc(docRef, newProduct);
@@ -7479,18 +7484,26 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'ক্যাটাগরি' : 'Category'}</label>
-                      <select
+                      <label className="text-[10px] uppercase text-slate-400 font-extrabold">{lang === 'bn' ? 'ক্যাটাগরি (যে কোনো নাম লিখুন)' : 'Category (Type Any)'}</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder={lang === 'bn' ? 'যেমন: ইলেক্ট্রনিক্স, পোশাক, ইত্যাদি' : 'e.g. Electronics, Fashion...'}
                         value={productForm.category || ''}
                         onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500 appearance-none cursor-pointer text-slate-300"
-                      >
-                        <option value="Lifestyle" className="bg-slate-900">Lifestyle</option>
-                        <option value="Digital" className="bg-slate-900">Digital</option>
-                        <option value="Electronics" className="bg-slate-900">Electronics</option>
-                        <option value="Services" className="bg-slate-900">Services</option>
-                        <option value="Other" className="bg-slate-900">Other</option>
-                      </select>
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-xs font-semibold text-slate-100 outline-none focus:border-blue-500"
+                        list="admin-category-suggestions"
+                      />
+                      <datalist id="admin-category-suggestions">
+                        <option value="Lifestyle" />
+                        <option value="Digital" />
+                        <option value="Electronics" />
+                        <option value="Services" />
+                        <option value="Fashion" />
+                        <option value="Gadgets" />
+                        <option value="Grocery" />
+                        <option value="Other" />
+                      </datalist>
                     </div>
                   </div>
 

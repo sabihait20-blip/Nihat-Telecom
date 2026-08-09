@@ -4,7 +4,7 @@ import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
   Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare,
-  Calculator, CreditCard, AlertTriangle, ShieldCheck, Phone, PhoneOff, PhoneCall
+  Calculator, CreditCard, AlertTriangle, ShieldCheck, Phone, PhoneOff, PhoneCall, BookOpen
 } from 'lucide-react';
 
 // Data types & assets
@@ -55,6 +55,7 @@ import KYCModal from './components/KYCModal';
 import SimCardModal from './components/SimCardModal';
 import VipMoneyRequestModal from './components/VipMoneyRequestModal';
 import TrafficFineModal from './components/TrafficFineModal';
+import TaliKhataModal from './components/TaliKhataModal';
 import PwaInstallModal from './components/PwaInstallModal';
 
 const ADMIN_EMAILS = [
@@ -193,6 +194,7 @@ export default function App() {
   const [isSimOpen, setIsSimOpen] = useState(false);
   const [isVipMoneyRequestOpen, setIsVipMoneyRequestOpen] = useState(false);
   const [isTrafficFineOpen, setIsTrafficFineOpen] = useState(false);
+  const [isTaliKhataOpen, setIsTaliKhataOpen] = useState(false);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -324,8 +326,8 @@ export default function App() {
       return;
     }
 
-    const anyModalOpen = isRechargeOpen || isScratchCardOpen || isBillPayOpen || isAddFundOpen || isTransferOpen || isVoucherOpen || isSupportOpen || isCashOutCalcOpen || isKYCOpen || isSimOpen || isVipMoneyRequestOpen || isTrafficFineOpen || isNotificationsOpen || isAdminOpen;
-    const prevAnyModalOpen = lastStateRef.current.isRechargeOpen || lastStateRef.current.isScratchCardOpen || lastStateRef.current.isBillPayOpen || lastStateRef.current.isAddFundOpen || lastStateRef.current.isTransferOpen || lastStateRef.current.isVoucherOpen || lastStateRef.current.isSupportOpen || lastStateRef.current.isCashOutCalcOpen || lastStateRef.current.isKYCOpen || lastStateRef.current.isSimOpen || lastStateRef.current.isVipMoneyRequestOpen || lastStateRef.current.isTrafficFineOpen || lastStateRef.current.isNotificationsOpen || lastStateRef.current.isAdminOpen;
+    const anyModalOpen = isRechargeOpen || isScratchCardOpen || isBillPayOpen || isAddFundOpen || isTransferOpen || isVoucherOpen || isSupportOpen || isCashOutCalcOpen || isKYCOpen || isSimOpen || isVipMoneyRequestOpen || isTrafficFineOpen || isTaliKhataOpen || isNotificationsOpen || isAdminOpen;
+    const prevAnyModalOpen = lastStateRef.current.isRechargeOpen || lastStateRef.current.isScratchCardOpen || lastStateRef.current.isBillPayOpen || lastStateRef.current.isAddFundOpen || lastStateRef.current.isTransferOpen || lastStateRef.current.isVoucherOpen || lastStateRef.current.isSupportOpen || lastStateRef.current.isCashOutCalcOpen || lastStateRef.current.isKYCOpen || lastStateRef.current.isSimOpen || lastStateRef.current.isVipMoneyRequestOpen || lastStateRef.current.isTrafficFineOpen || lastStateRef.current.isTaliKhataOpen || lastStateRef.current.isNotificationsOpen || lastStateRef.current.isAdminOpen;
 
     const tabChanged = activeTab !== lastStateRef.current.activeTab;
     const modalOpened = anyModalOpen && !prevAnyModalOpen;
@@ -372,6 +374,7 @@ export default function App() {
         isSimOpen: false,
         isVipMoneyRequestOpen: false,
         isTrafficFineOpen: false,
+        isTaliKhataOpen: false,
         isNotificationsOpen: false,
         isAdminOpen: false,
         isCustomState: true
@@ -397,6 +400,7 @@ export default function App() {
         setIsSimOpen(state.isSimOpen);
         setIsVipMoneyRequestOpen(state.isVipMoneyRequestOpen);
         setIsTrafficFineOpen(state.isTrafficFineOpen);
+        setIsTaliKhataOpen(state.isTaliKhataOpen);
         setIsNotificationsOpen(state.isNotificationsOpen);
         setIsAdminOpen(state.isAdminOpen);
       } else {
@@ -1400,6 +1404,13 @@ export default function App() {
       action: () => setIsTransferOpen(true)
     },
     {
+      id: 'tali_khata',
+      title: lang === 'bn' ? 'টালি খাতা' : 'Tali Khata',
+      icon: BookOpen,
+      color: 'bg-gradient-to-br from-emerald-500/25 to-teal-500/25 text-emerald-300 border border-emerald-400/40 shadow-md shadow-emerald-500/20',
+      action: () => setIsTaliKhataOpen(true)
+    },
+    {
       id: 'store',
       title: lang === 'bn' ? 'মেগা স্টোর' : 'Mega Store',
       icon: ShoppingBag,
@@ -1727,11 +1738,11 @@ export default function App() {
 
                   {/* Desktop Interactive Service Deck */}
                   <div className="grid grid-cols-4 gap-5">
-                    {gridServices.map((srv) => {
+                    {gridServices.map((srv, idx) => {
                       const Icon = srv.icon;
                       return (
                         <button
-                          key={`desktop-srv-${srv.id}`}
+                          key={`desktop-srv-${srv.id}-${idx}`}
                           onClick={srv.action}
                           className="bg-[#131B2E]/90 border border-slate-800/80 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1 rounded-2xl p-6 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[140px] relative overflow-hidden"
                         >
@@ -1918,11 +1929,11 @@ export default function App() {
               {/* Grid block of Fintech Services themed in Glassmorphic Pink & Orange */}
               <div className="px-4 -mt-10 relative z-20">
                 <div className="bg-[#210c31]/90 border border-pink-500/30 rounded-2xl p-4 shadow-2xl shadow-pink-950/40 backdrop-blur-2xl grid grid-cols-4 gap-y-4 gap-x-3">
-                  {gridServices.map((srv) => {
+                  {gridServices.map((srv, idx) => {
                     const Icon = srv.icon;
                     return (
                       <motion.button
-                        key={`mobile-srv-${srv.id}`}
+                        key={`mobile-srv-${srv.id}-${idx}`}
                         onClick={srv.action}
                         id={`home-service-${srv.id}`}
                         whileHover={{ 
@@ -2162,6 +2173,18 @@ export default function App() {
                 setIsTrafficFineOpen(false);
                 setIsAddFundOpen(true);
               }}
+            />
+          )}
+
+          {/* TALI KHATA DIGITAL LEDGER MODAL */}
+          {isTaliKhataOpen && (
+            <TaliKhataModal
+              isOpen={isTaliKhataOpen}
+              onClose={() => setIsTaliKhataOpen(false)}
+              lang={lang}
+              userId={currentUser?.uid || ''}
+              userName={currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User'}
+              userPhone={currentUser?.phoneNumber || ''}
             />
           )}
 

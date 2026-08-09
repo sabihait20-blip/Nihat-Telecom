@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShoppingBag, Search, Tag, Info, AlertTriangle, CheckCircle2, 
   ShoppingBag as BagIcon, Clock, ArrowLeft, Send, MapPin, Phone, 
   User, Check, AlertCircle, ShoppingCart, RefreshCw, X,
   Calculator, Barcode, Users, DollarSign, TrendingUp, Printer, FileText, Plus, Trash2, Edit3, ShieldCheck, Package, Layers, PieChart,
-  Minus
+  Minus, Share2, Eye, SlidersHorizontal, ArrowUpDown, Filter, Sparkles, Copy, ZoomIn, Heart
 } from 'lucide-react';
 import { StoreProduct, StoreOrder, Language, Supplier, Customer, ExpenseRecord, IncomeRecord, POSCartItem } from '../types';
 import { collection, doc, onSnapshot, writeBatch, query, where, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -27,6 +27,15 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'stock-desc' | 'name-asc'>('newest');
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('store_wishlist') || '[]');
+    } catch { return []; }
+  });
 
   // Purchase flow states
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
@@ -165,15 +174,58 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
     }
   }, [showClientCart, currentUser]);
 
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category || 'Lifestyle').filter((c): c is string => typeof c === 'string' && c.trim() !== '' && c.toLowerCase() !== 'all')))];
+  const toggleWishlist = (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setWishlist(prev => {
+      const next = prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId];
+      localStorage.setItem('store_wishlist', JSON.stringify(next));
+      return next;
+    });
+  };
 
-  const filteredProducts = products.filter(p => {
-    const title = p.title || '';
-    const titleBn = p.titleBn || '';
-    const queryStr = searchQuery ? searchQuery.toLowerCase() : '';
-    const categoryMatch = selectedCategory === 'All' || p.category === selectedCategory;
-    return categoryMatch && (title.toLowerCase().includes(queryStr) || titleBn.toLowerCase().includes(queryStr));
-  });
+  const categories = useMemo(() => {
+    const catsSet = new Set<string>();
+    products.forEach(p => {
+      const c = p.category?.trim();
+      if (c && c.toLowerCase() !== 'all') {
+        catsSet.add(c);
+      }
+    });
+    return ['All', ...Array.from(catsSet)];
+  }, [products]);
+
+  const getCategoryCount = (categoryName: string) => {
+    if (categoryName === 'All') return products.length;
+    return products.filter(p => p.category === categoryName).length;
+  };
+
+  const filteredProducts = useMemo(() => {
+    let list = products.filter(p => {
+      const title = (p.title || '').toLowerCase();
+      const titleBn = (p.titleBn || '').toLowerCase();
+      const desc = (p.description || '').toLowerCase();
+      const descBn = (p.descriptionBn || '').toLowerCase();
+      const cat = (p.category || '').toLowerCase();
+      const q = searchQuery.trim().toLowerCase();
+
+      const categoryMatch = selectedCategory === 'All' || p.category === selectedCategory;
+      const searchMatch = !q || title.includes(q) || titleBn.includes(q) || desc.includes(q) || descBn.includes(q) || cat.includes(q);
+      const stockMatch = !inStockOnly || p.stock > 0;
+
+      return categoryMatch && searchMatch && stockMatch;
+    });
+
+    if (sortBy === 'price-asc') {
+      list.sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-desc') {
+      list.sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'stock-desc') {
+      list.sort((a, b) => b.stock - a.stock);
+    } else if (sortBy === 'name-asc') {
+      list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+    return list;
+  }, [products, selectedCategory, searchQuery, inStockOnly, sortBy]);
 
   const addToClientCart = (product: StoreProduct, qty: number = 1) => {
     if (product.stock <= 0) {
@@ -585,32 +637,109 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       {/* TAB 1: BROWSE ONLINE SHOP */}
       {activeTab === 'browse' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/60 border border-white/10 p-4 rounded-[2rem] shadow-xl">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder={lang === 'bn' ? 'প্রোডাক্ট খুঁজুন...' : 'Search store products...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-950/50 border border-white/5 rounded-2xl text-xs font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
-              />
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto scrollbar-none">
-              {categories.map(cat => (
+          {/* Controls Bar: Search, Category Pills with counts, Sort & In-Stock toggle */}
+          <div className="space-y-4 bg-slate-900/60 border border-white/10 p-4 sm:p-5 rounded-[2rem] shadow-xl">
+            <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={lang === 'bn' ? 'প্রোডাক্টের নাম, বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন...' : 'Search products, description or category...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-11 pr-10 py-2.5 bg-slate-950/60 border border-white/10 rounded-2xl text-xs font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-3 text-slate-400 hover:text-slate-200 cursor-pointer">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/10 px-3 py-1.5 rounded-2xl">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="bg-transparent text-xs font-black text-slate-200 outline-none cursor-pointer"
+                  >
+                    <option value="newest" className="bg-slate-900">{lang === 'bn' ? 'সর্বশেষ প্রোডাক্ট' : 'Newest First'}</option>
+                    <option value="price-asc" className="bg-slate-900">{lang === 'bn' ? 'কম দাম থেকে বেশি' : 'Price: Low to High'}</option>
+                    <option value="price-desc" className="bg-slate-900">{lang === 'bn' ? 'বেশি দাম থেকে কম' : 'Price: High to Low'}</option>
+                    <option value="stock-desc" className="bg-slate-900">{lang === 'bn' ? 'বেশি স্টক আগে' : 'In Stock First'}</option>
+                    <option value="name-asc" className="bg-slate-900">{lang === 'bn' ? 'নাম অনুসারে (A-Z)' : 'Name (A-Z)'}</option>
+                  </select>
+                </div>
+
+                {/* In Stock Only Switch */}
                 <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-2xl text-xs font-black cursor-pointer transition-all whitespace-nowrap ${
-                    selectedCategory === cat 
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border-none' 
-                      : 'bg-slate-950/40 hover:bg-slate-950 text-slate-300 border border-white/5'
+                  type="button"
+                  onClick={() => setInStockOnly(!inStockOnly)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-black cursor-pointer transition-all border ${
+                    inStockOnly 
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                      : 'bg-slate-950/60 text-slate-400 border-white/10 hover:text-slate-200'
                   }`}
                 >
-                  {cat}
+                  <span className={`w-2 h-2 rounded-full ${inStockOnly ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                  <span>{lang === 'bn' ? 'শুধুমাত্র স্টকে আছে' : 'In Stock Only'}</span>
                 </button>
-              ))}
+              </div>
             </div>
+
+            {/* Dynamic Category Badges Bar */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-2 border-t border-white/5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 shrink-0 mr-1 flex items-center gap-1">
+                <Tag className="h-3 w-3 text-indigo-400" />
+                {lang === 'bn' ? 'ক্যাটাগরি:' : 'Category:'}
+              </span>
+              {categories.map((cat, catIdx) => {
+                const count = getCategoryCount(cat);
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={`cat-${cat}-${catIdx}`}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-black cursor-pointer transition-all whitespace-nowrap ${
+                      isSelected 
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border-none' 
+                        : 'bg-slate-950/60 hover:bg-slate-950 text-slate-300 border border-white/5'
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-white/5 text-slate-400'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Grid Header stats */}
+          <div className="flex justify-between items-center px-1">
+            <p className="text-xs font-black text-slate-400 flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+              <span>
+                {lang === 'bn' 
+                  ? `${filteredProducts.length} টি প্রোডাক্ট পাওয়া গেছে` 
+                  : `Showing ${filteredProducts.length} Products`}
+              </span>
+            </p>
+            {(selectedCategory !== 'All' || searchQuery || inStockOnly) && (
+              <button
+                onClick={() => { setSelectedCategory('All'); setSearchQuery(''); setInStockOnly(false); }}
+                className="text-xs font-black text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+                <span>{lang === 'bn' ? 'ফিল্টার মুছুন' : 'Reset Filters'}</span>
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -622,66 +751,112 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             <div className="bg-slate-900/40 rounded-[2rem] border border-white/5 p-12 text-center shadow-xl space-y-3">
               <ShoppingBag className="h-12 w-12 text-slate-600 mx-auto" />
               <p className="text-sm font-bold text-slate-400">{lang === 'bn' ? 'কোনো প্রোডাক্ট পাওয়া যায়নি' : 'No products found'}</p>
+              <button
+                onClick={() => { setSelectedCategory('All'); setSearchQuery(''); setInStockOnly(false); }}
+                className="px-4 py-2 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl text-xs font-black cursor-pointer"
+              >
+                {lang === 'bn' ? 'সব প্রোডাক্ট দেখুন' : 'Show All Products'}
+              </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredProducts.map(product => (
-                <motion.div
-                  key={product.id}
-                  whileHover={{ y: -4 }}
-                  onClick={() => setViewingProduct(product)}
-                  className="bg-slate-900/40 hover:bg-slate-900/80 border border-white/5 hover:border-white/10 rounded-[2rem] p-5 shadow-xl flex flex-col justify-between group transition-all duration-300 relative overflow-hidden cursor-pointer"
-                >
-                  <div>
-                    <div className="aspect-video bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-white/5">
-                      {product.imageUrl ? (
-                        <img 
-                          src={product.imageUrl} 
-                          alt={product.title} 
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                        />
-                      ) : (
-                        <ShoppingBag className="h-10 w-10 text-slate-700" />
-                      )}
-                      <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${
-                        product.stock > 0 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      }`}>
-                        {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">{product.category || 'General'}</span>
-                    <h3 className="text-sm font-black text-slate-100 mt-1 line-clamp-1">{lang === 'bn' ? product.titleBn : product.title}</h3>
-                    <p className="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">{lang === 'bn' ? product.descriptionBn : product.description}</p>
-                  </div>
-                  <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
+            /* 4-COLUMN RESPONSIVE GRID LAYOUT */
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {filteredProducts.map((product, pIdx) => {
+                const isWished = wishlist.includes(product.id);
+                return (
+                  <motion.div
+                    key={`${product.id || 'p'}-${pIdx}`}
+                    whileHover={{ y: -5 }}
+                    onClick={() => setViewingProduct(product)}
+                    className="bg-slate-900/50 hover:bg-slate-900/90 border border-white/5 hover:border-indigo-500/30 rounded-[2rem] p-4 sm:p-5 shadow-xl flex flex-col justify-between group transition-all duration-300 relative overflow-hidden cursor-pointer"
+                  >
                     <div>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
-                      <p className="text-base font-black text-emerald-400">৳{product.price.toLocaleString()}</p>
+                      {/* Product Image Container */}
+                      <div className="aspect-square bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-3.5 border border-white/5 group">
+                        {product.imageUrl ? (
+                          <img 
+                            src={product.imageUrl} 
+                            alt={product.title} 
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500" 
+                          />
+                        ) : (
+                          <ShoppingBag className="h-12 w-12 text-slate-700" />
+                        )}
+                        
+                        {/* Overlay badge on hover */}
+                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <span className="p-2.5 bg-slate-900/90 hover:bg-indigo-600 text-white rounded-full shadow-lg transition-transform active:scale-90 flex items-center justify-center">
+                            <Eye className="h-4 w-4" />
+                          </span>
+                        </div>
+
+                        {/* Stock Badge */}
+                        <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border backdrop-blur-md ${
+                          product.stock > 0 
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                            : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                        }`}>
+                          {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
+                        </span>
+
+                        {/* Bookmark/Wishlist button */}
+                        <button
+                          type="button"
+                          onClick={(e) => toggleWishlist(product.id, e)}
+                          className="absolute top-2.5 left-2.5 p-1.5 bg-slate-950/60 hover:bg-slate-900 text-white rounded-full border border-white/10 backdrop-blur-md cursor-pointer transition-transform active:scale-90"
+                        >
+                          <Heart className={`h-3.5 w-3.5 ${isWished ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
+                        </button>
+                      </div>
+
+                      {/* Category Pill */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9.5px] font-black text-indigo-400 uppercase tracking-wider bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                          {product.category || 'General'}
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="text-xs sm:text-sm font-black text-slate-100 mt-2 line-clamp-1 group-hover:text-indigo-300 transition-colors">
+                        {lang === 'bn' ? (product.titleBn || product.title) : product.title}
+                      </h3>
+
+                      {/* Description preview */}
+                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-snug">
+                        {lang === 'bn' ? (product.descriptionBn || product.description) : product.description}
+                      </p>
                     </div>
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => addToClientCart(product, 1)}
-                        disabled={product.stock <= 0}
-                        className="bg-white/5 hover:bg-white/10 disabled:opacity-50 text-slate-300 border border-white/5 p-2.5 rounded-2xl transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-                        title={lang === 'bn' ? 'কার্টে যোগ করুন' : 'Add to Cart'}
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => { setQuantity(1); setCheckoutProduct(product); }}
-                        disabled={product.stock <= 0}
-                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer active:scale-95 shadow-lg shadow-indigo-600/20 flex items-center gap-1.5"
-                      >
-                        <ShoppingBag className="h-3.5 w-3.5" />
-                        <span>{lang === 'bn' ? 'কিনুন' : 'Buy Now'}</span>
-                      </button>
+
+                    {/* Price and Cart Action Buttons */}
+                    <div className="mt-4 pt-3 border-t border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">{lang === 'bn' ? 'মূল্য' : 'Price'}</p>
+                        <p className="text-sm sm:text-base font-black text-emerald-400">৳{product.price.toLocaleString()}</p>
+                      </div>
+
+                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => addToClientCart(product, 1)}
+                          disabled={product.stock <= 0}
+                          className="bg-white/5 hover:bg-white/10 disabled:opacity-50 text-slate-200 border border-white/10 p-2 rounded-xl transition-all cursor-pointer active:scale-95 flex-1 sm:flex-initial flex items-center justify-center"
+                          title={lang === 'bn' ? 'কার্টে যোগ করুন' : 'Add to Cart'}
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setQuantity(1); setCheckoutProduct(product); }}
+                          disabled={product.stock <= 0}
+                          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 shadow-lg shadow-indigo-600/20 flex-1 sm:flex-initial flex items-center justify-center gap-1"
+                        >
+                          <ShoppingBag className="h-3.5 w-3.5" />
+                          <span>{lang === 'bn' ? 'কিনুন' : 'Buy Now'}</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
 
@@ -728,9 +903,9 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1">
-              {filteredProducts.map(p => (
+              {filteredProducts.map((p, pIdx) => (
                 <div
-                  key={p.id}
+                  key={`pos-prod-${p.id || 'p'}-${pIdx}`}
                   onClick={() => addToPosCart(p)}
                   className="bg-slate-50 hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-200 p-3 rounded-2xl cursor-pointer transition-all flex flex-col justify-between"
                 >
@@ -776,8 +951,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 {posCart.length === 0 ? (
                   <p className="text-xs text-slate-400 text-center py-8">{lang === 'bn' ? 'কার্ট খালি আছে' : 'Cart is empty'}</p>
                 ) : (
-                  posCart.map(item => (
-                    <div key={item.product.id} className="bg-slate-50 p-3 rounded-2xl flex items-center justify-between">
+                  posCart.map((item, itemIdx) => (
+                    <div key={`pos-cart-${item.product.id || 'item'}-${itemIdx}`} className="bg-slate-50 p-3 rounded-2xl flex items-center justify-between">
                       <div>
                         <p className="text-xs font-bold text-slate-800 line-clamp-1">{item.product.title}</p>
                         <p className="text-[10px] text-indigo-600 font-semibold">৳{item.product.price} × {item.quantity}</p>
@@ -859,8 +1034,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                {products.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50/50">
+                {products.map((p, pIdx) => (
+                  <tr key={`inv-p-${p.id || 'p'}-${pIdx}`} className="hover:bg-slate-50/50">
                     <td className="py-3.5 px-4 font-bold text-slate-900">{p.title}</td>
                     <td className="py-3.5 px-4"><span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full text-[10px] font-black">{p.category || 'General'}</span></td>
                     <td className="py-3.5 px-4 font-mono font-black text-indigo-600">৳{p.price.toLocaleString()}</td>
@@ -916,8 +1091,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             {suppliers.length === 0 ? (
               <p className="text-xs text-slate-400 py-8 text-center col-span-full">{lang === 'bn' ? 'কোনো সাপ্লায়ার নেই' : 'No suppliers added yet'}</p>
             ) : (
-              suppliers.map(s => (
-                <div key={s.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+              suppliers.map((s, sIdx) => (
+                <div key={`sup-${s.id || 's'}-${sIdx}`} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
                   <h4 className="text-sm font-black text-slate-900">{s.companyName}</h4>
                   <p className="text-xs text-slate-500 font-semibold">Contact: {s.contactPerson} ({s.phone})</p>
                   <p className="text-xs text-slate-400">Email: {s.email || 'N/A'}</p>
@@ -985,8 +1160,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             {customers.length === 0 ? (
               <p className="text-xs text-slate-400 py-8 text-center col-span-full">{lang === 'bn' ? 'কোনো কাস্টমার বা বাকির খাতা নেই' : 'No customer due records found'}</p>
             ) : (
-              customers.map(c => (
-                <div key={c.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3 shadow-xs hover:border-indigo-300 transition-all">
+              customers.map((c, cIdx) => (
+                <div key={`cust-${c.id || 'c'}-${cIdx}`} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3 shadow-xs hover:border-indigo-300 transition-all">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="text-sm font-black text-slate-900">{c.name}</h4>
@@ -1083,8 +1258,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                {expenses.map(e => (
-                  <tr key={e.id}>
+                {expenses.map((e, eIdx) => (
+                  <tr key={`exp-${e.id || 'e'}-${eIdx}`}>
                     <td className="py-3.5 px-4 font-bold text-slate-900">{e.title}</td>
                     <td className="py-3.5 px-4"><span className="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-full text-[10px] font-black">{e.category}</span></td>
                     <td className="py-3.5 px-4 font-mono font-black text-rose-600">৳{e.amount.toLocaleString()}</td>
@@ -1149,8 +1324,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
             {orders.length === 0 ? (
               <p className="text-xs text-slate-400 py-12 text-center">{lang === 'bn' ? 'কোনো অর্ডার করা হয়নি' : 'No store orders placed yet'}</p>
             ) : (
-              orders.map(order => (
-                <div key={order.id} className="bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              orders.map((order, oIdx) => (
+                <div key={`ord-${order.id || 'o'}-${oIdx}`} className="bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
                       order.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
@@ -1175,27 +1350,62 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       {/* PRODUCT DETAILS MODAL */}
       <AnimatePresence>
         {viewingProduct && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-6 w-full max-w-2xl shadow-2xl space-y-6 text-white my-8">
-              <div className="flex justify-between items-center pb-4 border-b border-white/5">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-6 w-full max-w-2xl shadow-2xl space-y-6 text-white my-8 relative">
+              <div className="flex justify-between items-start pb-4 border-b border-white/10">
                 <div>
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">{viewingProduct.category || 'General'}</span>
-                  <h3 className="text-lg font-black text-slate-100">{lang === 'bn' ? viewingProduct.titleBn : viewingProduct.title}</h3>
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20">{viewingProduct.category || 'General'}</span>
+                  <h3 className="text-lg sm:text-xl font-black text-slate-100 mt-2">{lang === 'bn' ? (viewingProduct.titleBn || viewingProduct.title) : viewingProduct.title}</h3>
+                  {viewingProduct.titleBn && viewingProduct.title && viewingProduct.titleBn !== viewingProduct.title && (
+                    <p className="text-xs text-slate-400 font-medium">{viewingProduct.title}</p>
+                  )}
                 </div>
-                <button onClick={() => setViewingProduct(null)} className="p-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-full cursor-pointer transition-colors"><X className="h-5 w-5" /></button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      setCopiedLink(true);
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    }}
+                    className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition-colors"
+                    title={lang === 'bn' ? 'লিঙ্ক কপি করুন' : 'Copy link'}
+                  >
+                    {copiedLink ? <Check className="h-4 w-4 text-emerald-400" /> : <Share2 className="h-4 w-4" />}
+                  </button>
+                  <button onClick={() => setViewingProduct(null)} className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition-colors"><X className="h-5 w-5" /></button>
+                </div>
               </div>
 
+              {copiedLink && (
+                <div className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 px-4 py-2 rounded-2xl text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>{lang === 'bn' ? 'প্রোডাক্ট লিঙ্ক কপি করা হয়েছে!' : 'Product link copied to clipboard!'}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="aspect-square bg-slate-950 rounded-3xl flex items-center justify-center overflow-hidden border border-white/5 relative">
+                <div 
+                  onClick={() => viewingProduct.imageUrl && setLightboxImage(viewingProduct.imageUrl)}
+                  className="aspect-square bg-slate-950 rounded-3xl flex items-center justify-center overflow-hidden border border-white/5 relative group cursor-pointer"
+                >
                   {viewingProduct.imageUrl ? (
-                    <img src={viewingProduct.imageUrl} alt={viewingProduct.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    <>
+                      <img src={viewingProduct.imageUrl} alt={viewingProduct.title} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="p-3 bg-slate-900/90 text-white rounded-full shadow-lg flex items-center gap-1.5 text-xs font-black">
+                          <ZoomIn className="h-4 w-4" />
+                          <span>{lang === 'bn' ? 'জুুম করুন' : 'Zoom'}</span>
+                        </span>
+                      </div>
+                    </>
                   ) : (
                     <ShoppingBag className="h-20 w-20 text-slate-800" />
                   )}
-                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-black uppercase border ${
+                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-black uppercase border backdrop-blur-md ${
                     viewingProduct.stock > 0 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                      : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                   }`}>
                     {viewingProduct.stock > 0 ? `${viewingProduct.stock} ${lang === 'bn' ? 'স্টকে আছে' : 'In Stock'}` : (lang === 'bn' ? 'আউট অফ স্টক' : 'Out of Stock')}
                   </span>
@@ -1204,23 +1414,23 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 <div className="flex flex-col justify-between space-y-4">
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">{lang === 'bn' ? 'বিস্তারিত বিবরণ' : 'Product Details'}</h4>
-                      <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-wrap bg-slate-950/40 border border-white/5 p-4 rounded-2xl h-44 overflow-y-auto">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">{lang === 'bn' ? 'বিস্তারিত বিবরণ' : 'Product Details'}</h4>
+                      <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-wrap bg-slate-950/60 border border-white/5 p-4 rounded-2xl h-40 overflow-y-auto">
                         {lang === 'bn' ? (viewingProduct.descriptionBn || viewingProduct.description) : viewingProduct.description}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between bg-slate-950/40 p-3.5 rounded-2xl border border-white/5">
                       <div>
-                        <span className="text-xs text-slate-500 font-bold uppercase">{lang === 'bn' ? 'মূল্য (প্রতি পিস)' : 'Price per unit'}</span>
-                        <p className="text-2xl font-black text-emerald-400 mt-0.5">৳{viewingProduct.price.toLocaleString()}</p>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">{lang === 'bn' ? 'একক মূল্য' : 'Price per unit'}</span>
+                        <p className="text-xl font-black text-emerald-400">৳{viewingProduct.price.toLocaleString()}</p>
                       </div>
                       
                       {/* Quantity Selector for detail page */}
                       {viewingProduct.stock > 0 && (
                         <div className="space-y-1">
                           <span className="text-[10px] text-slate-500 font-bold uppercase block text-right">{lang === 'bn' ? 'পরিমাণ' : 'Quantity'}</span>
-                          <div className="flex items-center gap-2 bg-slate-950/80 border border-white/5 p-1 rounded-2xl">
+                          <div className="flex items-center gap-2 bg-slate-900 border border-white/10 p-1 rounded-2xl">
                             <button 
                               type="button"
                               onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
@@ -1228,7 +1438,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                             >
                               <Minus className="h-3.5 w-3.5" />
                             </button>
-                            <span className="text-xs font-black px-2.5 w-8 text-center">{quantity}</span>
+                            <span className="text-xs font-black px-2 w-7 text-center">{quantity}</span>
                             <button 
                               type="button"
                               onClick={() => setQuantity(prev => Math.min(viewingProduct.stock, prev + 1))}
@@ -1240,6 +1450,13 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                         </div>
                       )}
                     </div>
+
+                    {quantity > 1 && (
+                      <div className="flex justify-between items-center px-1 text-xs font-black text-indigo-300">
+                        <span>{lang === 'bn' ? 'মোট মূল্য:' : 'Total Subtotal:'}</span>
+                        <span className="text-sm font-black text-emerald-400">৳{(viewingProduct.price * quantity).toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-white/5 flex gap-3">
@@ -1275,6 +1492,28 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         )}
       </AnimatePresence>
 
+      {/* FULL-SCREEN IMAGE LIGHTBOX MODAL */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg">
+            <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center">
+              <button
+                onClick={() => setLightboxImage(null)}
+                className="absolute -top-12 right-0 p-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full cursor-pointer"
+              >
+                <X className="h-6 w-6" />
+              </button>
+              <img
+                src={lightboxImage}
+                alt="Product Full View"
+                referrerPolicy="no-referrer"
+                className="max-w-full max-h-[80vh] object-contain rounded-3xl border border-white/10 shadow-2xl"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* SHOPPING CART MODAL */}
       <AnimatePresence>
         {showClientCart && (
@@ -1300,8 +1539,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 <form onSubmit={handleClientCartCheckout} className="space-y-6">
                   {/* Cart Items List */}
                   <div className="max-h-64 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-                    {clientCart.map(({ product, quantity }) => (
-                      <div key={product.id} className="bg-slate-950/60 border border-white/5 p-3 rounded-2xl flex items-center justify-between gap-3">
+                    {clientCart.map(({ product, quantity }, cIdx) => (
+                      <div key={`client-cart-${product.id || 'p'}-${cIdx}`} className="bg-slate-950/60 border border-white/5 p-3 rounded-2xl flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center border border-white/5 overflow-hidden">
                             {product.imageUrl ? (
