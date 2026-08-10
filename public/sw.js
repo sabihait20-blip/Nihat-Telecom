@@ -1,6 +1,6 @@
 // Service Worker for NIHAD BUSINESS POINT PWA & Push Notifications
 
-const CACHE_NAME = 'nihad-business-point-v6';
+const CACHE_NAME = 'nihad-business-point-v7';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
