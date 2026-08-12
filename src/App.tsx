@@ -216,6 +216,28 @@ export default function App() {
   });
   const [isPwaModalOpen, setIsPwaModalOpen] = useState<boolean>(false);
 
+  // Slide-in Popup Notice State (Triggered on login)
+  const [showPopupNoticeModal, setShowPopupNoticeModal] = useState<boolean>(false);
+  const [hasDismissedPopup, setHasDismissedPopup] = useState<boolean>(false);
+
+  // Trigger slide-in popup notification upon login
+  useEffect(() => {
+    if (
+      currentUser &&
+      appConfig?.popupNoticeEnabled !== false &&
+      (appConfig?.popupNoticeBodyBn || appConfig?.popupNoticeBodyEn) &&
+      !hasDismissedPopup
+    ) {
+      setShowPopupNoticeModal(true);
+    }
+  }, [
+    currentUser,
+    appConfig?.popupNoticeEnabled,
+    appConfig?.popupNoticeBodyBn,
+    appConfig?.popupNoticeBodyEn,
+    hasDismissedPopup
+  ]);
+
   // Register PWA Service Worker & capture Install Prompt
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -1728,7 +1750,7 @@ export default function App() {
                   )}
 
                   {/* Banner promotions on top */}
-                  <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-5 shadow-xl">
+                  <div className="bg-[#210c31]/90 border border-pink-500/30 backdrop-blur-2xl rounded-3xl p-5 shadow-2xl shadow-pink-950/40">
                     <Banners
                       lang={lang}
                       banners={dbBanners}
@@ -1744,14 +1766,14 @@ export default function App() {
                         <button
                           key={`desktop-srv-${srv.id}-${idx}`}
                           onClick={srv.action}
-                          className="bg-[#131B2E]/90 border border-slate-800/80 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1 rounded-2xl p-6 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[140px] relative overflow-hidden"
+                          className="bg-[#210c31]/90 border border-pink-500/30 hover:border-rose-400/60 hover:shadow-2xl hover:shadow-rose-500/20 hover:-translate-y-1 rounded-2xl p-6 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[140px] relative overflow-hidden backdrop-blur-2xl shadow-xl shadow-pink-950/40"
                         >
-                          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-30 transition-opacity duration-500 ${srv.color}`} />
-                          <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 shadow-sm ${srv.color}`}>
-                            <Icon className="h-5 w-5 stroke-[2.25]" />
+                          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-40 transition-opacity duration-500 ${srv.color}`} />
+                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 shadow-md border border-white/10 ${srv.color}`}>
+                            <Icon className="h-5.5 w-5.5 stroke-[2.25]" />
                           </div>
                           <div>
-                            <h3 className="text-[14px] font-bold text-white group-hover:text-indigo-300 transition-colors tracking-tight">
+                            <h3 className="text-[14px] font-bold text-white group-hover:text-rose-300 transition-colors tracking-tight">
                               {srv.title}
                             </h3>
                           </div>
@@ -1765,7 +1787,7 @@ export default function App() {
               )}
 
               {activeTab === 'packages' && (
-                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl">
+                <div className="bg-[#210c31]/90 border border-pink-500/30 backdrop-blur-2xl rounded-3xl p-7 shadow-2xl shadow-pink-950/40">
                   <InternetPacks
                     lang={lang}
                     packages={dbOffers}
@@ -1775,7 +1797,7 @@ export default function App() {
               )}
 
               {activeTab === 'history' && (
-                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl">
+                <div className="bg-[#210c31]/90 border border-pink-500/30 backdrop-blur-2xl rounded-3xl p-7 shadow-2xl shadow-pink-950/40">
                   <HistoryList
                     transactions={transactions}
                     lang={lang}
@@ -1784,16 +1806,17 @@ export default function App() {
               )}
 
               {activeTab === 'store' && (
-                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl flex flex-col h-[700px]">
+                <div className="bg-[#210c31]/90 border border-pink-500/30 backdrop-blur-2xl rounded-3xl p-7 shadow-2xl shadow-pink-950/40 flex flex-col h-[700px]">
                   <StorePanel
                     lang={lang}
                     walletBalance={balance}
+                    isAdmin={isUserAdmin}
                   />
                 </div>
               )}
 
               {activeTab === 'profile' && (
-                <div className="bg-[#101625] border border-slate-800/80 rounded-3xl p-7 shadow-xl">
+                <div className="bg-[#210c31]/90 border border-pink-500/30 backdrop-blur-2xl rounded-3xl p-7 shadow-2xl shadow-pink-950/40">
                   <ProfilePanel
                     lang={lang}
                     onLanguageToggle={handleLanguageToggle}
@@ -1914,6 +1937,24 @@ export default function App() {
           {activeTab === 'home' && (
             <div className="space-y-4">
               
+              {/* Dynamic Warning Marquee notice ticker at the VERY TOP of portal */}
+              {appConfig.showNotice && (
+                <div id="notice-ticker" className="mx-3 mt-3 bg-amber-500/15 border border-amber-500/30 rounded-xl py-2 px-3.5 flex items-center gap-2.5 overflow-hidden shadow-lg backdrop-blur-md">
+                  <div className="p-1 px-1.5 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg shrink-0 flex items-center justify-center gap-1 font-bold text-[10px] tracking-wide uppercase">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400"></span>
+                    </span>
+                    <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden relative">
+                    <div className="animate-marquee whitespace-nowrap text-amber-200 text-[10.5px] font-bold font-sans">
+                      {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Header card with loyalty parameters */}
               <Header
                 balance={balance}
@@ -1968,28 +2009,6 @@ export default function App() {
                 onSelectPromo={handleSelectPromo}
               />
 
-
-
-              {/* Dynamic Warning Marquee notice ticker */}
-              {appConfig.showNotice && (
-                <div id="notice-ticker" className="mx-4 bg-amber-500/10 border border-amber-500/20 rounded-xl py-2 px-3.5 flex items-center gap-2.5 overflow-hidden shadow-sm">
-                  <div className="p-1 px-1.5 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg shrink-0 flex items-center justify-center gap-1 font-bold text-[10px] tracking-wide uppercase">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400"></span>
-                    </span>
-                    <span>{lang === 'bn' ? 'নোটিশ' : 'Notice'}</span>
-                  </div>
-                  <div className="flex-1 overflow-hidden relative">
-                    <div className="animate-marquee whitespace-nowrap text-amber-200 text-[10.5px] font-bold font-sans">
-                      {lang === 'bn' ? appConfig.globalNoticeBn : appConfig.globalNoticeEn}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-
             </div>
           )}
 
@@ -2012,6 +2031,7 @@ export default function App() {
             <StorePanel
               lang={lang}
               walletBalance={balance}
+              isAdmin={isUserAdmin}
             />
           )}
 
@@ -2430,6 +2450,100 @@ export default function App() {
                 </button>
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 🚀 SLIDE-IN POPUP NOTIFICATION MODAL (ENTERS ON LOGIN) */}
+        <AnimatePresence>
+          {showPopupNoticeModal && (
+            <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, x: 120, scale: 0.9, rotate: 1 }}
+                animate={{ opacity: 1, x: 0, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, x: -120, scale: 0.9 }}
+                transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+                className="relative w-full max-w-lg bg-slate-900 border-2 border-amber-500/40 shadow-[0_25px_70px_-15px_rgba(245,158,11,0.35)] rounded-3xl p-6 text-white overflow-hidden select-none"
+              >
+                {/* Arrow Slide Decorative Top Bar */}
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-pulse" />
+                
+                <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-gradient-to-tr from-amber-500/30 to-orange-500/20 border border-amber-500/50 rounded-2xl text-amber-400 shadow-lg shadow-amber-500/20 shrink-0">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-black uppercase tracking-widest bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                          {lang === 'bn' ? 'জরুরী নোটিশ' : 'Announcement'}
+                        </span>
+                        <div className="flex items-center text-[10px] text-amber-400 font-bold gap-1 animate-bounce">
+                          <span>এরোস্লাইড</span>
+                          <ChevronRight className="h-3 w-3" />
+                        </div>
+                      </div>
+                      <h3 className="font-extrabold text-base text-white mt-0.5 tracking-tight">
+                        {lang === 'bn' 
+                          ? (appConfig?.popupNoticeTitleBn || 'বিশেষ আপডেট ও নোটিশ') 
+                          : (appConfig?.popupNoticeTitleEn || 'Special Update Notice')}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPopupNoticeModal(false);
+                      setHasDismissedPopup(true);
+                    }}
+                    className="p-2 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-full transition-all cursor-pointer shrink-0 active:scale-90"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Body Content */}
+                <div className="py-2 space-y-3">
+                  {/* Popup Notice Banner Image if configured */}
+                  {appConfig?.popupNoticeImageUrl && (
+                    <div className="rounded-2xl overflow-hidden border border-white/10 bg-slate-950 max-h-56 flex items-center justify-center shadow-md">
+                      <img
+                        src={appConfig.popupNoticeImageUrl}
+                        alt="Notice Banner"
+                        className="w-full max-h-56 object-cover rounded-2xl"
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-4 text-xs font-medium text-slate-200 leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap">
+                    {lang === 'bn' 
+                      ? (appConfig?.popupNoticeBodyBn || 'স্বাগতম! আমাদের নিহাদ বিজনেস পয়েন্ট অ্যাপের সকল সেবা চালু রয়েছে।') 
+                      : (appConfig?.popupNoticeBodyEn || 'Welcome to Nihad Business Point! All digital services are active.')}
+                  </div>
+                </div>
+
+                {/* Footer Action Button */}
+                <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPopupNoticeModal(false);
+                      setHasDismissedPopup(true);
+                    }}
+                    className="w-full py-3.5 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs rounded-2xl shadow-xl shadow-amber-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    <Check className="h-4 w-4" />
+                    <span>
+                      {lang === 'bn' 
+                        ? (appConfig?.popupNoticeButtonTextBn || 'ঠিক আছে, বুঝেছি') 
+                        : (appConfig?.popupNoticeButtonTextEn || 'Got It')}
+                    </span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 

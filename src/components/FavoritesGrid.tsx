@@ -68,28 +68,28 @@ export default function FavoritesGrid({
   };
 
   return (
-    <div className="mx-4 my-2 px-5 py-4 bg-white border border-slate-100 rounded-[28px] shadow-sm">
+    <div className="mx-4 my-3 px-5 py-4 bg-[#210c31]/90 border border-pink-500/30 rounded-2xl shadow-2xl shadow-pink-950/40 backdrop-blur-2xl">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-slate-900 font-bold text-sm tracking-tight flex items-center gap-1.5 font-display">
-          <Heart className="h-4 w-4 text-rose-500 fill-rose-500/10" />
+        <h3 className="text-white font-bold text-xs tracking-tight flex items-center gap-1.5 font-display">
+          <Heart className="h-4 w-4 text-rose-400 fill-rose-400/20" />
           <span>{t.favoriteOperator}</span>
         </h3>
         
         <button
           onClick={() => setIsAdding(!isAdding)}
           id="add-fav-toggle-btn"
-          className="text-xs font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100/80 px-3 py-1.5 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+          className="text-xs font-black text-rose-300 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 px-3 py-1.5 rounded-full flex items-center gap-1 cursor-pointer transition-all shadow-sm"
         >
-          <Plus className="h-3 w-3 text-indigo-600 stroke-[2.5px]" />
+          <Plus className="h-3 w-3 text-rose-300 stroke-[2.5px]" />
           <span>{isAdding ? t.close : t.addFav}</span>
         </button>
       </div>
 
       {isAdding && (
-        <form onSubmit={handleCreate} id="add-favorite-form" className="mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/50 space-y-3">
+        <form onSubmit={handleCreate} id="add-favorite-form" className="mb-4 p-3 bg-slate-950/60 rounded-2xl border border-white/10 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">
+              <label className="block text-[10px] uppercase tracking-wider text-pink-200/70 font-bold mb-1">
                 {lang === 'bn' ? 'নাম' : 'Name'}
               </label>
               <input
@@ -97,12 +97,12 @@ export default function FavoritesGrid({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={lang === 'bn' ? 'নাম লিখুন' : 'e.g. Friends'}
-                className="w-full text-xs font-medium bg-white border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 transition-colors"
+                className="w-full text-xs font-medium bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 outline-none focus:border-rose-500 transition-colors"
                 required
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">
+              <label className="block text-[10px] uppercase tracking-wider text-pink-200/70 font-bold mb-1">
                 {lang === 'bn' ? 'নম্বর' : 'Mobile Number'}
               </label>
               <input
@@ -110,23 +110,23 @@ export default function FavoritesGrid({
                 value={number}
                 onChange={handlePhoneInputChange}
                 placeholder="01712xxxxxx"
-                className="w-full text-xs font-medium bg-white border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 transition-colors font-mono"
+                className="w-full text-xs font-medium bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 outline-none focus:border-rose-500 transition-colors font-mono"
                 required
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-1 border-t border-white/5">
             <button
               type="button"
               onClick={() => setIsAdding(false)}
-              className="px-3 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-100 rounded-lg cursor-pointer"
+              className="px-3 py-1.5 text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/5 rounded-lg cursor-pointer"
             >
               {t.close}
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 text-[11px] font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/15 rounded-lg cursor-pointer transition-colors"
+              className="px-4 py-1.5 text-[11px] font-black text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 shadow-md shadow-pink-950/40 rounded-lg cursor-pointer transition-all"
             >
               {lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save'}
             </button>
@@ -146,7 +146,7 @@ export default function FavoritesGrid({
             <button
               onClick={() => onSelectContact(fav.number, fav.operator)}
               id={`fav-click-${fav.id}`}
-              className={`h-13 w-13 rounded-2xl bg-gradient-to-tr ${fav.color} flex items-center justify-center text-white font-bold text-base shadow-md cursor-pointer hover:scale-105 active:scale-95 transition-all text-center relative overflow-hidden`}
+              className={`h-13 w-13 rounded-2xl bg-gradient-to-tr ${fav.color} flex items-center justify-center text-white font-bold text-base shadow-lg cursor-pointer hover:scale-105 active:scale-95 transition-all text-center relative overflow-hidden border border-white/20`}
             >
               {/* Operator micro layout watermarks */}
               <span className="text-white text-base tracking-tighter drop-shadow-md">
@@ -154,15 +154,15 @@ export default function FavoritesGrid({
               </span>
               
               {/* Operator code bubble */}
-              <span className="absolute bottom-1 right-1 text-[8px] tracking-tight bg-black/15 font-bold px-1 rounded-sm">
+              <span className="absolute bottom-1 right-1 text-[8px] tracking-tight bg-black/30 backdrop-blur-xs font-bold px-1 rounded-sm text-white">
                 {fav.operator}
               </span>
             </button>
 
-            <span className="text-[11px] font-medium text-slate-700 mt-2 truncate w-full text-center">
+            <span className="text-[11px] font-medium text-slate-200 mt-2 truncate w-full text-center">
               {fav.name}
             </span>
-            <span className="text-[9px] text-slate-400 font-semibold font-mono tracking-tighter truncate w-full text-center">
+            <span className="text-[9px] text-pink-300/70 font-semibold font-mono tracking-tighter truncate w-full text-center">
               {fav.number}
             </span>
 
@@ -173,7 +173,7 @@ export default function FavoritesGrid({
                 onRemoveContact(fav.id);
               }}
               id={`fav-delete-${fav.id}`}
-              className="absolute -top-1 -right-1 h-5 w-5 bg-rose-50 border border-rose-100 hover:bg-rose-500 hover:text-white rounded-full flex items-center justify-center text-rose-500 scale-0 group-hover:scale-100 focus:scale-100 cursor-pointer transition-all shadow-sm"
+              className="absolute -top-1 -right-1 h-5 w-5 bg-rose-950 border border-rose-500/40 hover:bg-rose-600 text-rose-300 hover:text-white rounded-full flex items-center justify-center scale-0 group-hover:scale-100 focus:scale-100 cursor-pointer transition-all shadow-md"
               title="Remove contact"
             >
               <Trash2 className="h-3 w-3" />

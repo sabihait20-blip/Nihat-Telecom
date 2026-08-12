@@ -113,6 +113,12 @@ export default function Header({
           </motion.div>
           
           <div className="flex flex-col">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[9.5px] font-black tracking-wider text-rose-300 uppercase bg-gradient-to-r from-rose-500/20 to-orange-500/20 px-2.5 py-0.5 rounded-full border border-rose-500/30 flex items-center gap-1 shadow-sm">
+                <Sparkles className="h-2.5 w-2.5 text-rose-300" />
+                <span>Nihad Business Point</span>
+              </span>
+            </div>
             <span className="text-white text-xs font-bold tracking-tight leading-none drop-shadow-xs">
               {userName}
             </span>

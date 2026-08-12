@@ -47,7 +47,7 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
               <button
                 key={op.id}
                 onClick={() => setSelectedOperator(op.id)}
-                className={`p-4 bg-[#131B2E] hover:bg-slate-800/80 border ${op.border} rounded-2xl flex items-center justify-between transition-all cursor-pointer group shadow-lg active:scale-[0.99]`}
+                className={`p-4 bg-[#240d35]/80 backdrop-blur-xl hover:bg-[#2e1142]/90 border ${op.border} rounded-2xl flex items-center justify-between transition-all cursor-pointer group shadow-lg shadow-pink-950/30 active:scale-[0.99]`}
               >
                 <div className="flex items-center gap-3.5">
                   <div className={`h-12 w-12 rounded-2xl ${op.bg} ${op.color} border ${op.border} flex items-center justify-center font-black font-mono text-base shadow-inner group-hover:scale-105 transition-transform overflow-hidden`}>
@@ -58,15 +58,15 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
                     )}
                   </div>
                   <div className="text-left">
-                    <h3 className="text-white font-bold text-sm group-hover:text-indigo-300 transition-colors">
+                    <h3 className="text-white font-bold text-sm group-hover:text-rose-300 transition-colors">
                       {op.name}
                     </h3>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      {op.subtitle} • <span className="text-indigo-400 font-bold">{count} {lang === 'bn' ? 'টি প্যাক' : 'Packs'}</span>
+                    <p className="text-[11px] text-pink-200/70 font-medium">
+                      {op.subtitle} • <span className="text-rose-400 font-bold">{count} {lang === 'bn' ? 'টি প্যাক' : 'Packs'}</span>
                     </p>
                   </div>
                 </div>
-                <div className="h-8 w-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-500 transition-all">
+                <div className="h-8 w-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 group-hover:bg-rose-600 group-hover:text-white group-hover:border-rose-500 transition-all">
                   <ChevronRight className="h-4 w-4" />
                 </div>
               </button>
@@ -178,18 +178,18 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
             return (
               <div
                 key={`${pkg.id || 'pack'}-${idx}`}
-                className="bg-white border border-slate-200/80 rounded-[1.5rem] p-4 shadow-sm relative overflow-hidden flex items-stretch justify-between gap-2.5 hover:shadow-md transition-all group text-slate-900"
+                className="bg-[#240d35]/90 border border-pink-500/25 rounded-2xl p-4 shadow-xl shadow-pink-950/30 backdrop-blur-xl relative overflow-hidden flex items-stretch justify-between gap-2.5 hover:border-pink-500/45 hover:shadow-2xl hover:shadow-pink-950/50 transition-all group text-white"
               >
-                {/* Discount Ribbon at the top right exactly like the image */}
+                {/* Discount Ribbon at the top right */}
                 {hasDiscount && (
-                  <div className="absolute right-0 top-0 bg-[#FF5A00] text-white px-3.5 py-1 text-[10px] font-black rounded-bl-xl shadow-sm z-10">
+                  <div className="absolute right-0 top-0 bg-gradient-to-r from-orange-500 to-rose-500 text-white px-3.5 py-1 text-[10px] font-black rounded-bl-xl shadow-sm z-10 border-b border-l border-white/20">
                     discount: ৳{discountAmt}
                   </div>
                 )}
 
                 <div className="flex gap-4 items-start flex-1">
                   {/* Left Side: Operator Logo */}
-                  <div className="h-14 w-14 md:h-18 md:w-18 rounded-2xl overflow-hidden shrink-0 border border-slate-100 bg-slate-50 shadow-inner flex items-center justify-center self-start mt-1 relative">
+                  <div className="h-14 w-14 md:h-16 md:w-16 rounded-2xl overflow-hidden shrink-0 border border-white/10 bg-slate-950/60 shadow-inner flex items-center justify-center self-start mt-1 relative">
                     {logoSrc ? (
                       <img 
                         src={logoSrc} 
@@ -198,39 +198,39 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <Gift className="h-7 w-7 text-emerald-600" />
+                      <Gift className="h-7 w-7 text-emerald-400" />
                     )}
                   </div>
 
                   {/* Middle Side: Offer Details */}
                   <div className="space-y-1.5 flex-1 pr-4">
-                    {/* Title in Emerald Green exactly like the image */}
-                    <h3 className="text-[#00B060] font-black text-sm md:text-base tracking-tight leading-snug">
+                    {/* Title in Emerald Green */}
+                    <h3 className="text-emerald-400 font-black text-sm md:text-base tracking-tight leading-snug">
                       {lang === 'bn' ? pkg.titleBn : pkg.title}
                     </h3>
 
-                    {/* price: 1199 (Red text) */}
-                    <div className="text-rose-500 font-extrabold text-xs flex items-center gap-1">
+                    {/* price: 1199 */}
+                    <div className="text-rose-400 font-extrabold text-xs flex items-center gap-1">
                       <span>price:</span>
-                      <span className="font-mono">{regularPrice}</span>
-                      <span className="text-[10px] text-slate-400 font-medium ml-2">
+                      <span className="font-mono">৳{regularPrice}</span>
+                      <span className="text-[10px] text-pink-200/60 font-medium ml-2">
                         • {lang === 'bn' ? 'মেয়াদ:' : 'Validity:'} {lang === 'bn' ? pkg.validityBn : pkg.validity}
                       </span>
                     </div>
 
                     {/* Category Capsule Button Badge in Green and Coins Stack */}
                     <div className="flex flex-col items-start gap-1">
-                      <span className="bg-[#00B060] text-white text-[9.5px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider">
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider">
                         {lang === 'bn' 
                           ? (pkg.category === 'internet' ? 'ইন্টারনেট' : pkg.category === 'talktime' ? 'টকটাইম' : 'বান্ডেল')
                           : (pkg.category === 'internet' ? 'Internet' : pkg.category === 'talktime' ? 'Voice' : 'Bundle')}
                       </span>
 
                       {/* Coins Stack Icon */}
-                      <div className="flex items-center gap-1.5 text-emerald-600 mt-1">
-                        <Coins className="h-4.5 w-4.5 fill-emerald-100" />
+                      <div className="flex items-center gap-1.5 text-emerald-400 mt-1">
+                        <Coins className="h-4 w-4 text-emerald-400" />
                         {hasDiscount && (
-                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">
+                          <span className="text-[10px] font-black bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded-md">
                             {lang === 'bn' ? `কমিশন ৳${discountAmt}` : `Comm ৳${discountAmt}`}
                           </span>
                         )}
@@ -244,13 +244,13 @@ export default function InternetPacks({ lang, packages = [], onSelectPackage }: 
                   <button
                     onClick={() => onSelectPackage(pkg.operator, finalPrice)}
                     id={`pkg-buy-${pkg.id}`}
-                    className="border-[2px] border-[#00B060] text-[#00B060] hover:bg-emerald-50 px-3 py-1.5 rounded-full text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 bg-white shadow-sm"
+                    className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-3.5 py-1.5 rounded-full text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 shadow-md shadow-emerald-950/40 border border-emerald-400/30"
                   >
                     <span>buy ৳ {finalPrice}</span>
                   </button>
 
                   {/* Arrow Down Chevron on bottom right */}
-                  <div className="text-slate-300 group-hover:text-emerald-500 transition-colors pt-2">
+                  <div className="text-pink-300/40 group-hover:text-emerald-400 transition-colors pt-2">
                     <ChevronDown className="h-5 w-5 stroke-[2.5]" />
                   </div>
                 </div>

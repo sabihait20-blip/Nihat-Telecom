@@ -5,7 +5,7 @@ import {
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
   Eye, Download, Crown, Phone, Zap, PhoneCall, PhoneOff, Mic, MicOff, VolumeX, Image, Play, Pause, Square, Radio,
-  History, Trophy, TrendingUp, Search, Filter, Coins
+  History, Trophy, TrendingUp, Search, Filter, Coins, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -539,6 +539,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     globalNoticeBn: 'এয়ারটেল প্যাকেজগুলোর রক্ষণাবেক্ষনের কাজ চলছে। অন্য প্যাকেজ ব্যবহার করুন!',
     showNotice: true,
     requireKyc: true,
+    popupNoticeTitleBn: 'বিশেষ আপডেট ও নোটিশ',
+    popupNoticeTitleEn: 'Special Update Notice',
+    popupNoticeBodyBn: 'স্বাগতম! আমাদের নিহাদ বিজনেস পয়েন্ট অ্যাপের সকল ডিজিটাল সার্ভিস সম্পূর্ণ সক্রিয় আছে। যেকোনো প্রয়োজনে হেল্পলাইনে যোগাযোগ করুন।',
+    popupNoticeBodyEn: 'Welcome! All digital services on Nihad Business Point app are active.',
+    popupNoticeEnabled: true,
+    popupNoticeButtonTextBn: 'ঠিক আছে, বুঝেছি',
+    popupNoticeButtonTextEn: 'Got It',
+    popupNoticeImageUrl: '',
   });
 
   useEffect(() => {
@@ -565,6 +573,14 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
           globalNoticeBn: data.globalNoticeBn || '',
           showNotice: typeof data.showNotice === 'boolean' ? data.showNotice : true,
           requireKyc: typeof data.requireKyc === 'boolean' ? data.requireKyc : true,
+          popupNoticeTitleBn: data.popupNoticeTitleBn || 'বিশেষ আপডেট ও নোটিশ',
+          popupNoticeTitleEn: data.popupNoticeTitleEn || 'Special Update Notice',
+          popupNoticeBodyBn: data.popupNoticeBodyBn || 'স্বাগতম! আমাদের নিহাদ বিজনেস পয়েন্ট অ্যাপের সকল ডিজিটাল সার্ভিস সম্পূর্ণ সক্রিয় আছে। যেকোনো প্রয়োজনে হেল্পলাইনে যোগাযোগ করুন।',
+          popupNoticeBodyEn: data.popupNoticeBodyEn || 'Welcome! All digital services on Nihad Business Point app are active.',
+          popupNoticeEnabled: typeof data.popupNoticeEnabled === 'boolean' ? data.popupNoticeEnabled : true,
+          popupNoticeButtonTextBn: data.popupNoticeButtonTextBn || 'ঠিক আছে, বুঝেছি',
+          popupNoticeButtonTextEn: data.popupNoticeButtonTextEn || 'Got It',
+          popupNoticeImageUrl: data.popupNoticeImageUrl || '',
         });
       }
     }, (error) => {
@@ -8777,6 +8793,314 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 8. SYSTEM SETTINGS & POPUP NOTIFICATION MANAGER */}
+          {activeSubTab === 'settings' && (
+            <div className="space-y-6 animate-fade-in">
+              <form onSubmit={handleSaveSettings} className="space-y-6">
+
+                {/* A. SLIDE-IN POPUP NOTIFICATION CONFIGURATION */}
+                <div className="bg-slate-900 border-2 border-amber-500/30 rounded-3xl p-6 space-y-5 relative overflow-hidden shadow-xl shadow-amber-500/5">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-2xl shrink-0">
+                        <Sparkles className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-white tracking-tight flex items-center gap-2">
+                          <span>{lang === 'bn' ? 'লগইন স্লাইড-ইন পপআপ নোটিফিকেশন' : 'Login Slide-In Popup Notification'}</span>
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 font-mono px-2.5 py-0.5 rounded-full border border-amber-500/30 uppercase font-extrabold">
+                            Arrow Slide
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                          {lang === 'bn' ? 'সাইটে ইউজার লগইন করলেই ভাসমান স্লাইড-ইন পপআপ নোটিশ দেখাবে।' : 'This notification slides in floating over the screen upon user login.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Enable/Disable Toggle */}
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.popupNoticeEnabled ?? true}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeEnabled: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-12 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                      <span className="ml-2 text-xs font-extrabold text-slate-300">
+                        {(settingsForm.popupNoticeEnabled ?? true) ? (lang === 'bn' ? 'চালু' : 'Active') : (lang === 'bn' ? 'বন্ধ' : 'Disabled')}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Notice Title Bangla */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-extrabold text-amber-400 uppercase tracking-wider block">
+                        {lang === 'bn' ? 'পপআপ শিরোনাম (বাংলা)' : 'Popup Title (Bangla)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsForm.popupNoticeTitleBn || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeTitleBn: e.target.value })}
+                        placeholder="যেমন: বিশেষ আপডেট ও নোটিশ"
+                        className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl px-4 py-3 text-xs font-bold text-white outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Notice Title English */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-extrabold text-amber-400 uppercase tracking-wider block">
+                        {lang === 'bn' ? 'পপআপ শিরোনাম (ইংরেজি)' : 'Popup Title (English)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsForm.popupNoticeTitleEn || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeTitleEn: e.target.value })}
+                        placeholder="e.g. Special Update Notice"
+                        className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl px-4 py-3 text-xs font-bold text-white outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Notice Message Bangla */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-extrabold text-slate-300 uppercase tracking-wider block">
+                        {lang === 'bn' ? 'নোটিশের বিস্তারিত বার্তা (বাংলা) *' : 'Notice Body Message (Bangla)'}
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={settingsForm.popupNoticeBodyBn || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeBodyBn: e.target.value })}
+                        placeholder="ইউজার লগইন করার পর পপআপে দেখানোর জন্য বিস্তারিত মেসেজ বা অফার বিস্তারিত লিখুন..."
+                        className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl p-4 text-xs font-medium text-slate-200 outline-none transition-all leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Notice Message English */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-extrabold text-slate-300 uppercase tracking-wider block">
+                        {lang === 'bn' ? 'নোটিশের বিস্তারিত বার্তা (ইংরেজি)' : 'Notice Body Message (English)'}
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={settingsForm.popupNoticeBodyEn || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeBodyEn: e.target.value })}
+                        placeholder="Detailed notice message in English..."
+                        className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl p-4 text-xs font-medium text-slate-200 outline-none transition-all leading-relaxed"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    {/* Button Text Bangla */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                        {lang === 'bn' ? 'বাটনের লেখা (বাংলা)' : 'Action Button Label (Bangla)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsForm.popupNoticeButtonTextBn || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeButtonTextBn: e.target.value })}
+                        placeholder="যেমন: ঠিক আছে, বুঝেছি"
+                        className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl px-4 py-2.5 text-xs font-bold text-white outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Button Text English */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                        {lang === 'bn' ? 'বাটনের লেখা (ইংরেজি)' : 'Action Button Label (English)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsForm.popupNoticeButtonTextEn || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeButtonTextEn: e.target.value })}
+                        placeholder="e.g. Got It"
+                        className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl px-4 py-2.5 text-xs font-bold text-white outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Popup Image Link */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[10.5px] font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Image className="h-3.5 w-3.5" />
+                      <span>{lang === 'bn' ? 'পপআপ ব্যানার / ছবি লিংক (Image URL - অপশনাল)' : 'Popup Banner / Image Link (Optional)'}</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={settingsForm.popupNoticeImageUrl || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, popupNoticeImageUrl: e.target.value })}
+                      placeholder="https://example.com/banner-image.jpg"
+                      className="w-full bg-slate-950 border border-white/10 focus:border-amber-500 rounded-2xl px-4 py-3 text-xs font-mono font-medium text-amber-200 outline-none transition-all"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      {lang === 'bn' ? 'এখানে ছবির লিংক দিলে পপআপ নোটিফিকেশনে ছবিটি দেখাবে।' : 'Enter a direct image link to show a picture inside the popup notification.'}
+                    </p>
+                  </div>
+
+                  {/* Live Preview Card */}
+                  <div className="pt-3 border-t border-white/10">
+                    <span className="text-[10px] font-mono font-black uppercase tracking-widest text-amber-400 block mb-2">
+                      👁️ {lang === 'bn' ? 'লাইভ পপআপ নোটিফিকেশন প্রিভিউ' : 'Live Popup Notification Preview'}
+                    </span>
+                    <div className="bg-slate-950 border border-amber-500/40 rounded-3xl p-5 shadow-2xl relative max-w-md mx-auto text-white">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 bg-amber-500/20 text-amber-400 rounded-xl">
+                            <Sparkles className="h-4 w-4" />
+                          </span>
+                          <h4 className="font-extrabold text-xs text-amber-400">
+                            {settingsForm.popupNoticeTitleBn || 'বিশেষ আপডেট নোটিশ'}
+                          </h4>
+                        </div>
+                        <span className="p-1 rounded-full bg-white/10 text-slate-400">
+                          <X className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+
+                      {/* Image Preview inside Popup Preview */}
+                      {settingsForm.popupNoticeImageUrl && (
+                        <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 bg-slate-900 max-h-48 flex items-center justify-center">
+                          <img
+                            src={settingsForm.popupNoticeImageUrl}
+                            alt="Popup Preview"
+                            className="w-full max-h-48 object-cover rounded-2xl"
+                            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                          />
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-200 font-medium leading-relaxed whitespace-pre-wrap mb-4">
+                        {settingsForm.popupNoticeBodyBn || 'এখানে আপনার পপআপ নোটিশের বর্ণনা দেখাবে...'}
+                      </p>
+                      <button
+                        type="button"
+                        className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-black text-xs rounded-xl shadow-md text-center"
+                      >
+                        {settingsForm.popupNoticeButtonTextBn || 'ঠিক আছে, বুঝেছি'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* B. TOP TICKER GLOBAL NOTICE */}
+                <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <h3 className="text-sm font-black text-white tracking-tight flex items-center gap-2">
+                      <Bell className="h-5 w-5 text-blue-400" />
+                      <span>{lang === 'bn' ? 'উপরের রানিং নোটিশ বার (Ticker)' : 'Top Running Notice Ticker'}</span>
+                    </h3>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.showNotice}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, showNotice: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block">নোটিশ (বাংলা)</label>
+                      <input
+                        type="text"
+                        value={settingsForm.globalNoticeBn}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, globalNoticeBn: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-blue-500 font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block">Notice (English)</label>
+                      <input
+                        type="text"
+                        value={settingsForm.globalNoticeEn}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, globalNoticeEn: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-blue-500 font-medium"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* C. PAYMENT & HELPLINE NUMBERS */}
+                <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4">
+                  <h3 className="text-sm font-black text-white tracking-tight border-b border-white/10 pb-3 flex items-center gap-2">
+                    <Phone className="h-5 w-5 text-emerald-400" />
+                    <span>{lang === 'bn' ? 'অফিশিয়াল মোবাইল ব্যাংকিং ও হেল্পলাইন নম্বর' : 'Mobile Banking & Helpline Numbers'}</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-pink-400 uppercase block">Bkash Agent</label>
+                      <input
+                        type="text"
+                        value={settingsForm.agentBkashNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, agentBkashNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-orange-400 uppercase block">Nagad Agent</label>
+                      <input
+                        type="text"
+                        value={settingsForm.agentNagadNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, agentNagadNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-purple-400 uppercase block">Rocket Agent</label>
+                      <input
+                        type="text"
+                        value={settingsForm.agentRocketNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, agentRocketNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-emerald-400 uppercase block">Helpline Number</label>
+                      <input
+                        type="text"
+                        value={settingsForm.helplineNumber}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, helplineNumber: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2">
+                    <label className="text-[10px] font-bold text-emerald-400 uppercase block">WhatsApp Direct Contact URL</label>
+                    <input
+                      type="text"
+                      value={settingsForm.whatsappUrl}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, whatsappUrl: e.target.value })}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* SAVE BUTTON */}
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-500/20 cursor-pointer transition-all active:scale-95 flex items-center gap-2"
+                  >
+                    <Check className="h-4 w-4" />
+                    <span>{lang === 'bn' ? 'সেটিংস সেভ করুন' : 'Save All Settings'}</span>
+                  </button>
+                </div>
+
+              </form>
             </div>
           )}
 

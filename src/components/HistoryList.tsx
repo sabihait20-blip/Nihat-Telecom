@@ -154,7 +154,7 @@ export default function HistoryList({ transactions, lang }: HistoryListProps) {
           filteredTx.map((tx, index) => (
             <div
               key={`${tx.id || index}-${index}`}
-              className="bg-[#131B2E] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-xl hover:border-indigo-500/30 transition-all"
+              className="bg-[#240d35]/80 backdrop-blur-xl border border-rose-500/20 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-pink-950/30 hover:border-rose-500/40 hover:shadow-2xl hover:shadow-pink-950/50 transition-all"
             >
               <div className="flex items-center gap-3">
                 {/* Visual Category symbol */}

@@ -292,7 +292,7 @@ export default function ProfilePanel({
       </div>
 
       {/* KYC Status Banner */}
-      <div className="bg-[#131B2E] border border-white/10 rounded-2xl p-4 shadow-xl">
+      <div className="bg-[#240d35]/80 backdrop-blur-xl border border-rose-500/20 rounded-2xl p-4 shadow-xl shadow-pink-950/30">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-xl ${

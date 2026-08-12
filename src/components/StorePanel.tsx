@@ -5,24 +5,30 @@ import {
   ShoppingBag as BagIcon, Clock, ArrowLeft, Send, MapPin, Phone, 
   User, Check, AlertCircle, ShoppingCart, RefreshCw, X,
   Calculator, Barcode, Users, DollarSign, TrendingUp, Printer, FileText, Plus, Trash2, Edit3, ShieldCheck, Package, Layers, PieChart,
-  Minus, Share2, Eye, SlidersHorizontal, ArrowUpDown, Filter, Sparkles, Copy, ZoomIn, Heart
+  Minus, Share2, Eye, SlidersHorizontal, ArrowUpDown, Filter, Sparkles, Copy, ZoomIn, Heart, Wallet, Truck
 } from 'lucide-react';
 import { StoreProduct, StoreOrder, Language, Supplier, Customer, ExpenseRecord, IncomeRecord, POSCartItem } from '../types';
-import { collection, doc, onSnapshot, writeBatch, query, where, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, writeBatch, query, where, getDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
 interface StorePanelProps {
   lang: Language;
   walletBalance: number;
+  isAdmin?: boolean;
 }
 
-export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
+export default function StorePanel({ lang, walletBalance, isAdmin = false }: StorePanelProps) {
+  const isUserAdmin = isAdmin;
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [orders, setOrders] = useState<StoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Navigation tabs: browse | pos | inventory | suppliers | customers | expenses | reports | orders
   const [activeTab, setActiveTab] = useState<'browse' | 'pos' | 'inventory' | 'suppliers' | 'customers' | 'expenses' | 'reports' | 'orders'>('browse');
+
+  // Checkout payment method selection ('Wallet' | 'COD')
+  const [clientCartPaymentMethod, setClientCartPaymentMethod] = useState<'Wallet' | 'COD'>('Wallet');
+  const [singleCheckoutPaymentMethod, setSingleCheckoutPaymentMethod] = useState<'Wallet' | 'COD'>('Wallet');
 
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,6 +153,20 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       unsubExp();
     };
   }, []);
+
+  // Order status update function
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: 'Approved' | 'Rejected') => {
+    try {
+      await updateDoc(doc(db, 'store_orders', orderId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+      alert(lang === 'bn' ? `অর্ডারের স্ট্যাটাস '${newStatus}' আপডেট করা হয়েছে।` : `Order status updated to '${newStatus}'.`);
+    } catch (err: any) {
+      console.error("Error updating order status:", err);
+      alert(lang === 'bn' ? "অর্ডার স্ট্যাটাস আপডেট ব্যর্থ হয়েছে" : "Failed to update order status");
+    }
+  };
 
   // Prefill phone on checkout
   useEffect(() => {
@@ -274,8 +294,8 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
     }
 
     const totalCost = clientCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    if (walletBalance < totalCost) {
-      alert(lang === 'bn' ? 'দুঃখিত, আপনার ওয়ালেট ব্যালেন্স অপর্যাপ্ত!' : 'Sorry, your wallet balance is insufficient!');
+    if (clientCartPaymentMethod === 'Wallet' && walletBalance < totalCost) {
+      alert(lang === 'bn' ? 'দুঃখিত, আপনার ওয়ালেট ব্যালেন্স অপর্যাপ্ত! ক্যাশ অন ডেলিভারি সিলেক্ট করুন অথবা ব্যালেন্স রিচার্জ করুন।' : 'Sorry, your wallet balance is insufficient! Select Cash on Delivery or add funds.');
       return;
     }
 
@@ -308,7 +328,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
           userName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Customer',
           userPhone: clientCartPhone,
           deliveryAddress: clientCartAddress,
-          note: clientCartNote ? `${clientCartNote} (Cart Order)` : 'Cart Order'
+          note: `${clientCartPaymentMethod === 'COD' ? '[Cash on Delivery] ' : '[Wallet Paid] '}${clientCartNote || ''}`.trim()
         };
 
         batch.set(doc(db, 'store_orders', orderId), newOrder);
@@ -325,16 +345,18 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
           billerNameBn: `স্টোর: ${item.product.titleBn || item.product.title} (x${item.quantity})`,
           date: dateStr,
           txId: orderId,
-          status: 'Pending',
+          status: clientCartPaymentMethod === 'COD' ? 'Pending' : 'Success',
           userId: currentUser.uid,
           userEmail: currentUser.email,
-          note: `Phone: ${clientCartPhone} | Addr: ${clientCartAddress}`
+          note: `Method: ${clientCartPaymentMethod} | Phone: ${clientCartPhone} | Addr: ${clientCartAddress}`
         };
         batch.set(doc(db, 'users', currentUser.uid, 'transactions', txId), storeTx);
       }
 
-      const newBalanceVal = Math.max(walletBalance - totalCost, 0);
-      batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+      if (clientCartPaymentMethod === 'Wallet') {
+        const newBalanceVal = Math.max(walletBalance - totalCost, 0);
+        batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+      }
 
       await batch.commit();
       setIsSubmitting(false);
@@ -360,7 +382,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
     }
 
     const totalCost = checkoutProduct.price * quantity;
-    if (walletBalance < totalCost) {
+    if (singleCheckoutPaymentMethod === 'Wallet' && walletBalance < totalCost) {
       alert(lang === 'bn' ? 'দুঃখিত, আপনার ব্যালেন্স অপর্যাপ্ত!' : 'Sorry, your wallet balance is insufficient!');
       return;
     }
@@ -389,14 +411,17 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       userName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Customer',
       userPhone: contactPhone,
       deliveryAddress: deliveryAddress,
-      note: orderNote
+      note: `${singleCheckoutPaymentMethod === 'COD' ? '[Cash on Delivery] ' : '[Wallet Paid] '}${orderNote || ''}`.trim()
     };
 
     const batch = writeBatch(db);
     try {
       batch.set(doc(db, 'store_orders', newOrderId), newOrder);
-      const newBalanceVal = Math.max(walletBalance - totalCost, 0);
-      batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+
+      if (singleCheckoutPaymentMethod === 'Wallet') {
+        const newBalanceVal = Math.max(walletBalance - totalCost, 0);
+        batch.set(doc(db, 'users', currentUser.uid, 'wallet', 'balance_doc'), { balance: newBalanceVal });
+      }
 
       const txId = `tx-store-${Date.now()}`;
       const storeTx = {
@@ -404,13 +429,13 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         type: 'Voucher',
         amount: totalCost,
         billerName: `Store: ${checkoutProduct.title} (x${quantity})`,
-        billerNameBn: `স্টোর: ${checkoutProduct.titleBn} (x${quantity})`,
+        billerNameBn: `স্টোর: ${checkoutProduct.titleBn || checkoutProduct.title} (x${quantity})`,
         date: dateStr,
         txId: newOrderId,
-        status: 'Pending',
+        status: singleCheckoutPaymentMethod === 'COD' ? 'Pending' : 'Success',
         userId: currentUser.uid,
         userEmail: currentUser.email,
-        note: `Phone: ${contactPhone} | Addr: ${deliveryAddress}`
+        note: `Method: ${singleCheckoutPaymentMethod} | Phone: ${contactPhone} | Addr: ${deliveryAddress}`
       };
       batch.set(doc(db, 'users', currentUser.uid, 'transactions', txId), storeTx);
 
@@ -572,48 +597,60 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
 
   return (
     <div className="space-y-6 pb-24 max-w-7xl mx-auto px-4 sm:px-6">
-      {/* A2Z Shop Management Top Header & Navigation Bar */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden">
+      {/* Shop Header & Navigation Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] p-5 sm:p-6 text-white shadow-xl relative overflow-hidden border border-indigo-500/20">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="bg-indigo-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider">
-                {lang === 'bn' ? 'এটুজেড শপ ও পিওএস সিস্টেম' : 'A2Z Shop & POS System'}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider shadow-sm flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                {isUserAdmin ? (lang === 'bn' ? 'এটুজেড শপ ও পিওএস অ্যাডমিন' : 'A2Z Shop Admin Panel') : (lang === 'bn' ? 'নিহাদ অফিশিয়াল স্টোর' : 'NIHAD Official Store')}
               </span>
-              <span className="text-xs text-indigo-300 font-semibold">PC & Mobile Responsive</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                <ShieldCheck className="h-3 w-3" />
+                {lang === 'bn' ? '১০০% অরিজিনাল প্রোডাক্ট' : '100% Genuine Guarantee'}
+              </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black mt-2 tracking-tight">
-              {lang === 'bn' ? 'স্মার্ট শপ ম্যানেজমেন্ট ও পিওএস' : 'A2Z Smart Shop & POS Management'}
+            <h1 className="text-xl sm:text-3xl font-black mt-2 tracking-tight">
+              {isUserAdmin 
+                ? (lang === 'bn' ? 'স্মার্ট শপ ম্যানেজমেন্ট ও পিওএস' : 'Smart Shop & POS Management')
+                : (lang === 'bn' ? 'স্মার্ট গ্যাজেট ও টেক অ্যাক্সেসরিজ শপ' : 'Smart Gadgets & Electronics Store')}
             </h1>
-            <p className="text-xs text-slate-300 mt-1 max-w-xl">
-              {lang === 'bn' ? 'আপনার দোকানের স্টক, পিওএস বিলিং, সাপ্লায়ার, কাস্টমার এবং দৈনিক হিসাব রাখুন অত্যন্ত সহজে।' : 'Manage inventory, POS quick billing, suppliers, customers, expenses, and invoices in one seamless platform.'}
+            <p className="text-xs text-indigo-200/80 mt-1 max-w-xl font-medium">
+              {isUserAdmin
+                ? (lang === 'bn' ? 'ইনভেন্টরি, পিওএস কুইক বিলিং, কাস্টমার বাকির খাতা ও শপ রিপোর্ট পরিচালনা করুন।' : 'Manage inventory, POS billing, debtors ledger, expenses, and invoices in one seamless dashboard.')
+                : (lang === 'bn' ? 'সেরা দামে অরিজিনাল গ্যাজেট ও টেক প্রোডাক্ট কিনুন। আপনার ওয়ালেট ব্যালেন্স অথবা ক্যাশ অন ডেলিভারিতে অর্ডার করুন।' : 'Shop authentic gadgets and electronics at best prices with Wallet Balance or Cash on Delivery.')}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
-              <p className="text-[10px] text-indigo-200 font-bold uppercase">{lang === 'bn' ? 'মোট স্টক ভ্যালু' : 'Total Stock Value'}</p>
-              <p className="text-base font-black text-white">৳{totalStockValue.toLocaleString()}</p>
+
+          <div className="flex flex-wrap gap-2.5">
+            <div className="bg-indigo-950/60 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-indigo-500/20">
+              <p className="text-[9.5px] text-indigo-300 font-extrabold uppercase tracking-wider">{lang === 'bn' ? 'ওয়ালেট ব্যালেন্স' : 'Wallet Balance'}</p>
+              <p className="text-base sm:text-lg font-black text-emerald-400 font-mono">৳{walletBalance.toLocaleString()}</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
-              <p className="text-[10px] text-emerald-300 font-bold uppercase">{lang === 'bn' ? 'মোট প্রোডাক্ট' : 'Total Products'}</p>
-              <p className="text-base font-black text-white">{products.length}</p>
+            <div className="bg-indigo-950/60 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-indigo-500/20">
+              <p className="text-[9.5px] text-indigo-300 font-extrabold uppercase tracking-wider">{lang === 'bn' ? 'মোট প্রোডাক্টস' : 'Total Items'}</p>
+              <p className="text-base sm:text-lg font-black text-white font-mono">{products.length}</p>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation Menu */}
         <div className="flex items-center gap-2 overflow-x-auto mt-6 pt-4 border-t border-white/10 scrollbar-none">
-          {[
+          {(isUserAdmin ? [
             { id: 'browse', label: lang === 'bn' ? 'অনলাইন শপ' : 'Online Shop', icon: ShoppingBag },
+            { id: 'orders', label: lang === 'bn' ? 'অর্ডারসমূহ' : 'Store Orders', icon: Clock },
             { id: 'pos', label: lang === 'bn' ? 'POS টার্মিনাল' : 'POS Terminal', icon: Calculator },
-            { id: 'inventory', label: lang === 'bn' ? 'স্টক ও প্রোডাক্ট' : 'Inventory', icon: Package },
+            { id: 'inventory', label: lang === 'bn' ? 'স্টক ইনভেন্টরি' : 'Inventory', icon: Package },
             { id: 'suppliers', label: lang === 'bn' ? 'সাপ্লায়ার্স' : 'Suppliers', icon: Users },
-            { id: 'customers', label: lang === 'bn' ? 'কাস্টমার্স' : 'Customers', icon: User },
+            { id: 'customers', label: lang === 'bn' ? 'বাকির খাতা' : 'Debtors Ledger', icon: User },
             { id: 'expenses', label: lang === 'bn' ? 'খরচ ও আয়' : 'Expenses', icon: DollarSign },
             { id: 'reports', label: lang === 'bn' ? 'রিপোর্টস' : 'Reports', icon: TrendingUp },
+          ] : [
+            { id: 'browse', label: lang === 'bn' ? 'অনলাইন শপ' : 'Online Shop', icon: ShoppingBag },
             { id: 'orders', label: lang === 'bn' ? 'আমার অর্ডার' : 'My Orders', icon: Clock },
-          ].map(tab => {
+          ]).map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
@@ -622,7 +659,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                   isActive 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30' 
                     : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
                 }`}
               >
@@ -882,7 +919,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       )}
 
       {/* TAB 2: POS TERMINAL */}
-      {activeTab === 'pos' && (
+      {activeTab === 'pos' && isUserAdmin && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Product Picker */}
           <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
@@ -1002,7 +1039,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       )}
 
       {/* TAB 3: INVENTORY & STOCK */}
-      {activeTab === 'inventory' && (
+      {activeTab === 'inventory' && isUserAdmin && (
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -1071,7 +1108,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       )}
 
       {/* TAB 4: SUPPLIERS */}
-      {activeTab === 'suppliers' && (
+      {activeTab === 'suppliers' && isUserAdmin && (
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -1108,7 +1145,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       )}
 
       {/* TAB 5: CUSTOMERS */}
-      {activeTab === 'customers' && (
+      {activeTab === 'customers' && isUserAdmin && (
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-3">
             <div>
@@ -1216,7 +1253,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       )}
 
       {/* TAB 6: EXPENSES & INCOME */}
-      {activeTab === 'expenses' && (
+      {activeTab === 'expenses' && isUserAdmin && (
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -1273,7 +1310,7 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
       )}
 
       {/* TAB 7: REPORTS */}
-      {activeTab === 'reports' && (
+      {activeTab === 'reports' && isUserAdmin && (
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
           <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-indigo-600" />
@@ -1312,36 +1349,133 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
         </div>
       )}
 
-      {/* TAB 8: MY ORDERS */}
+      {/* TAB 8: MY ORDERS / STORE ORDERS */}
       {activeTab === 'orders' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
-          <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-indigo-600" />
-            <span>{lang === 'bn' ? 'আমার শপ অর্ডার ইতিহাস' : 'My Store Order History'}</span>
-          </h3>
+        <div className="bg-slate-900/60 border border-white/10 rounded-[2rem] p-6 space-y-6 text-slate-100 shadow-xl">
+          <div className="flex justify-between items-center border-b border-white/5 pb-4 flex-wrap gap-2">
+            <div>
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <Clock className="h-5 w-5 text-indigo-400" />
+                <span>{isUserAdmin ? (lang === 'bn' ? 'কাস্টমারদের শপ অর্ডারসমূহ' : 'Customer Store Orders') : (lang === 'bn' ? 'আমার শপ অর্ডার ইতিহাস' : 'My Store Order History')}</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {lang === 'bn' ? 'অর্ডারের লাইভ ডেলিভারি স্ট্যাটাস, অ্যাড্রেস ও আইডি ট্র্যাকিং' : 'Track live status and delivery timeline for your store orders'}
+              </p>
+            </div>
+            <span className="bg-indigo-500/10 text-indigo-400 font-extrabold text-xs px-3 py-1 rounded-full border border-indigo-500/20">
+              {orders.length} {lang === 'bn' ? 'টি অর্ডার' : 'Total Orders'}
+            </span>
+          </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {orders.length === 0 ? (
-              <p className="text-xs text-slate-400 py-12 text-center">{lang === 'bn' ? 'কোনো অর্ডার করা হয়নি' : 'No store orders placed yet'}</p>
+              <div className="text-center py-16 border border-dashed border-white/10 rounded-3xl space-y-3">
+                <ShoppingBag className="h-10 w-10 text-slate-500 mx-auto" />
+                <p className="text-xs font-bold text-slate-400">{lang === 'bn' ? 'কোনো শপ অর্ডার পাওয়া যায়নি।' : 'No store orders placed yet.'}</p>
+                <button
+                  onClick={() => setActiveTab('browse')}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl transition-all shadow-md cursor-pointer"
+                >
+                  {lang === 'bn' ? 'অনলাইন শপে প্রোডাক্টস দেখুন' : 'Browse Products Now'}
+                </button>
+              </div>
             ) : (
-              orders.map((order, oIdx) => (
-                <div key={`ord-${order.id || 'o'}-${oIdx}`} className="bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
-                      order.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
-                      order.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {order.status}
-                    </span>
-                    <h4 className="text-sm font-black text-slate-900 mt-2">{lang === 'bn' ? order.productTitleBn : order.productTitle}</h4>
-                    <p className="text-xs text-slate-500">Qty: {order.quantity} | Total: ৳{order.totalPrice.toLocaleString()}</p>
+              orders.map((order, oIdx) => {
+                const isPending = order.status === 'Pending';
+                const isApproved = order.status === 'Approved';
+                const isRejected = order.status === 'Rejected';
+
+                return (
+                  <div 
+                    key={`ord-${order.id || 'o'}-${oIdx}`} 
+                    className="bg-slate-950/60 border border-white/10 rounded-3xl p-5 space-y-4 hover:border-indigo-500/30 transition-all"
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-mono text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                            ID: {order.id}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            📅 {new Date(order.date).toLocaleString()}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-black text-white mt-1.5">
+                          {lang === 'bn' ? (order.productTitleBn || order.productTitle) : order.productTitle}
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider border ${
+                          isApproved ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                          isRejected ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' : 
+                          'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse'
+                        }`}>
+                          {isApproved ? (lang === 'bn' ? 'অনুমোদিত / ডেলিভারড' : 'Approved / Delivered') :
+                           isRejected ? (lang === 'bn' ? 'বাতিল' : 'Cancelled') : 
+                           (lang === 'bn' ? 'প্রসেসিং / পন্ডিং' : 'Processing')}
+                        </span>
+
+                        {isUserAdmin && isPending && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleUpdateOrderStatus(order.id, 'Approved')}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleUpdateOrderStatus(order.id, 'Rejected')}
+                              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Order Details Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-900/50 p-3.5 rounded-2xl border border-white/5">
+                      <div>
+                        <span className="text-[9.5px] font-extrabold text-slate-400 uppercase font-mono block">{lang === 'bn' ? 'পরিমাণ' : 'Quantity'}</span>
+                        <span className="font-bold text-slate-200 mt-0.5 block">{order.quantity} Pcs</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-extrabold text-slate-400 uppercase font-mono block">{lang === 'bn' ? 'একক মূল্য' : 'Unit Price'}</span>
+                        <span className="font-mono font-bold text-slate-200 mt-0.5 block">৳{order.price.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-extrabold text-slate-400 uppercase font-mono block">{lang === 'bn' ? 'মোট মূল্য' : 'Total Price'}</span>
+                        <span className="font-mono font-black text-emerald-400 mt-0.5 block">৳{order.totalPrice.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] font-extrabold text-slate-400 uppercase font-mono block">{lang === 'bn' ? 'ডেলিভারি ঠিকানা' : 'Address'}</span>
+                        <span className="font-semibold text-slate-300 mt-0.5 block truncate max-w-[150px]">{order.deliveryAddress || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Order Progress Timeline */}
+                    <div className="pt-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 font-mono">{lang === 'bn' ? 'ডেলিভারি ট্র্যাকিং স্ট্যাটাস:' : 'Delivery Progress Timeline:'}</p>
+                      <div className="grid grid-cols-4 gap-1.5 text-center text-[9px] font-black uppercase font-mono">
+                        <div className={`p-1.5 rounded-xl border ${!isRejected ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/30' : 'bg-white/5 text-slate-500 border-white/5'}`}>
+                          1. Order Placed
+                        </div>
+                        <div className={`p-1.5 rounded-xl border ${isApproved || isPending ? 'bg-amber-600/20 text-amber-300 border-amber-500/30' : 'bg-white/5 text-slate-500 border-white/5'}`}>
+                          2. Processing
+                        </div>
+                        <div className={`p-1.5 rounded-xl border ${isApproved ? 'bg-blue-600/20 text-blue-300 border-blue-500/30' : 'bg-white/5 text-slate-500 border-white/5'}`}>
+                          3. Shipping
+                        </div>
+                        <div className={`p-1.5 rounded-xl border ${isApproved ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-slate-500 border-white/5'}`}>
+                          4. Delivered
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold">{new Date(order.date).toLocaleDateString()}</p>
-                    <p className="text-xs font-mono font-bold text-slate-600">{order.id}</p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -1633,6 +1767,44 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     </div>
                   </div>
 
+                  {/* Payment Method Selection */}
+                  <div className="bg-slate-950/40 border border-white/5 p-4 rounded-3xl space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'পেমেন্ট মেথড সিলেক্ট করুন' : 'Select Payment Method'}</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setClientCartPaymentMethod('Wallet')}
+                        className={`p-3 rounded-2xl border text-xs font-black flex items-center justify-between transition-all cursor-pointer ${
+                          clientCartPaymentMethod === 'Wallet'
+                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 shadow-sm'
+                            : 'bg-slate-950/60 border-white/5 text-slate-400 hover:border-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-emerald-400" />
+                          <span>{lang === 'bn' ? 'ওয়ালেট' : 'Wallet'}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">৳{walletBalance.toLocaleString()}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setClientCartPaymentMethod('COD')}
+                        className={`p-3 rounded-2xl border text-xs font-black flex items-center justify-between transition-all cursor-pointer ${
+                          clientCartPaymentMethod === 'COD'
+                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 shadow-sm'
+                            : 'bg-slate-950/60 border-white/5 text-slate-400 hover:border-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-4 w-4 text-amber-400" />
+                          <span>{lang === 'bn' ? 'ক্যাশ অন ডেলিভারি' : 'Cash on Delivery'}</span>
+                        </div>
+                        <span className="text-[9px] font-mono text-amber-400 font-bold">COD</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Wallet & checkout details */}
                   <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
@@ -1643,10 +1815,10 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                     <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                       <button
                         type="submit"
-                        disabled={isSubmitting || walletBalance < clientCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)}
+                        disabled={isSubmitting || (clientCartPaymentMethod === 'Wallet' && walletBalance < clientCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0))}
                         className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg shadow-indigo-600/20 cursor-pointer active:scale-95 transition-all w-full sm:w-auto text-center"
                       >
-                        {isSubmitting ? (lang === 'bn' ? 'প্রক্রিয়াকরণ হচ্ছে...' : 'Processing...') : (lang === 'bn' ? 'অর্ডার সম্পন্ন করুন' : 'Confirm Order & Pay')}
+                        {isSubmitting ? (lang === 'bn' ? 'প্রক্রিয়াকরণ হচ্ছে...' : 'Processing...') : (lang === 'bn' ? 'অর্ডার সম্পন্ন করুন' : 'Confirm Order')}
                       </button>
                     </div>
                   </div>
@@ -1714,17 +1886,54 @@ export default function StorePanel({ lang, walletBalance }: StorePanelProps) {
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400">{lang === 'bn' ? 'পেমেন্ট মেথড' : 'Payment Method'}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSingleCheckoutPaymentMethod('Wallet')}
+                      className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-between cursor-pointer ${
+                        singleCheckoutPaymentMethod === 'Wallet'
+                          ? 'bg-indigo-50 border-indigo-600 text-indigo-700 font-extrabold'
+                          : 'bg-slate-50 border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1">
+                        <Wallet className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>{lang === 'bn' ? 'ওয়ালেট' : 'Wallet'}</span>
+                      </span>
+                      <span className="text-[9px] font-mono font-bold text-emerald-600">৳{walletBalance.toLocaleString()}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSingleCheckoutPaymentMethod('COD')}
+                      className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-between cursor-pointer ${
+                        singleCheckoutPaymentMethod === 'COD'
+                          ? 'bg-indigo-50 border-indigo-600 text-indigo-700 font-extrabold'
+                          : 'bg-slate-50 border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1">
+                        <Truck className="h-3.5 w-3.5 text-amber-600" />
+                        <span>{lang === 'bn' ? 'ক্যাশ অন ডেলিভারি' : 'COD'}</span>
+                      </span>
+                      <span className="text-[9px] font-mono font-bold text-amber-600">COD</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
                   <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Total Payable</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">{lang === 'bn' ? 'মোট প্রদেয়' : 'Total Payable'}</p>
                     <p className="text-base font-black text-indigo-600">৳{(checkoutProduct.price * quantity).toLocaleString()}</p>
                   </div>
                   <button
                     type="submit"
-                    disabled={isSubmitting || walletBalance < (checkoutProduct.price * quantity)}
+                    disabled={isSubmitting || (singleCheckoutPaymentMethod === 'Wallet' && walletBalance < (checkoutProduct.price * quantity))}
                     className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl text-xs font-black shadow-md cursor-pointer active:scale-95"
                   >
-                    {isSubmitting ? 'Processing...' : 'Confirm Order'}
+                    {isSubmitting ? (lang === 'bn' ? 'প্রসেসিং...' : 'Processing...') : (lang === 'bn' ? 'অর্ডার কনফার্ম করুন' : 'Confirm Order')}
                   </button>
                 </div>
               </form>
