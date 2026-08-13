@@ -834,8 +834,15 @@ export default function AuthPanel({ lang, onSuccess }: AuthPanelProps) {
 
       {/* Top Header Logo Banner */}
       <div className="px-6 pt-10 pb-4 text-center relative z-10">
-        <div className="mx-auto w-14 h-14 bg-gradient-to-tr from-pink-500 via-rose-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/30 mb-3 border border-white/20">
-          <Sparkles className="h-7 w-7 text-white" />
+        <div className="mx-auto w-16 h-16 rounded-2xl p-1 bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 shadow-xl shadow-rose-500/30 mb-3 border border-white/30 flex items-center justify-center overflow-hidden">
+          <img
+            src="/nbp-logo.jpg"
+            alt="NBP Logo"
+            className="w-full h-full object-cover rounded-xl"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = 'https://i.ibb.co/sdsHgDkJ/NBP-Final-Logo.jpg';
+            }}
+          />
         </div>
         <h1 className="text-xl font-black tracking-tight text-white mb-1">
           {t.appName}

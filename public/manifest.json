@@ -4,6 +4,12 @@
   "description": "Nihad Business Point - গ্যারান্টিড সেবা, ইনস্ট্যান্ট মোবাইল রিচার্জ, ড্রাইভ অফার, বিল পে ও ডিজিটাল ওয়ালেট।",
   "icons": [
     {
+      "src": "/nbp-logo.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
       "src": "/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
