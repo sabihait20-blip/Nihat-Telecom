@@ -4,17 +4,18 @@ import {
   Smartphone, Wifi, Landmark, Eye, History, Heart,
   Bell, Check, Info, Sparkles, X, ChevronRight, HelpCircle, ArrowRight,
   Monitor, LogOut, Globe, Plus, Home, Package, User, Send, Wallet, ShoppingBag, Coins, Percent, Gift, MessageSquare,
-  Calculator, CreditCard, AlertTriangle, ShieldCheck, Phone, PhoneOff, PhoneCall, BookOpen
+  Calculator, CreditCard, AlertTriangle, ShieldCheck, Phone, PhoneOff, PhoneCall, BookOpen, RefreshCw, ArrowLeftRight
 } from 'lucide-react';
 
 // Data types & assets
-import { AppTab, Language, Operator, Transaction, FavoriteContact, RechargePackage, PromoBanner, BillProvider } from './types';
+import { AppTab, Language, Operator, Transaction, FavoriteContact, RechargePackage, PromoBanner, BillProvider, PhoneListing } from './types';
 import { TRANSLATIONS } from './data/translations';
 import {
   OPERATORS,
   POPULAR_PACKAGES,
   BILL_PROVIDERS,
 } from './data/mockData';
+import { INITIAL_PHONE_LISTINGS } from './data/mockPhoneListings';
 
 // Firestore helpers
 import {
@@ -57,6 +58,7 @@ import VipMoneyRequestModal from './components/VipMoneyRequestModal';
 import TrafficFineModal from './components/TrafficFineModal';
 import TaliKhataModal from './components/TaliKhataModal';
 import PwaInstallModal from './components/PwaInstallModal';
+import PhoneExchangeModal from './components/PhoneExchangeModal';
 
 const ADMIN_EMAILS = [
   'musicnrs2020@gmail.com',
@@ -178,6 +180,20 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Sync phone exchange listings from Firestore
+  useEffect(() => {
+    const q = query(collection(db, 'phone_exchange_listings'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const items: PhoneListing[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhoneListing));
+        setPhoneListings(items);
+      }
+    }, (err) => {
+      console.warn("Phone listings firestore snapshot error:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Modal triggers
   const [isRechargeOpen, setIsRechargeOpen] = useState(false);
   const [isScratchCardOpen, setIsScratchCardOpen] = useState(false);
@@ -195,6 +211,8 @@ export default function App() {
   const [isVipMoneyRequestOpen, setIsVipMoneyRequestOpen] = useState(false);
   const [isTrafficFineOpen, setIsTrafficFineOpen] = useState(false);
   const [isTaliKhataOpen, setIsTaliKhataOpen] = useState(false);
+  const [isPhoneExchangeOpen, setIsPhoneExchangeOpen] = useState(false);
+  const [phoneListings, setPhoneListings] = useState<PhoneListing[]>(INITIAL_PHONE_LISTINGS);
 
   // Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -1377,6 +1395,33 @@ export default function App() {
     }
   };
 
+  const handleCreatePhoneListing = async (newListing: Omit<PhoneListing, 'id' | 'createdAt' | 'status'>) => {
+    const newId = `phone-${Date.now()}`;
+    const fullListing: PhoneListing = {
+      ...newListing,
+      id: newId,
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      status: 'Active'
+    };
+
+    setPhoneListings(prev => [fullListing, ...prev]);
+
+    try {
+      await setDoc(doc(db, 'phone_exchange_listings', newId), fullListing);
+    } catch (err) {
+      console.error("Error saving phone listing: ", err);
+    }
+  };
+
+  const handleDeletePhoneListing = async (id: string) => {
+    setPhoneListings(prev => prev.filter(item => item.id !== id));
+    try {
+      await deleteDoc(doc(db, 'phone_exchange_listings', id));
+    } catch (err) {
+      console.error("Error deleting phone listing: ", err);
+    }
+  };
+
   // Home Dashboard quick shortcut grids restored with Glassmorphic Pink & Orange design
   const gridServices = [
     {
@@ -1389,6 +1434,13 @@ export default function App() {
         setPrefilledAmt(null);
         setIsRechargeOpen(true);
       }
+    },
+    {
+      id: 'phone_exchange',
+      title: lang === 'bn' ? 'ফোন এক্সচেঞ্জ' : 'Phone Exchange',
+      icon: RefreshCw,
+      color: 'bg-gradient-to-br from-pink-500/25 via-rose-500/25 to-amber-500/25 text-rose-300 border border-rose-400/50 shadow-md shadow-rose-500/30',
+      action: () => setIsPhoneExchangeOpen(true)
     },
     {
       id: 'scratch_card',
@@ -2205,6 +2257,21 @@ export default function App() {
               userId={currentUser?.uid || ''}
               userName={currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User'}
               userPhone={currentUser?.phoneNumber || ''}
+            />
+          )}
+
+          {/* PHONE EXCHANGE & BUY/SELL MARKETPLACE MODAL */}
+          {isPhoneExchangeOpen && (
+            <PhoneExchangeModal
+              isOpen={isPhoneExchangeOpen}
+              onClose={() => setIsPhoneExchangeOpen(false)}
+              lang={lang}
+              listings={phoneListings}
+              onCreateListing={handleCreatePhoneListing}
+              onDeleteListing={handleDeletePhoneListing}
+              currentUserEmail={currentUser?.email || ''}
+              currentUserName={currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User'}
+              currentUserPhone={currentUser?.phoneNumber || ''}
             />
           )}
 

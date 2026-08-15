@@ -207,3 +207,37 @@ export interface POSCartItem {
   discount: number;
 }
 
+export interface PhoneListing {
+  id: string;
+  title: string;
+  brand: string;
+  model: string;
+  ram: string;
+  rom: string;
+  batteryHealth: string;
+  camera: string;
+  processor: string;
+  display: string;
+  sim: string;
+  purchaseDate: string;
+  usageDuration: string;
+  condition: 'Mint / Like New' | 'Good (Minor Marks)' | 'Fair / Has Scratches' | 'Needs Screen Repair';
+  listingType: 'Sell' | 'Exchange' | 'Both';
+  expectedPrice: number;
+  swapTarget?: string;
+  cashTopup?: string;
+  reasonForSelling: string;
+  includedAccessories: string[];
+  images: string[];
+  sellerName: string;
+  sellerPhone: string;
+  sellerWhatsapp: string;
+  sellerLocation: string;
+  sellerEmail: string;
+  createdAt: string;
+  status: 'Active' | 'Sold' | 'Exchanged';
+  isVerifiedSeller?: boolean;
+  aiPriceRating?: string;
+  userId?: string;
+}
+
