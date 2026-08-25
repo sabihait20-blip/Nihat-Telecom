@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Landmark, Smartphone, Check, ShieldCheck, 
   HelpCircle, Sparkles, RefreshCw, AlertCircle, ArrowUpRight,
-  Users, ArrowLeft, Search
+  Users, ArrowLeft, Search, Gauge, Calendar, Zap, AlertTriangle
 } from 'lucide-react';
-import { Language, FavoriteContact } from '../types';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { Language, FavoriteContact, Transaction } from '../types';
+import { doc, onSnapshot, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import { calculateTransferLimitStats, validateTransferLimit, DAILY_TRANSFER_LIMIT, MONTHLY_TRANSFER_LIMIT } from '../utils/transferLimits';
 
 interface TransferModalProps {
   lang: Language;
@@ -25,11 +26,21 @@ interface TransferModalProps {
   ) => void | Promise<void>;
   favorites?: FavoriteContact[];
   currentUser?: any;
+  transactions?: Transaction[];
 }
 
 type TransferMethod = 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'NIHAD BUSINESS POINT Wallet (User)';
 
-export default function TransferModal({ lang, isOpen, onClose, currentBalance, onSuccess, favorites = [], currentUser }: TransferModalProps) {
+export default function TransferModal({ 
+  lang, 
+  isOpen, 
+  onClose, 
+  currentBalance, 
+  onSuccess, 
+  favorites = [], 
+  currentUser,
+  transactions = []
+}: TransferModalProps) {
   const [method, setMethod] = useState<TransferMethod>('bKash');
   const [amountInput, setAmountInput] = useState<string>('');
   const [targetNumber, setTargetNumber] = useState<string>('');
@@ -40,6 +51,9 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
   const [validationError, setValidationError] = useState<string>('');
   const [showSuccessOverlay, setShowSuccessOverlay] = useState<boolean>(false);
 
+  // User transactions for live limit calculation if not provided
+  const [liveUserTx, setLiveUserTx] = useState<Transaction[]>(transactions);
+
   // Contact book state managers
   const [showContactBook, setShowContactBook] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
@@ -49,6 +63,28 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
     minTransfer: 50,
     maxTransfer: 25000,
   });
+
+  // Calculate live transfer limits
+  const limitStats = useMemo(() => {
+    const activeList = liveUserTx.length > 0 ? liveUserTx : transactions;
+    return calculateTransferLimitStats(activeList);
+  }, [liveUserTx, transactions]);
+
+  useEffect(() => {
+    if (!isOpen || !currentUser?.uid) return;
+    const historyRef = collection(db, 'users', currentUser.uid, 'transactions');
+    const q = query(historyRef, orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: Transaction[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id } as Transaction);
+      });
+      setLiveUserTx(list);
+    }, (error) => {
+      console.error("Error loading user transactions for limits: ", error);
+    });
+    return () => unsubscribe();
+  }, [isOpen, currentUser?.uid]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -121,6 +157,13 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
 
     if (amt > currentBalance) {
       setValidationError(lang === 'bn' ? 'দুঃখিত, আপনার ওয়ালেট ব্যালেন্স অপর্যাপ্ত!' : 'Sorry, your wallet balance is insufficient.');
+      return;
+    }
+
+    // Strict Daily & Monthly Limit Enforcement
+    const limitCheck = validateTransferLimit(amt, limitStats, lang);
+    if (!limitCheck.allowed) {
+      setValidationError(limitCheck.errorMessage || (lang === 'bn' ? 'ট্রান্সফার লিমিট অতিক্রম করেছে!' : 'Transfer limit exceeded!'));
       return;
     }
 
@@ -238,15 +281,96 @@ export default function TransferModal({ lang, isOpen, onClose, currentBalance, o
           </button>
         </div>
 
-        {/* Available Wallet Balance Pill */}
-        <div className="mb-5 bg-violet-50/50 border border-violet-100/50 p-3 rounded-2xl flex justify-between items-center text-xs font-bold text-violet-800">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-violet-600" />
-            {labels.currBal}
-          </span>
-          <span className="text-[10px] bg-violet-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold font-mono">
-            SECURE
-          </span>
+        {/* Available Wallet Balance Pill & Transfer Limits Quota Widget */}
+        <div className="mb-5 space-y-3">
+          <div className="bg-violet-50/50 border border-violet-100/50 p-3 rounded-2xl flex justify-between items-center text-xs font-bold text-violet-800">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-violet-600" />
+              {labels.currBal}
+            </span>
+            <span className="text-[10px] bg-violet-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold font-mono">
+              SECURE
+            </span>
+          </div>
+
+          {/* Transfer Limits Tracker Card */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Gauge className="h-4 w-4 text-indigo-600" />
+                <span className="text-[11px] font-black text-slate-800">
+                  {lang === 'bn' ? 'আপনার ট্রান্সফার লিমিট ও ব্যবহার' : 'Your Transfer Limit & Quota'}
+                </span>
+              </div>
+              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full font-mono">
+                {lang === 'bn' ? 'স্বয়ংক্রিয় সীমা' : 'Auto Policy'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Daily Limit Tracker */}
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-extrabold text-slate-700 flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-amber-500 fill-amber-500" />
+                    {lang === 'bn' ? 'দৈনিক লিমিট' : 'Daily Limit'}
+                  </span>
+                  <span className="font-mono font-black text-slate-900">৳30,000</span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      limitStats.dailyPercentage >= 100 ? 'bg-rose-500' :
+                      limitStats.dailyPercentage >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, limitStats.dailyPercentage)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] font-medium text-slate-500 pt-0.5">
+                  <span>{lang === 'bn' ? 'ব্যবহৃত:' : 'Used:'} <strong className="text-slate-800 font-mono">৳{limitStats.dailySpent.toLocaleString()}</strong></span>
+                  <span>{lang === 'bn' ? 'অবশিষ্ট:' : 'Left:'} <strong className={`font-mono ${limitStats.dailyRemaining === 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}`}>৳{limitStats.dailyRemaining.toLocaleString()}</strong></span>
+                </div>
+              </div>
+
+              {/* Monthly Limit Tracker */}
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-extrabold text-slate-700 flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-blue-500" />
+                    {lang === 'bn' ? 'মাসিক লিমিট' : 'Monthly Limit'}
+                  </span>
+                  <span className="font-mono font-black text-slate-900">৳3,00,000</span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      limitStats.monthlyPercentage >= 100 ? 'bg-rose-500' :
+                      limitStats.monthlyPercentage >= 80 ? 'bg-amber-500' : 'bg-blue-500'
+                    }`}
+                    style={{ width: `${Math.min(100, limitStats.monthlyPercentage)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] font-medium text-slate-500 pt-0.5">
+                  <span>{lang === 'bn' ? 'ব্যবহৃত:' : 'Used:'} <strong className="text-slate-800 font-mono">৳{limitStats.monthlySpent.toLocaleString()}</strong></span>
+                  <span>{lang === 'bn' ? 'অবশিষ্ট:' : 'Left:'} <strong className={`font-mono ${limitStats.monthlyRemaining === 0 ? 'text-rose-600 font-bold' : 'text-blue-600 font-bold'}`}>৳{limitStats.monthlyRemaining.toLocaleString()}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            {/* If limit is reached or entered amount exceeds limit */}
+            {amountInput && !isNaN(parseFloat(amountInput)) && (parseFloat(amountInput) > limitStats.dailyRemaining || parseFloat(amountInput) > limitStats.monthlyRemaining) && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                <span>
+                  {parseFloat(amountInput) > limitStats.dailyRemaining
+                    ? (lang === 'bn' ? `আজ আর সর্বোচ্চ ৳${limitStats.dailyRemaining.toLocaleString()} টাকা পাঠাতে পারবেন (দৈনিক সীমা ৩০,০০০)।` : `Exceeds daily remaining quota of ৳${limitStats.dailyRemaining.toLocaleString()} (Daily limit ৳30,000).`)
+                    : (lang === 'bn' ? `এই মাসে আর সর্বোচ্চ ৳${limitStats.monthlyRemaining.toLocaleString()} টাকা পাঠাতে পারবেন (মাসিক সীমা ৩,০০,০০০)।` : `Exceeds monthly remaining quota of ৳${limitStats.monthlyRemaining.toLocaleString()} (Monthly limit ৳300,000).`)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Form Element */}

@@ -58,6 +58,7 @@ import VipMoneyRequestModal from './components/VipMoneyRequestModal';
 import TrafficFineModal from './components/TrafficFineModal';
 import TaliKhataModal from './components/TaliKhataModal';
 import PwaInstallModal from './components/PwaInstallModal';
+import { calculateTransferLimitStats, validateTransferLimit } from './utils/transferLimits';
 import PhoneExchangeModal from './components/PhoneExchangeModal';
 
 const ADMIN_EMAILS = [
@@ -1121,6 +1122,14 @@ export default function App() {
       return;
     }
 
+    // Daily & Monthly Transfer Limits Enforcement (৳30,000 Daily & ৳300,000 Monthly)
+    const limitStats = calculateTransferLimitStats(transactions);
+    const limitValidation = validateTransferLimit(amount, limitStats, lang);
+    if (!limitValidation.allowed) {
+      alert(limitValidation.errorMessage);
+      return;
+    }
+
     if (method === 'NIHAD BUSINESS POINT Wallet (User)') {
       if (!recipientUid) {
         alert(lang === 'bn' ? 'গ্রাহক তথ্য পাওয়া যায়নি!' : 'Recipient info not found!');
@@ -1884,6 +1893,7 @@ export default function App() {
                     onVipMoneyRequestClick={() => setIsVipMoneyRequestOpen(true)}
                     onInstallPwa={handleInstallPwa}
                     isPwaInstalled={isPwaInstalled}
+                    transactions={transactions}
                   />
                 </div>
               )}
@@ -2103,6 +2113,7 @@ export default function App() {
               onVipMoneyRequestClick={() => setIsVipMoneyRequestOpen(true)}
               onInstallPwa={handleInstallPwa}
               isPwaInstalled={isPwaInstalled}
+              transactions={transactions}
             />
           )}
         </div>
@@ -2172,6 +2183,7 @@ export default function App() {
               onSuccess={handleTransferSuccess}
               favorites={favorites}
               currentUser={currentUser}
+              transactions={transactions}
             />
           )}
 
@@ -2623,6 +2635,25 @@ export default function App() {
           isPwaInstalled={isPwaInstalled}
           onAppInstalled={() => setIsPwaInstalled(true)}
         />
+
+        {/* Floating Return to Admin Mode Pill if currently in user view */}
+        {isUserAdmin && adminUserViewMode === 'user' && (
+          <div className="fixed bottom-20 left-4 right-4 z-40 flex items-center justify-between gap-2 p-2 px-3.5 bg-slate-950/95 border border-pink-500/50 rounded-2xl shadow-2xl backdrop-blur-xl animate-fade-in">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span className="text-[11px] font-mono font-bold text-slate-200">
+                {lang === 'bn' ? '👑 এডমিন ইউজার ভিউ' : '👑 Admin User View'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminUserViewMode('admin')}
+              className="px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold text-[11px] rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+            >
+              <span>{lang === 'bn' ? 'এডমিন প্যানেলে ফিরুন' : 'Back to Admin'}</span>
+            </button>
+          </div>
+        )}
 
       </div>
     );

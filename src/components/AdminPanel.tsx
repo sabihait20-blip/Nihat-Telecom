@@ -5,9 +5,12 @@ import {
   Smartphone, CreditCard, Layers, Sparkles, RefreshCw, AlertCircle, FileText, Gift, Send,
   LogOut, User, Settings, Copy, MessageSquare, Globe, ShoppingBag, Volume2, Maximize, Minimize,
   Eye, Download, Crown, Phone, Zap, PhoneCall, PhoneOff, Mic, MicOff, VolumeX, Image, Play, Pause, Square, Radio,
-  History, Trophy, TrendingUp, Search, Filter, Coins, Bell
+  History, Trophy, TrendingUp, Search, Filter, Coins, Bell,
+  Wrench, Power, Clock, Lock, KeyRound, CheckCircle2, Megaphone, Moon, ArrowRight,
+  Gauge, Calendar, ArrowUpRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { calculateTransferLimitStats, DAILY_TRANSFER_LIMIT, MONTHLY_TRANSFER_LIMIT } from '../utils/transferLimits';
 
 // Audio Player Component for Admin Support Panel
 function AdminAudioNotePlayer({ audioUrl, duration, isAdmin }: { audioUrl: string; duration?: number; isAdmin?: boolean }) {
@@ -382,6 +385,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false, onToggleUserView }: AdminPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'requests' | 'offers' | 'banners' | 'billers' | 'users' | 'user_transactions' | 'settings' | 'support' | 'products' | 'orders' | 'sim_orders' | 'scratch' | 'kyc' | 'fines'>('overview');
+  const [maintenancePreviewLang, setMaintenancePreviewLang] = useState<Language>(lang);
   const [trafficFines, setTrafficFines] = useState<any[]>([]);
   const [editingFineId, setEditingFineId] = useState<string | null>(null);
   const [verifyingFineId, setVerifyingFineId] = useState<string | null>(null);
@@ -521,6 +525,18 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
   // Dynamic App Settings State
   const [settingsForm, setSettingsForm] = useState({
+    isSiteOnline: true,
+    maintenanceTitleBn: 'সাইট সাময়িক রক্ষণাবেক্ষণে রয়েছে',
+    maintenanceTitleEn: 'System Under Maintenance',
+    maintenanceMessageBn: 'আমাদের সার্ভার আপগ্রেড ও রক্ষণাবেক্ষণের কাজ চলছে। খুব শীঘ্রই সকল সেবা পুনরায় সচল হবে। সাময়িক অসুবিধার জন্য আমরা আন্তরিকভাবে দুঃখিত।',
+    maintenanceMessageEn: 'We are currently performing scheduled maintenance and system upgrades. All services will be back online shortly. Thank you for your patience.',
+    maintenanceModeType: 'maintenance' as 'maintenance' | 'emergency' | 'closed' | 'custom',
+    estimatedReturnTime: '',
+    showCountdownTimer: false,
+    allowEmergencyContact: true,
+    emergencyPhone: '01970250988',
+    emergencyWhatsapp: 'https://wa.me/8801970250988',
+    maintenanceBadgeText: 'সিস্টেম আপগ্রেড চলমান',
     agentBkashNumber: '01970250988',
     agentNagadNumber: '01970250988',
     agentRocketNumber: '019702509883',
@@ -554,7 +570,22 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
     const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        if (data.isSiteOnline === false) {
+          setDoc(settingsDocRef, { isSiteOnline: true }, { merge: true }).catch(console.error);
+        }
         setSettingsForm({
+          isSiteOnline: true,
+          maintenanceTitleBn: data.maintenanceTitleBn || 'সাইট সাময়িক রক্ষণাবেক্ষণে রয়েছে',
+          maintenanceTitleEn: data.maintenanceTitleEn || 'System Under Maintenance',
+          maintenanceMessageBn: data.maintenanceMessageBn || 'আমাদের সার্ভার আপগ্রেড ও রক্ষণাবেক্ষণের কাজ চলছে। খুব শীঘ্রই সকল সেবা পুনরায় সচল হবে। সাময়িক অসুবিধার জন্য আমরা আন্তরিকভাবে দুঃখিত।',
+          maintenanceMessageEn: data.maintenanceMessageEn || 'We are currently performing scheduled maintenance and system upgrades. All services will be back online shortly. Thank you for your patience.',
+          maintenanceModeType: data.maintenanceModeType || 'maintenance',
+          estimatedReturnTime: data.estimatedReturnTime || '',
+          showCountdownTimer: typeof data.showCountdownTimer === 'boolean' ? data.showCountdownTimer : false,
+          allowEmergencyContact: typeof data.allowEmergencyContact === 'boolean' ? data.allowEmergencyContact : true,
+          emergencyPhone: data.emergencyPhone || data.helplineNumber || '01970250988',
+          emergencyWhatsapp: data.emergencyWhatsapp || data.whatsappUrl || 'https://wa.me/8801970250988',
+          maintenanceBadgeText: data.maintenanceBadgeText || 'সিস্টেম আপগ্রেড চলমান',
           agentBkashNumber: data.agentBkashNumber || data.bkashNumber || '01970250988',
           agentNagadNumber: data.agentNagadNumber || data.nagadNumber || '01970250988',
           agentRocketNumber: data.agentRocketNumber || data.rocketNumber || '019702509883',
@@ -668,6 +699,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
   const [selectedUserBalance, setSelectedUserBalance] = useState<number | null>(null);
   const [selectedUserHistory, setSelectedUserHistory] = useState<Transaction[]>([]);
   const [loadingUserHistory, setLoadingUserHistory] = useState(false);
+
+  // Selected User's Live Daily (30k) and Monthly (3 lakh) Transfer Limits Tracking
+  const selectedUserLimitStats = useMemo(() => {
+    return calculateTransferLimitStats(selectedUserHistory);
+  }, [selectedUserHistory]);
   const [userBalanceAdjustValue, setUserBalanceAdjustValue] = useState('');
   const [userBalanceAdjustType, setUserBalanceAdjustType] = useState<'increment' | 'decrement' | 'set'>('increment');
   const [userBalanceAdjustReason, setUserBalanceAdjustReason] = useState('');
@@ -3372,6 +3408,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
 
                   {/* 1-Click Command Shortcuts */}
                   <div className="flex flex-wrap items-center gap-2">
+                    <div className="px-3 py-1 rounded-xl text-[10px] font-mono font-black border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 flex items-center gap-1.5">
+                      <Power className="h-3 w-3 text-emerald-400" />
+                      <span>{lang === 'bn' ? '🟢 সিস্টেম অ্যাক্টিভ' : '🟢 System Active'}</span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => setActiveSubTab('requests')}
@@ -5718,6 +5759,130 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                       </div>
                       <div className="p-2.5 bg-blue-600/20 border border-blue-500/30 rounded-2xl text-blue-400 shrink-0">
                         <CreditCard className="h-6 w-6" />
+                      </div>
+                    </div>
+
+                    {/* USER TRANSFER LIMIT & QUOTA MONITORING SYSTEM (Daily ৳30k / Monthly ৳3 Lakh) */}
+                    <div className="bg-slate-900/60 border border-violet-500/20 rounded-3xl p-4 space-y-3.5 shadow-lg shadow-violet-950/20">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-violet-500/20 text-violet-400 rounded-xl border border-violet-500/30">
+                            <Gauge className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10.5px] font-black text-white block uppercase tracking-wider font-mono flex items-center gap-1.5">
+                              <span>{lang === 'bn' ? 'ট্রান্সফার লিমিট ও ইউজেস কোটা' : 'Transfer Limits & Quota Usage'}</span>
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              {lang === 'bn' ? 'দৈনিক ৩০,০০০ টাকা ও মাসিক ৩,০০,০০০ টাকা অটো-পলিসি' : 'Daily ৳30,000 & Monthly ৳300,000 Auto Policy'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-mono font-black text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 rounded-full">
+                          {lang === 'bn' ? 'লাইভ ট্র্যাকার' : 'Live Policy'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Daily Transfer Limit Card */}
+                        <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-3 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold text-amber-300 flex items-center gap-1">
+                              <Zap className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                              {lang === 'bn' ? 'দৈনিক ট্রান্সফার সীমা' : 'Daily Transfer Quota'}
+                            </span>
+                            <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              selectedUserLimitStats.isDailyLimitExceeded
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                : selectedUserLimitStats.dailyPercentage >= 80
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            }`}>
+                              {selectedUserLimitStats.isDailyLimitExceeded
+                                ? (lang === 'bn' ? 'লিমিট শেষ' : 'Exceeded')
+                                : (lang === 'bn' ? 'স্বাভাবিক' : 'Normal')}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-slate-200">
+                            <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                              <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider block">{lang === 'bn' ? 'আজকের ব্যয়' : 'Spent Today'}</span>
+                              <span className="text-white font-mono font-black text-xs">৳{selectedUserLimitStats.dailySpent.toLocaleString()}</span>
+                            </div>
+                            <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                              <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider block">{lang === 'bn' ? 'আজকের অবশিষ্ট' : 'Remaining'}</span>
+                              <span className={`font-mono font-black text-xs ${selectedUserLimitStats.dailyRemaining === 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                ৳{selectedUserLimitStats.dailyRemaining.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[8.5px] font-bold text-slate-400">
+                              <span>{lang === 'bn' ? 'ব্যবহৃত:' : 'Used:'} {selectedUserLimitStats.dailyPercentage}% ({selectedUserLimitStats.todayCount} টি লেনদেন)</span>
+                              <span className="font-mono text-slate-300">সর্বোচ্চ ৳30,000</span>
+                            </div>
+                            <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  selectedUserLimitStats.dailyPercentage >= 100 ? 'bg-rose-500' :
+                                  selectedUserLimitStats.dailyPercentage >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min(100, selectedUserLimitStats.dailyPercentage)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Monthly Transfer Limit Card */}
+                        <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-3 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold text-blue-300 flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5 text-blue-400" />
+                              {lang === 'bn' ? 'মাসিক ট্রান্সফার সীমা' : 'Monthly Transfer Quota'}
+                            </span>
+                            <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              selectedUserLimitStats.isMonthlyLimitExceeded
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                : selectedUserLimitStats.monthlyPercentage >= 80
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                            }`}>
+                              {selectedUserLimitStats.isMonthlyLimitExceeded
+                                ? (lang === 'bn' ? 'লিমিট শেষ' : 'Exceeded')
+                                : (lang === 'bn' ? 'স্বাভাবিক' : 'Normal')}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-slate-200">
+                            <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                              <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider block">{lang === 'bn' ? 'মাসের মোট ব্যয়' : 'Spent This Month'}</span>
+                              <span className="text-white font-mono font-black text-xs">৳{selectedUserLimitStats.monthlySpent.toLocaleString()}</span>
+                            </div>
+                            <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                              <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider block">{lang === 'bn' ? 'মাসের অবশিষ্ট' : 'Remaining'}</span>
+                              <span className={`font-mono font-black text-xs ${selectedUserLimitStats.monthlyRemaining === 0 ? 'text-rose-400' : 'text-blue-400'}`}>
+                                ৳{selectedUserLimitStats.monthlyRemaining.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[8.5px] font-bold text-slate-400">
+                              <span>{lang === 'bn' ? 'ব্যবহৃত:' : 'Used:'} {selectedUserLimitStats.monthlyPercentage}% ({selectedUserLimitStats.monthCount} টি লেনদেন)</span>
+                              <span className="font-mono text-slate-300">সর্বোচ্চ ৳3,00,000</span>
+                            </div>
+                            <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  selectedUserLimitStats.monthlyPercentage >= 100 ? 'bg-rose-500' :
+                                  selectedUserLimitStats.monthlyPercentage >= 80 ? 'bg-amber-500' : 'bg-blue-500'
+                                }`}
+                                style={{ width: `${Math.min(100, selectedUserLimitStats.monthlyPercentage)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 

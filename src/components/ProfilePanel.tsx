@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   User, Shield, Phone, BellRing, Info, LogOut, ChevronRight,
-  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift, Crown, Coins, Smartphone, Download
+  Sparkles, ExternalLink, Globe, HelpCircle, Fingerprint, Key, ShieldCheck, Check, X, Wallet, RefreshCw, Camera, Gift, Crown, Coins, Smartphone, Download, Gauge, Calendar, Zap
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, Transaction } from '../types';
 import { TRANSLATIONS } from '../data/translations';
 import { auth, db } from '../firebase';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { calculateTransferLimitStats, DAILY_TRANSFER_LIMIT, MONTHLY_TRANSFER_LIMIT } from '../utils/transferLimits';
 
 interface ProfilePanelProps {
   lang: Language;
@@ -24,6 +25,7 @@ interface ProfilePanelProps {
   onVipMoneyRequestClick?: () => void;
   onInstallPwa?: () => void;
   isPwaInstalled?: boolean;
+  transactions?: Transaction[];
 }
 
 export default function ProfilePanel({
@@ -41,11 +43,37 @@ export default function ProfilePanel({
   onVipMoneyRequestClick,
   onInstallPwa,
   isPwaInstalled,
+  transactions = [],
 }: ProfilePanelProps) {
   const t = TRANSLATIONS[lang];
 
   const currentUser = auth.currentUser;
   const kycStatus = userData?.kycStatus || 'not_verified';
+
+  // Live transactions if not provided
+  const [liveUserTx, setLiveUserTx] = useState<Transaction[]>(transactions);
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const historyRef = collection(db, 'users', currentUser.uid, 'transactions');
+    const q = query(historyRef, orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: Transaction[] = [];
+      snapshot.forEach((snap) => {
+        list.push({ ...snap.data(), id: snap.id } as Transaction);
+      });
+      setLiveUserTx(list);
+    }, (error) => {
+      console.error("Error loading user transactions in profile: ", error);
+    });
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
+  const limitStats = useMemo(() => {
+    const activeList = liveUserTx.length > 0 ? liveUserTx : transactions;
+    return calculateTransferLimitStats(activeList);
+  }, [liveUserTx, transactions]);
+
   const userInitials = currentUser?.displayName
     ? currentUser.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : currentUser?.email
@@ -384,6 +412,84 @@ export default function ProfilePanel({
             </div>
           </div>
         )}
+      </div>
+
+      {/* User Transfer Limits & Quota Information Card */}
+      <div className="bg-[#240d35]/80 backdrop-blur-xl border border-violet-500/30 rounded-2xl p-4 shadow-xl shadow-pink-950/30 text-white space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-violet-500/20 text-violet-300 rounded-xl border border-violet-500/30">
+              <Gauge className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-white flex items-center gap-1.5">
+                <span>{lang === 'bn' ? 'ট্রান্সফার সীমা ও কোটা' : 'Transfer Limits & Quota'}</span>
+              </h4>
+              <p className="text-[9px] font-bold text-violet-300">
+                {lang === 'bn' ? 'দৈনিক ৩০ হাজার ও মাসিক ৩ লাখ টাকা সীমা' : 'Daily ৳30,000 & Monthly ৳300,000 Policy'}
+              </p>
+            </div>
+          </div>
+          <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
+            {lang === 'bn' ? 'সক্রিয় লিমিট' : 'Active Quota'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Daily Limit */}
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl space-y-2">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-extrabold text-slate-300 flex items-center gap-1">
+                <Zap className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                {lang === 'bn' ? 'দৈনিক ট্রান্সফার লিমিট' : 'Daily Transfer Limit'}
+              </span>
+              <span className="font-mono font-black text-amber-400">৳30,000</span>
+            </div>
+            <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  limitStats.dailyPercentage >= 100 ? 'bg-rose-500' :
+                  limitStats.dailyPercentage >= 80 ? 'bg-amber-500' : 'bg-emerald-400'
+                }`}
+                style={{ width: `${Math.min(100, limitStats.dailyPercentage)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[9.5px] font-medium text-slate-400">
+              <span>{lang === 'bn' ? 'আজকের খরচ:' : 'Used:'} <strong className="text-white font-mono">৳{limitStats.dailySpent.toLocaleString()}</strong></span>
+              <span>{lang === 'bn' ? 'অবশিষ্ট:' : 'Left:'} <strong className={`font-mono ${limitStats.dailyRemaining === 0 ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}`}>৳{limitStats.dailyRemaining.toLocaleString()}</strong></span>
+            </div>
+          </div>
+
+          {/* Monthly Limit */}
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl space-y-2">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-extrabold text-slate-300 flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5 text-blue-400" />
+                {lang === 'bn' ? 'মাসিক ট্রান্সফার লিমিট' : 'Monthly Transfer Limit'}
+              </span>
+              <span className="font-mono font-black text-blue-400">৳3,00,000</span>
+            </div>
+            <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  limitStats.monthlyPercentage >= 100 ? 'bg-rose-500' :
+                  limitStats.monthlyPercentage >= 80 ? 'bg-amber-500' : 'bg-blue-400'
+                }`}
+                style={{ width: `${Math.min(100, limitStats.monthlyPercentage)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[9.5px] font-medium text-slate-400">
+              <span>{lang === 'bn' ? 'মাসের খরচ:' : 'Used:'} <strong className="text-white font-mono">৳{limitStats.monthlySpent.toLocaleString()}</strong></span>
+              <span>{lang === 'bn' ? 'অবশিষ্ট:' : 'Left:'} <strong className={`font-mono ${limitStats.monthlyRemaining === 0 ? 'text-rose-400 font-bold' : 'text-blue-400 font-bold'}`}>৳{limitStats.monthlyRemaining.toLocaleString()}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[9px] text-slate-400 font-medium">
+          {lang === 'bn'
+            ? '💡 দৈনিক সীমা প্রতিদিন রাত ১২:০০ টায় স্বয়ংক্রিয়ভাবে রিসেট হয় এবং মাসিক সীমা প্রতি মাসের শুরুতে রিসেট হয়।'
+            : '💡 Daily transfer limits automatically reset at 12:00 AM midnight, and monthly limits reset on the 1st of each month.'}
+        </p>
       </div>
 
       {/* SYSTEM 6: Loyalty Reward Points & Wallet Cashback Redeem Card */}

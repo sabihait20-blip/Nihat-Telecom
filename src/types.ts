@@ -241,3 +241,47 @@ export interface PhoneListing {
   userId?: string;
 }
 
+export type MaintenanceModeType = 'maintenance' | 'emergency' | 'closed' | 'custom';
+
+export interface AppSiteConfig {
+  isSiteOnline?: boolean;
+  maintenanceTitleBn?: string;
+  maintenanceTitleEn?: string;
+  maintenanceMessageBn?: string;
+  maintenanceMessageEn?: string;
+  maintenanceModeType?: MaintenanceModeType;
+  estimatedReturnTime?: string;
+  showCountdownTimer?: boolean;
+  allowEmergencyContact?: boolean;
+  emergencyPhone?: string;
+  emergencyWhatsapp?: string;
+  maintenanceBadgeText?: string;
+  
+  agentBkashNumber?: string;
+  agentNagadNumber?: string;
+  agentRocketNumber?: string;
+  agentUpayNumber?: string;
+  personalBkashNumber?: string;
+  personalNagadNumber?: string;
+  personalRocketNumber?: string;
+  personalUpayNumber?: string;
+  personalCharge?: string;
+  helplineNumber?: string;
+  whatsappUrl?: string;
+  minAddFund?: number;
+  maxAddFund?: number;
+  referralBonus?: number;
+  globalNoticeEn?: string;
+  globalNoticeBn?: string;
+  showNotice?: boolean;
+  requireKyc?: boolean;
+  popupNoticeTitleBn?: string;
+  popupNoticeTitleEn?: string;
+  popupNoticeBodyBn?: string;
+  popupNoticeBodyEn?: string;
+  popupNoticeEnabled?: boolean;
+  popupNoticeButtonTextBn?: string;
+  popupNoticeButtonTextEn?: string;
+  popupNoticeImageUrl?: string;
+}
+
