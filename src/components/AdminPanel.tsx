@@ -3254,6 +3254,7 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
               <button
                 onClick={onToggleUserView}
                 className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Switch to User View"
               >
                 <Globe className="h-3.5 w-3.5" />
                 <span>User</span>
@@ -3294,9 +3295,11 @@ export default function AdminPanel({ lang, isOpen, onClose, isStandalone = false
                 {onToggleUserView && (
                   <button
                     onClick={onToggleUserView}
-                    className="p-2 bg-blue-500/10 text-blue-400 rounded-xl text-[9px] font-black border border-blue-500/15 cursor-pointer"
+                    className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 rounded-xl text-[9px] font-black border border-blue-500/15 cursor-pointer flex items-center gap-1"
+                    title="Switch to User View"
                   >
                     <Globe className="h-3.5 w-3.5" />
+                    <span>User</span>
                   </button>
                 )}
                 <button

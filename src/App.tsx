@@ -2636,24 +2636,6 @@ export default function App() {
           onAppInstalled={() => setIsPwaInstalled(true)}
         />
 
-        {/* Floating Return to Admin Mode Pill if currently in user view */}
-        {isUserAdmin && adminUserViewMode === 'user' && (
-          <div className="fixed bottom-20 left-4 right-4 z-40 flex items-center justify-between gap-2 p-2 px-3.5 bg-slate-950/95 border border-pink-500/50 rounded-2xl shadow-2xl backdrop-blur-xl animate-fade-in">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              <span className="text-[11px] font-mono font-bold text-slate-200">
-                {lang === 'bn' ? '👑 এডমিন ইউজার ভিউ' : '👑 Admin User View'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAdminUserViewMode('admin')}
-              className="px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold text-[11px] rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1"
-            >
-              <span>{lang === 'bn' ? 'এডমিন প্যানেলে ফিরুন' : 'Back to Admin'}</span>
-            </button>
-          </div>
-        )}
 
       </div>
     );
