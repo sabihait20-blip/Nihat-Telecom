@@ -1827,10 +1827,10 @@ export default function App() {
                         <button
                           key={`desktop-srv-${srv.id}-${idx}`}
                           onClick={srv.action}
-                          className="bg-[#210c31]/90 border border-pink-500/30 hover:border-rose-400/60 hover:shadow-2xl hover:shadow-rose-500/20 hover:-translate-y-1 rounded-2xl p-6 transition-all duration-300 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[140px] relative overflow-hidden backdrop-blur-2xl shadow-xl shadow-pink-950/40"
+                          className="neu-card neu-card-hover p-6 flex flex-col items-start justify-between text-left group cursor-pointer min-h-[140px] relative overflow-hidden"
                         >
                           <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-40 transition-opacity duration-500 ${srv.color}`} />
-                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 shadow-md border border-white/10 ${srv.color}`}>
+                          <div className={`h-12 w-12 rounded-xl neu-icon-well flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-4 ${srv.color}`}>
                             <Icon className="h-5.5 w-5.5 stroke-[2.25]" />
                           </div>
                           <div>
@@ -2029,9 +2029,9 @@ export default function App() {
                 isPwaInstalled={isPwaInstalled}
               />
 
-              {/* Grid block of Fintech Services themed in Glassmorphic Pink & Orange */}
+              {/* Grid block of Fintech Services themed in Neomorphism Soft 3D */}
               <div className="px-4 -mt-10 relative z-20">
-                <div className="bg-[#210c31]/90 border border-pink-500/30 rounded-2xl p-4 shadow-2xl shadow-pink-950/40 backdrop-blur-2xl grid grid-cols-4 gap-y-4 gap-x-3">
+                <div className="neu-card p-4 shadow-2xl grid grid-cols-4 gap-y-4 gap-x-3">
                   {gridServices.map((srv, idx) => {
                     const Icon = srv.icon;
                     return (
@@ -2051,8 +2051,8 @@ export default function App() {
                         }}
                         className="flex flex-col items-center justify-center text-center group cursor-pointer focus:outline-none selection:bg-transparent"
                       >
-                        {/* Circular icon container */}
-                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-300 mb-1.5 border border-white/10 shadow-md ${srv.color}`}>
+                        {/* Circular Neomorphic icon container */}
+                        <div className={`h-12 w-12 rounded-xl neu-icon-well flex items-center justify-center transition-all duration-300 mb-1.5 ${srv.color}`}>
                           <Icon className="h-5 w-5 stroke-[2.25]" />
                         </div>
                         <span className="text-[10.5px] font-bold text-slate-200 leading-tight block truncate w-full px-0.5 font-sans">

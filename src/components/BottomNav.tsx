@@ -40,7 +40,7 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-2 bg-[#12071a]/85 backdrop-blur-2xl border-t border-rose-500/20 flex justify-center shadow-[0_-10px_35px_rgba(244,63,94,0.15)] selection:bg-transparent">
+    <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-2 bg-[#12071a]/90 backdrop-blur-2xl border-t border-rose-500/20 flex justify-center neu-panel rounded-t-3xl border-b-0 selection:bg-transparent">
       <div className="w-full max-w-md flex items-end justify-around px-2 relative h-14">
         
         {tabs.map((tab) => {
@@ -69,18 +69,18 @@ export default function BottomNav({ activeTab, setActiveTab, lang }: BottomNavPr
               }}
               className="relative flex flex-col items-center justify-center select-none cursor-pointer focus:outline-none py-1.5 px-3.5 min-w-[72px] z-10"
             >
-              {/* Active glowing pill */}
+              {/* Active Neomorphic pill */}
               {isActive && (
                 <motion.div
                   layoutId="active-nav-pink-pill"
                   transition={{ type: 'spring', stiffness: 380, damping: 22 }}
-                  className="absolute inset-0 bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-orange-500/20 rounded-2xl -z-10 border border-pink-500/40 shadow-md shadow-pink-500/20 backdrop-blur-md"
+                  className="absolute inset-0 neu-btn bg-gradient-to-r from-rose-500/25 via-pink-500/25 to-orange-500/25 rounded-2xl -z-10 border border-pink-500/40 shadow-lg"
                 />
               )}
 
               {/* Tab Icon */}
               <Icon
-                className={`transition-colors h-5 w-5 mb-1 ${isActive ? 'text-pink-400 stroke-[2.25px]' : 'text-slate-400'}`}
+                className={`transition-colors h-5 w-5 mb-1 ${isActive ? 'text-pink-400 stroke-[2.25px] filter drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]' : 'text-slate-400'}`}
               />
 
               {/* Tab Label */}

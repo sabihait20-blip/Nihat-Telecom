@@ -674,11 +674,11 @@ export default function PhoneExchangeModal({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredListings.map(item => {
+                {filteredListings.map((item, idx) => {
                   const isCompared = compareItems.some(c => c.id === item.id);
                   return (
                     <motion.div
-                      key={item.id}
+                      key={`listing-${item.id || idx}-${idx}`}
                       whileHover={{ y: -3, scale: 1.01 }}
                       transition={{ duration: 0.2 }}
                       onClick={() => setSelectedListing(item)}
@@ -1222,8 +1222,8 @@ export default function PhoneExchangeModal({
               </div>
             ) : (
               <div className="space-y-3">
-                {myFilteredListings.map(item => (
-                  <div key={item.id} className="bg-slate-900 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
+                {myFilteredListings.map((item, idx) => (
+                  <div key={`my-listing-${item.id || idx}-${idx}`} className="bg-slate-900 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <img src={item.images[0]} alt={item.title} className="w-14 h-14 rounded-xl object-cover border border-white/10" />
                       <div>
@@ -1286,7 +1286,7 @@ export default function PhoneExchangeModal({
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {directMessages.map((msg) => {
+                  {directMessages.map((msg, idx) => {
                     const matchingListing = listings.find(l => l.id === msg.listingId) || {
                       id: msg.listingId,
                       title: msg.listingTitle,
@@ -1319,7 +1319,7 @@ export default function PhoneExchangeModal({
 
                     return (
                       <div
-                        key={msg.id}
+                        key={`dm-${msg.id || idx}-${idx}`}
                         onClick={() => setActiveChatListing(matchingListing as PhoneListing)}
                         className="p-3.5 bg-slate-950/80 hover:bg-slate-800/80 border border-white/10 hover:border-blue-500/50 rounded-2xl transition-all cursor-pointer space-y-2 group"
                       >
@@ -1736,7 +1736,7 @@ export default function PhoneExchangeModal({
                   {/* Grid 2 Columns */}
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     {compareItems.map((item, idx) => (
-                      <div key={item.id} className="bg-slate-900/90 border border-white/10 rounded-2xl p-3 space-y-3">
+                      <div key={`compare-${item.id || idx}-${idx}`} className="bg-slate-900/90 border border-white/10 rounded-2xl p-3 space-y-3">
                         <div className="h-32 rounded-xl overflow-hidden bg-slate-950 border border-white/10 relative">
                           <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
                           <span className="absolute top-2 left-2 px-2 py-0.5 bg-rose-500/80 text-white rounded-full text-[9px] font-bold">
@@ -1978,9 +1978,9 @@ export default function PhoneExchangeModal({
                   ) : (
                     directMessages
                       .filter(m => m.listingId === activeChatListing.id)
-                      .map((msg) => (
+                      .map((msg, idx) => (
                         <div
-                          key={msg.id}
+                          key={`chat-msg-${msg.id || idx}-${idx}`}
                           className={`flex flex-col ${msg.isMine ? 'items-end' : 'items-start'} space-y-1`}
                         >
                           <span className="text-[9px] text-slate-400 px-1 font-mono">

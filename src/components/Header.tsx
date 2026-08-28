@@ -88,13 +88,13 @@ export default function Header({
       {/* Top Main Header Row */}
       <div className="relative flex items-center justify-between z-10 mb-5">
         <div className="flex items-center gap-3">
-          {/* Avatar with subtle ring */}
+          {/* Avatar with Neomorphic 3D ring */}
           <motion.div 
             whileHover={{ scale: 1.05 }}
             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
             className="relative cursor-pointer"
           >
-            <div className="w-11 h-11 rounded-full border border-pink-400/50 bg-rose-950/70 overflow-hidden flex items-center justify-center shadow-lg backdrop-blur-md">
+            <div className="w-11 h-11 rounded-full neu-icon-well overflow-hidden flex items-center justify-center shadow-lg">
               <img 
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" 
                 alt="user" 
@@ -114,7 +114,7 @@ export default function Header({
           
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[9.5px] font-black tracking-wider text-rose-300 uppercase bg-gradient-to-r from-rose-500/20 to-orange-500/20 px-2.5 py-0.5 rounded-full border border-rose-500/30 flex items-center gap-1 shadow-sm">
+              <span className="text-[9.5px] font-black tracking-wider text-rose-300 uppercase neu-pill px-2.5 py-0.5 border border-rose-500/30 flex items-center gap-1 shadow-sm">
                 <Sparkles className="h-2.5 w-2.5 text-rose-300" />
                 <span>Nihad Business Point</span>
               </span>
@@ -123,12 +123,12 @@ export default function Header({
               {userName}
             </span>
             
-            {/* Lovable Tap Balance capsule box */}
+            {/* Neomorphic Tap Balance capsule box */}
             <div className="mt-1 relative">
               <motion.button
                 onClick={handleBalanceTap}
                 whileTap={{ scale: 0.96 }}
-                className="relative flex items-center bg-[#2d143c]/80 hover:bg-[#3d1a50] border border-pink-500/30 rounded-full p-0.5 pr-3 pl-1 h-7.5 min-w-[145px] shadow-lg shadow-pink-950/40 select-none outline-none overflow-hidden cursor-pointer backdrop-blur-md transition-colors"
+                className="relative flex items-center neu-btn p-0.5 pr-3 pl-1 h-7.5 min-w-[145px] select-none outline-none overflow-hidden cursor-pointer transition-colors"
               >
                 {/* Shimmer loading wave */}
                 {isShimmering && (
@@ -185,7 +185,7 @@ export default function Header({
             animate={{ scale: isHovered === 'lang' ? 1.08 : 1 }}
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center cursor-pointer backdrop-blur-md shadow-md text-slate-200 font-bold text-xs transition-colors"
+            className="w-9 h-9 rounded-full neu-btn flex items-center justify-center cursor-pointer text-slate-200 font-bold text-xs transition-colors"
             title="Switch Language"
           >
             <span>{lang === 'bn' ? 'EN' : 'বাং'}</span>
@@ -199,9 +199,9 @@ export default function Header({
             animate={{ scale: isHovered === 'notif' ? 1.08 : 1 }}
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-white flex items-center justify-center cursor-pointer backdrop-blur-md shadow-md relative"
+            className="w-9 h-9 rounded-full neu-btn text-white flex items-center justify-center cursor-pointer relative"
           >
-            <Bell className="w-4 h-4 text-indigo-200" />
+            <Bell className="w-4 h-4 text-pink-300" />
             {unreadNotifications && (
               <span className="absolute top-1 right-1 flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-80" />

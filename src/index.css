@@ -32,50 +32,201 @@
   }
 }
 
-/* Custom Glassmorphism Utilities (Pink-Orange Glass Theme) */
+/* Neomorphism (Soft UI 3D) Design System Utilities */
+
+/* 1. Neomorphic Extruded Elevated Surfaces */
+.neu-card, .neu-panel {
+  background: linear-gradient(145deg, #1f0d32, #13071f);
+  box-shadow: 
+    8px 8px 24px rgba(0, 0, 0, 0.75),
+    -6px -6px 20px rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(244, 63, 94, 0.15);
+  border-radius: 1.5rem;
+}
+
+.neu-card-flat {
+  background: #170a25;
+  box-shadow: 
+    6px 6px 18px rgba(0, 0, 0, 0.65),
+    -5px -5px 16px rgba(255, 255, 255, 0.04);
+}
+
+.neu-card-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.neu-card-hover:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 
+    12px 12px 30px rgba(0, 0, 0, 0.85),
+    -8px -8px 25px rgba(255, 255, 255, 0.07),
+    0 0 30px rgba(244, 63, 94, 0.25);
+}
+
+/* 2. Neomorphic Recessed / Sunken Inset Surfaces */
+.neu-inset, .neu-pressed {
+  background: #0d0615;
+  box-shadow: 
+    inset 6px 6px 16px rgba(0, 0, 0, 0.85),
+    inset -6px -6px 16px rgba(255, 255, 255, 0.04);
+  border-radius: 1.25rem;
+}
+
+/* 3. Neomorphic Interactive Buttons */
+.neu-btn {
+  background: linear-gradient(145deg, #240e3a, #150723);
+  box-shadow: 
+    6px 6px 16px rgba(0, 0, 0, 0.7),
+    -5px -5px 14px rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.neu-btn:hover {
+  box-shadow: 
+    8px 8px 20px rgba(0, 0, 0, 0.8),
+    -6px -6px 18px rgba(255, 255, 255, 0.07),
+    0 0 20px rgba(236, 72, 153, 0.3);
+  transform: translateY(-2px);
+}
+.neu-btn:active {
+  background: #110619;
+  box-shadow: 
+    inset 5px 5px 12px rgba(0, 0, 0, 0.9),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.05);
+  transform: translateY(0);
+}
+
+.neu-btn-primary {
+  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 50%, #f97316 100%);
+  color: #ffffff;
+  box-shadow: 
+    6px 6px 20px rgba(0, 0, 0, 0.6),
+    -4px -4px 14px rgba(255, 255, 255, 0.1),
+    0 6px 24px rgba(244, 63, 94, 0.45);
+  border-radius: 1rem;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.neu-btn-primary:hover {
+  box-shadow: 
+    8px 8px 26px rgba(0, 0, 0, 0.75),
+    -6px -6px 18px rgba(255, 255, 255, 0.15),
+    0 8px 32px rgba(249, 115, 22, 0.6);
+  transform: translateY(-2px) scale(1.02);
+}
+.neu-btn-primary:active {
+  box-shadow: 
+    inset 4px 4px 10px rgba(0, 0, 0, 0.7),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.2);
+  transform: translateY(0) scale(0.98);
+}
+
+/* 4. Neomorphic Inputs */
+.neu-input {
+  background: #0d0615;
+  box-shadow: 
+    inset 5px 5px 14px rgba(0, 0, 0, 0.85),
+    inset -5px -5px 14px rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(244, 63, 94, 0.15);
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+.neu-input:focus {
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 
+    inset 5px 5px 14px rgba(0, 0, 0, 0.9),
+    0 0 0 3px rgba(244, 63, 94, 0.25),
+    0 0 20px rgba(244, 63, 94, 0.2);
+  outline: none;
+}
+
+/* 5. Neomorphic Icon Wells & Avatars */
+.neu-icon-well {
+  background: linear-gradient(145deg, #28113f, #150724);
+  box-shadow: 
+    5px 5px 15px rgba(0, 0, 0, 0.7),
+    -4px -4px 12px rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.neu-icon-well-inset {
+  background: #0e0617;
+  box-shadow: 
+    inset 4px 4px 10px rgba(0, 0, 0, 0.8),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.04);
+}
+
+/* 6. Neomorphic Pills & Badges */
+.neu-pill {
+  background: linear-gradient(145deg, #260e3b, #160724);
+  box-shadow: 
+    4px 4px 12px rgba(0, 0, 0, 0.65),
+    -3px -3px 10px rgba(255, 255, 255, 0.04);
+  border-radius: 9999px;
+}
+
+.neu-pill-inset {
+  background: #0d0615;
+  box-shadow: 
+    inset 4px 4px 10px rgba(0, 0, 0, 0.8),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.04);
+  border-radius: 9999px;
+}
+
+/* Upgrade Custom Glassmorphism Utilities to Neomorphism Soft UI 3D */
 .glass-panel-dark {
-  background: rgba(26, 15, 38, 0.75);
+  background: linear-gradient(145deg, rgba(31, 15, 48, 0.85), rgba(18, 8, 28, 0.9));
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(244, 63, 94, 0.22);
-  box-shadow: 0 10px 40px -10px rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  box-shadow: 
+    10px 10px 30px rgba(0, 0, 0, 0.75),
+    -8px -8px 24px rgba(255, 255, 255, 0.04),
+    0 10px 40px -10px rgba(244, 63, 94, 0.2);
 }
 
 .glass-card {
-  background: rgba(33, 19, 48, 0.65);
+  background: linear-gradient(145deg, rgba(38, 19, 58, 0.8), rgba(22, 10, 35, 0.85));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(251, 146, 60, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  box-shadow: 
+    7px 7px 22px rgba(0, 0, 0, 0.7),
+    -5px -5px 18px rgba(255, 255, 255, 0.04);
 }
 
 .glass-card-pink-orange {
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(249, 115, 22, 0.15) 100%);
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.18) 0%, rgba(249, 115, 22, 0.18) 100%);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  box-shadow: 0 8px 32px 0 rgba(236, 72, 153, 0.2);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  box-shadow: 
+    8px 8px 25px rgba(0, 0, 0, 0.65),
+    -6px -6px 20px rgba(255, 255, 255, 0.06),
+    0 8px 32px 0 rgba(236, 72, 153, 0.25);
 }
 
 .glass-card-hover {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .glass-card-hover:hover {
-  border-color: rgba(244, 63, 94, 0.45);
-  box-shadow: 0 0 30px rgba(249, 115, 22, 0.25);
-  transform: translateY(-2px);
+  border-color: rgba(244, 63, 94, 0.5);
+  box-shadow: 
+    12px 12px 32px rgba(0, 0, 0, 0.85),
+    -8px -8px 24px rgba(255, 255, 255, 0.08),
+    0 0 30px rgba(249, 115, 22, 0.3);
+  transform: translateY(-3px);
 }
 
 .glow-pink {
-  box-shadow: 0 0 35px rgba(244, 63, 94, 0.3);
+  box-shadow: 0 0 35px rgba(244, 63, 94, 0.35), 8px 8px 20px rgba(0, 0, 0, 0.6);
 }
 
 .glow-orange {
-  box-shadow: 0 0 35px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 0 35px rgba(249, 115, 22, 0.35), 8px 8px 20px rgba(0, 0, 0, 0.6);
 }
 
 .glow-pink-orange {
-  box-shadow: 0 0 40px rgba(236, 72, 153, 0.35);
+  box-shadow: 0 0 40px rgba(236, 72, 153, 0.4), 8px 8px 25px rgba(0, 0, 0, 0.7);
 }
 
 .bg-gradient-pink-orange {
@@ -92,14 +243,23 @@
   background: linear-gradient(135deg, #f43f5e 0%, #ec4899 50%, #f97316 100%);
   color: #FFFFFF;
   font-weight: 700;
-  box-shadow: 0 6px 24px rgba(244, 63, 94, 0.4);
+  box-shadow: 
+    6px 6px 20px rgba(0, 0, 0, 0.6),
+    -4px -4px 14px rgba(255, 255, 255, 0.1),
+    0 6px 24px rgba(244, 63, 94, 0.4);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .btn-primary-lovable:hover {
-  box-shadow: 0 8px 30px rgba(249, 115, 22, 0.5);
+  box-shadow: 
+    8px 8px 26px rgba(0, 0, 0, 0.75),
+    -5px -5px 18px rgba(255, 255, 255, 0.15),
+    0 8px 30px rgba(249, 115, 22, 0.55);
   transform: translateY(-2px) scale(1.01);
 }
 .btn-primary-lovable:active {
+  box-shadow: 
+    inset 4px 4px 10px rgba(0, 0, 0, 0.7),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.2);
   transform: translateY(0) scale(0.99);
 }
 
