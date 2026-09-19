@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Circular Glow Base -->
+        <path
+            android:fillColor="#33EC4899"
+            android:pathData="M54,22 C71.67,22 86,36.33 86,54 C86,71.67 71.67,86 54,86 C36.33,86 22,71.67 22,54 C22,36.33 36.33,22 54,22 Z" />
+
+        <!-- Phone Frame with gradient -->
+        <path
+            android:pathData="M40,28 L68,28 C71.31,28 74,30.69 74,34 L74,74 C74,77.31 71.31,80 68,80 L40,80 C36.69,80 34,77.31 34,74 L34,34 C34,30.69 36.69,28 40,28 Z">
+            <aapt:attr name="android:fillColor" xmlns:aapt="http://schemas.android.com/aapt">
+                <gradient
+                    android:startX="34"
+                    android:startY="28"
+                    android:endX="74"
+                    android:endY="80"
+                    android:type="linear">
+                    <item android:offset="0" android:color="#F43F5E" />
+                    <item android:offset="0.5" android:color="#EC4899" />
+                    <item android:offset="1" android:color="#F97316" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Inner Screen -->
+        <path
+            android:fillColor="#150824"
+            android:pathData="M37,35 L71,35 C72.1,35 73,35.9 73,37 L73,71 C73,72.1 72.1,73 71,73 L37,73 C35.9,73 35,72.1 35,71 L35,37 C35,35.9 35.9,35 37,35 Z" />
+
+        <!-- Flash / Lightning Bolt / Signal inside screen -->
+        <path
+            android:pathData="M56,38 L44,52 L52,52 L48,68 L64,50 L56,50 Z">
+            <aapt:attr name="android:fillColor" xmlns:aapt="http://schemas.android.com/aapt">
+                <gradient
+                    android:startX="44"
+                    android:startY="38"
+                    android:endX="64"
+                    android:endY="68"
+                    android:type="linear">
+                    <item android:offset="0" android:color="#FFFFFF" />
+                    <item android:offset="1" android:color="#FDE047" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Speaker Notch -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M50,31 L58,31 C58.55,31 59,31.45 59,32 C59,32.55 58.55,33 58,33 L50,33 C49.45,33 49,32.55 49,32 C49,31.45 49.45,31 50,31 Z" />
+
+        <!-- Home Bar Indicator -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M50,76 L58,76 C58.55,76 59,76.45 59,77 C59,77.55 58.55,78 58,78 L50,78 C49.45,78 49,77.55 49,77 C49,76.45 49.45,76 50,76 Z" />
+    </group>
+</vector>
